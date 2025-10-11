@@ -6,6 +6,8 @@
 
 #include "Extern/XmlToMavSDK.h"
 #include "QGroundControlStation.h"
+#include "QVehicle.h"
+#include "QDataLink.h"
 
 int main(int argc, char *argv[])
 {
@@ -18,47 +20,52 @@ int main(int argc, char *argv[])
     // 创建QGroundControlStation实例
     QGroundControlStation groundStation;
     
-    // 连接信号槽
-    QObject::connect(&groundStation, &QGroundControlStation::vehicleConnected,
-                     [](uint8_t systemId) {
-                         qDebug() << "系统已连接，ID:" << systemId;
-                     });
+    // 创建数据链路
+    QDataLink* dataLink = groundStation.createDataLink();
     
-    QObject::connect(&groundStation, &QGroundControlStation::vehicleDisconnected,
-                     [](uint8_t systemId) {
-                         qDebug() << "系统已断开，ID:" << systemId;
-                     });
-    
-    QObject::connect(&groundStation, &QGroundControlStation::connectionError, 
+    // 连接数据链路的信号
+    QObject::connect(dataLink, &QDataLink::connectionError, 
                      [](const QString &error) {
                          qWarning() << "连接错误:" << error;
                      });
     
-    QObject::connect(&groundStation, &QGroundControlStation::vehicleInfoUpdated, 
-                     [](const VehicleInfo &info) {
-                         qDebug() << "飞控信息更新:";
-                         qDebug() << "  系统ID:" << info.unID;
-                         qDebug() << "  自动驾驶仪类型:" << info.autopilotType;
-                         qDebug() << "  载具类型:" << info.vehicleType;
-                         qDebug() << "  是否连接:" << info.isConnected;
-                         qDebug() << "  是否有相机:" << info.hasCamera;
-                         qDebug() << "  组件数量:" << info.componentIds.size();
+    // 连接新飞控对象创建信号
+    QObject::connect(dataLink, &QDataLink::vehicleCreated,
+                     [](QVehicle* vehicle) {
+                         qDebug() << "新飞控对象创建:" << vehicle->toString();
+                         
+                         // 连接飞控对象的信号
+                         QObject::connect(vehicle, &QVehicle::connected, [vehicle]() {
+                             qDebug() << "飞控已连接:" << vehicle->toString();
+                         });
+                         
+                         QObject::connect(vehicle, &QVehicle::disconnected, [vehicle](const QString &reason) {
+                             qDebug() << "飞控已断开:" << vehicle->toString() << "原因:" << reason;
+                         });
+                         
+                         QObject::connect(vehicle, &QVehicle::communicationLost, [vehicle](const QString &error) {
+                             qWarning() << "飞控通信链路断开:" << vehicle->toString() << "错误:" << error;
+                         });
+                         
+                         QObject::connect(vehicle, &QVehicle::infoUpdated, [vehicle]() {
+                             qDebug() << "飞控信息更新:" << vehicle->toString();
+                         });
                      });
 
     // 尝试连接飞控（串口连接示例）
     qDebug() << "尝试连接飞控...";
-    bool connected = groundStation.connectToDataLink(ConnectionType::Serial, "COM11",57600);
+    bool connected = dataLink->connectToDataLink(ConnectionType::Serial, "COM11", 57600);
     
     if (!connected) {
         qWarning() << "连接失败，尝试TCP连接...";
         // 尝试TCP连接
-        connected = groundStation.connectToDataLink(ConnectionType::TCP, "localhost",14550);
+        connected = dataLink->connectToDataLink(ConnectionType::TCP, "localhost", 14550);
     }
     
     if (!connected) {
         qWarning() << "连接失败，尝试UDP连接...";
         // 尝试UDP连接
-        connected = groundStation.connectToDataLink(ConnectionType::UDP, "localhost",14550);
+        connected = dataLink->connectToDataLink(ConnectionType::UDP, "localhost", 14550);
     }
 
     if (connected) {
@@ -66,34 +73,25 @@ int main(int argc, char *argv[])
         
         // 等待系统连接
         int attempts = 0;
-        while (!groundStation.isConnected() && attempts < 50) {
+        while (!dataLink->isConnected() && attempts < 50) {
             std::this_thread::sleep_for(std::chrono::milliseconds(200));
             QCoreApplication::processEvents();
             attempts++;
         }
         
-        if (groundStation.isConnected()) {
-            qDebug() << "飞控已连接，系统数量:" << groundStation.getSystemCount();
+        if (dataLink->isConnected()) {
+            qDebug() << "飞控已连接，系统数量:" << dataLink->getSystemCount();
             
-            // 获取所有飞控信息
-            auto vehicleInfos = groundStation.getAllVehicleInfo();
-            for (const auto &info : vehicleInfos) {
-                qDebug() << "飞控信息:";
-                qDebug() << "  系统ID:" << info.unID;
-                qDebug() << "  自动驾驶仪类型:" << info.autopilotType;
-                qDebug() << "  载具类型:" << info.vehicleType;
-                qDebug() << "  固件版本:" << info.firmwareVersion;
-                qDebug() << "  硬件版本:" << info.hardwareVersion;
-                qDebug() << "  软件版本:" << info.softwareVersion;
-                qDebug() << "  是否连接:" << info.isConnected;
-                qDebug() << "  是否有相机:" << info.hasCamera;
-                qDebug() << "  组件ID列表:" << info.componentIds;
+            // 获取所有飞控对象
+            auto vehicles = dataLink->getAllVehicles();
+            for (auto vehicle : vehicles) {
+                qDebug() << "飞控信息:" << vehicle->toString();
             }
             
             // 获取系统句柄用于XmlToMavSDK
-            auto systemIds = groundStation.getVehicleIDs();
+            auto systemIds = dataLink->getVehicleIDs();
             if (!systemIds.isEmpty()) {
-                auto systemHandle = groundStation.getSystemHandle(systemIds.first());
+                auto systemHandle = dataLink->getSystemHandle(systemIds.first());
                 if (systemHandle) {
                     // 使用XmlToMavSDK
                     XmlToMavSDK testXML("ardupilotmega.xml");
@@ -102,7 +100,7 @@ int main(int argc, char *argv[])
                     // 将void*转换为std::shared_ptr<mavsdk::System>
                     auto system = std::shared_ptr<mavsdk::System>(
                         static_cast<mavsdk::System*>(systemHandle), 
-                        [](mavsdk::System*){} // 空删除器，因为QGroundStation管理生命周期
+                        [](mavsdk::System*){} // 空删除器，因为QDataLink管理生命周期
                     );
                     testXML.setSystem(system);
                     

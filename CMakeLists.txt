@@ -20,12 +20,17 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/Inc)
 set(SOURCES
     main.cpp
     Src/Extern/XmlToMavSDK.cpp
+    Src/QVehicle.cpp
+    Src/QDataLink.cpp
     Src/QGroundControlStation.cpp
-    Src/Private/QGroundControlStationPrivate.cpp
+    Src/Private/QDataLinkPrivate.cpp
+    Src/Private/QVehiclePrivate.cpp
 )
 
 set(HEADERS
     Inc/QGroundControlStation.h
+    Inc/QVehicle.h
+    Inc/QDataLink.h
 )
 
 add_executable(${PROJECT_NAME} 
