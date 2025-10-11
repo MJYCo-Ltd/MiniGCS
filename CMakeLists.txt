@@ -4,7 +4,7 @@ if(WIN32)
     set(MAVSDK_DIR ${CMAKE_SOURCE_DIR}/Depends/lib/cmake/MAVSDK)
 endif()
 
-project(MiniGSC LANGUAGES CXX)
+project(MiniGCS LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -14,16 +14,29 @@ find_package(Qt6 REQUIRED COMPONENTS
     Core
 )
 
-add_executable(${PROJECT_NAME} 
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/Inc)
+
+# 设置源文件
+set(SOURCES
     main.cpp
     Src/Extern/XmlToMavSDK.cpp
-    Src/QGroundStation.cpp
-    Src/Private/QGroundStationPrivate.cpp
+    Src/QGroundControlStation.cpp
+    Src/Private/QGroundControlStationPrivate.cpp
 )
 
-target_include_directories(${PROJECT_NAME}
-    PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/Inc
+set(HEADERS
+    Inc/QGroundControlStation.h
+)
+
+add_executable(${PROJECT_NAME} 
+    ${SOURCES}
+    ${HEADERS}
+)
+
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    AUTOMOC ON
+    AUTOUIC ON
+    AUTORCC ON
 )
 
 if(MSVC)

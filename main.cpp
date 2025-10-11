@@ -5,7 +5,7 @@
 #include <QDebug>
 
 #include "Extern/XmlToMavSDK.h"
-#include "QGroundStation.h"
+#include "QGroundControlStation.h"
 
 int main(int argc, char *argv[])
 {
@@ -15,29 +15,29 @@ int main(int argc, char *argv[])
     std::streambuf* cout_buf = std::cout.rdbuf(); // 保存原始缓冲区
     std::cout.rdbuf(log_file.rdbuf());            // 重定向
 
-    // 创建QGroundStation实例
-    QGroundStation groundStation;
+    // 创建QGroundControlStation实例
+    QGroundControlStation groundStation;
     
     // 连接信号槽
-    QObject::connect(&groundStation, &QGroundStation::vehicleConnected,
+    QObject::connect(&groundStation, &QGroundControlStation::vehicleConnected,
                      [](uint8_t systemId) {
                          qDebug() << "系统已连接，ID:" << systemId;
                      });
     
-    QObject::connect(&groundStation, &QGroundStation::vehicleDisconnected,
+    QObject::connect(&groundStation, &QGroundControlStation::vehicleDisconnected,
                      [](uint8_t systemId) {
                          qDebug() << "系统已断开，ID:" << systemId;
                      });
     
-    QObject::connect(&groundStation, &QGroundStation::connectionError, 
+    QObject::connect(&groundStation, &QGroundControlStation::connectionError, 
                      [](const QString &error) {
                          qWarning() << "连接错误:" << error;
                      });
     
-    QObject::connect(&groundStation, &QGroundStation::vehicleInfoUpdated, 
+    QObject::connect(&groundStation, &QGroundControlStation::vehicleInfoUpdated, 
                      [](const VehicleInfo &info) {
                          qDebug() << "飞控信息更新:";
-                         qDebug() << "  系统ID:" << info.systemId;
+                         qDebug() << "  系统ID:" << info.unID;
                          qDebug() << "  自动驾驶仪类型:" << info.autopilotType;
                          qDebug() << "  载具类型:" << info.vehicleType;
                          qDebug() << "  是否连接:" << info.isConnected;
@@ -47,18 +47,18 @@ int main(int argc, char *argv[])
 
     // 尝试连接飞控（串口连接示例）
     qDebug() << "尝试连接飞控...";
-    bool connected = groundStation.connectToVehicle(ConnectionType::Serial, "COM11:57600");
+    bool connected = groundStation.connectToDataLink(ConnectionType::Serial, "COM11",57600);
     
     if (!connected) {
         qWarning() << "连接失败，尝试TCP连接...";
         // 尝试TCP连接
-        connected = groundStation.connectToVehicle(ConnectionType::TCP, "localhost:14550");
+        connected = groundStation.connectToDataLink(ConnectionType::TCP, "localhost",14550);
     }
     
     if (!connected) {
         qWarning() << "连接失败，尝试UDP连接...";
         // 尝试UDP连接
-        connected = groundStation.connectToVehicle(ConnectionType::UDP, "14550");
+        connected = groundStation.connectToDataLink(ConnectionType::UDP, "localhost",14550);
     }
 
     if (connected) {
@@ -79,7 +79,7 @@ int main(int argc, char *argv[])
             auto vehicleInfos = groundStation.getAllVehicleInfo();
             for (const auto &info : vehicleInfos) {
                 qDebug() << "飞控信息:";
-                qDebug() << "  系统ID:" << info.systemId;
+                qDebug() << "  系统ID:" << info.unID;
                 qDebug() << "  自动驾驶仪类型:" << info.autopilotType;
                 qDebug() << "  载具类型:" << info.vehicleType;
                 qDebug() << "  固件版本:" << info.firmwareVersion;
@@ -91,7 +91,7 @@ int main(int argc, char *argv[])
             }
             
             // 获取系统句柄用于XmlToMavSDK
-            auto systemIds = groundStation.getConnectedSystemIds();
+            auto systemIds = groundStation.getVehicleIDs();
             if (!systemIds.isEmpty()) {
                 auto systemHandle = groundStation.getSystemHandle(systemIds.first());
                 if (systemHandle) {

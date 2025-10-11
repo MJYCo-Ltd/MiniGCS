@@ -1,5 +1,5 @@
-#ifndef QGROUNDSTATION_H
-#define QGROUNDSTATION_H
+#ifndef QGROUNDCONTROLSTATION_H
+#define QGROUNDCONTROLSTATION_H
 
 #include <QObject>
 #include <QString>
@@ -9,7 +9,7 @@
 #include <memory>
 
 // 前向声明
-class QGroundStationPrivate;
+class QGroundControlStationPrivate;
 
 /**
  * @brief 连接方式枚举
@@ -24,7 +24,7 @@ enum class ConnectionType {
  * @brief 飞控信息结构体
  */
 struct VehicleInfo {
-    uint8_t systemId;                    ///< 系统ID
+    uint8_t unID;                        ///< 飞控唯一ID
     uint8_t componentId;                 ///< 组件ID
     QString autopilotType;               ///< 自动驾驶仪类型
     QString vehicleType;                 ///< 载具类型
@@ -34,48 +34,45 @@ struct VehicleInfo {
     bool isConnected;                    ///< 是否已连接
     bool hasCamera;                      ///< 是否有相机
     std::vector<uint8_t> componentIds;       ///< 组件ID列表
-    qint64 lastHeartbeatTime;           ///< 最后心跳时间戳（毫秒）
-    bool isHeartbeatActive;              ///< 心跳是否活跃
 };
 
 /**
  * @brief 连接配置结构体
  */
 struct ConnectionConfig {
-    int heartbeatTimeoutMs;              ///< 心跳超时时间（毫秒），默认5000ms
     bool autoReconnect;                 ///< 是否自动重连，默认true
     int reconnectIntervalMs;            ///< 重连间隔时间（毫秒），默认3000ms
     int maxReconnectAttempts;            ///< 最大重连尝试次数，默认-1（无限）
     
     ConnectionConfig() 
-        : heartbeatTimeoutMs(5000)
-        , autoReconnect(true)
+        : autoReconnect(true)
         , reconnectIntervalMs(3000)
         , maxReconnectAttempts(-1)
     {}
 };
 
 /**
- * @brief QGroundStation类 - 地面站控制类
+ * @brief QGroundControlStation类 - 地面控制站类
  * 
  * 该类继承自QObject，支持串口、TCP、UDP连接飞控，
  * 并提供飞控信息查询功能
  */
-class QGroundStation : public QObject
+class QGroundControlStation : public QObject
 {
     Q_OBJECT
 
 public:
-    explicit QGroundStation(QObject *parent = nullptr);
-    ~QGroundStation();
+    explicit QGroundControlStation(QObject *parent = nullptr);
+    ~QGroundControlStation();
 
     /**
-     * @brief 连接到飞控
+     * @brief 连接到数据链路
      * @param connectionType 连接类型
-     * @param connectionString 连接字符串
+     * @param address 地址（串口名称、IP地址）
+     * @param portOrBaudRate 端口号或波特率
      * @return 连接是否成功
      */
-    bool connectToVehicle(ConnectionType connectionType, const QString &connectionString);
+    bool connectToDataLink(ConnectionType connectionType, const QString &address, int portOrBaudRate);
 
     /**
      * @brief 断开连接
@@ -83,10 +80,10 @@ public:
     void disconnect();
 
     /**
-     * @brief 获取所有已连接的飞控系统ID
-     * @return 飞控系统ID列表
+     * @brief 获取所有已连接的飞控ID
+     * @return 飞控ID列表
      */
-    QVector<uint8_t> getConnectedSystemIds() const;
+    QVector<uint8_t> getVehicleIDs() const;
 
     /**
      * @brief 获取指定系统的飞控信息
@@ -133,12 +130,6 @@ public:
     ConnectionConfig getConnectionConfig() const;
 
     /**
-     * @brief 设置心跳超时时间
-     * @param timeoutMs 超时时间（毫秒）
-     */
-    void setHeartbeatTimeout(int timeoutMs);
-
-    /**
      * @brief 设置是否自动重连
      * @param autoReconnect 是否自动重连
      */
@@ -150,6 +141,18 @@ public:
      * @return 重连是否成功
      */
     bool reconnectSystem(uint8_t systemId);
+
+    /**
+     * @brief 获取地面站系统ID
+     * @return 地面站系统ID
+     */
+    uint8_t getGroundStationSystemId() const;
+
+    /**
+     * @brief 获取地面站组件ID
+     * @return 地面站组件ID
+     */
+    uint8_t getGroundStationComponentId() const;
 
 signals:
     /**
@@ -186,13 +189,6 @@ signals:
     void vehicleInfoUpdated(const VehicleInfo &vehicleInfo);
 
     /**
-     * @brief 心跳状态变化信号
-     * @param systemId 系统ID
-     * @param isActive 心跳是否活跃
-     */
-    void heartbeatStatusChanged(uint8_t systemId, bool isActive);
-
-    /**
      * @brief 重连尝试信号
      * @param systemId 系统ID
      * @param attemptCount 尝试次数
@@ -212,12 +208,6 @@ signals:
      */
     void reconnectFailed(uint8_t systemId, const QString &error);
 
-private slots:
-    /**
-     * @brief 定期检查系统状态
-     */
-    void checkSystemStatus();
-
 private:
     /**
      * @brief 获取系统信息
@@ -226,7 +216,7 @@ private:
      */
     VehicleInfo extractVehicleInfo(void* system) const;
 
-    std::unique_ptr<QGroundStationPrivate> d_ptr;    ///< 私有实现指针
+    std::unique_ptr<QGroundControlStationPrivate> d_ptr;    ///< 私有实现指针
 };
 
-#endif // QGROUNDSTATION_H
+#endif // QGROUNDCONTROLSTATION_H
