@@ -1,0 +1,117 @@
+#include "Extern/XmlToMavSDK.h"
+
+XmlToMavSDK::XmlToMavSDK(const QString& xmlPath)
+{
+    loadXml(xmlPath);
+}
+
+// 查找命令
+const XmlToMavSDK::ExternCmd* XmlToMavSDK::findCmd(const QString& name) const
+{
+    auto it = m_mapExternCMDs.find(name);
+    if (it != m_mapExternCMDs.end()) return &it.value();
+    return nullptr;
+}
+
+// 列出所有命令
+QStringList XmlToMavSDK::listCmdNames() const {
+    return m_mapExternCMDs.keys();
+}
+
+void XmlToMavSDK::setSystem(std::shared_ptr<mavsdk::System> system)
+{
+    m_pMavlinkDirect = std::make_shared<mavsdk::MavlinkDirect>(system);
+}
+
+// 发送命令（参数数量不足时自动补0）
+mavsdk::MavlinkDirect::Result XmlToMavSDK::sendCmd(const QString& name,const QVector<float>& params)
+{
+    const ExternCmd* cmd = findCmd(name);
+    if (!cmd)
+    {
+        qWarning() << "Command not found:" << name;
+        return mavsdk::MavlinkDirect::Result::Unknown;
+    }
+
+    QVector<float> realParams = params;
+    while (realParams.size() < 7) realParams.append(0);
+
+    // 构建 COMMAND_LONG 消息的 JSON 字段
+    QString fieldsJson = QString(R"({
+        "command": %1,
+        "target_system": %2,
+        "target_component": %3,
+        "confirmation": 0,
+        "param1": %4,
+        "param2": %5,
+        "param3": %6,
+        "param4": %7,
+        "param5": %8,
+        "param6": %9,
+        "param7": %10
+    })")
+    .arg(cmd->value)
+    .arg(1)  // 默认目标系统ID为1
+    .arg(1)  // 默认目标组件ID为1
+    .arg(realParams[0])
+    .arg(realParams[1])
+    .arg(realParams[2])
+    .arg(realParams[3])
+    .arg(realParams[4])
+    .arg(realParams[5])
+    .arg(realParams[6]);
+
+    mavsdk::MavlinkDirect::MavlinkMessage message;
+    message.message_name = "COMMAND_LONG";
+    message.target_system_id = 1;  // 默认目标系统ID为1
+    message.target_component_id = 1;  // 默认目标组件ID为1
+    message.fields_json = fieldsJson.toStdString();
+
+    return m_pMavlinkDirect->send_message(message);
+}
+
+void XmlToMavSDK::loadXml(const QString& xmlPath) {
+    QFile file(xmlPath);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qWarning() << "Failed to open xml:" << xmlPath;
+        return;
+    }
+    QXmlStreamReader xml(&file);
+
+    while (!xml.atEnd() && !xml.hasError()) {
+        xml.readNext();
+        if (xml.isStartElement() && xml.name() == "enum" &&
+            xml.attributes().value("name") == "MAV_CMD") {
+            // 进入 MAV_CMD 枚举
+            while (!(xml.isEndElement() && xml.name() == "enum")) {
+                xml.readNext();
+                if (xml.isStartElement() && xml.name() == "entry") {
+                    ExternCmd cmd;
+                    cmd.name = xml.attributes().value("name").toString();
+                    cmd.value = xml.attributes().value("value").toString().toUShort();
+                    // 处理内部
+                    while (!(xml.isEndElement() && xml.name() == "entry")) {
+                        xml.readNext();
+                        if (xml.isStartElement()) {
+                            if (xml.name() == "description") {
+                                cmd.description = xml.readElementText();
+                            } else if (xml.name() == "param") {
+                                CommandParam param;
+                                param.index = xml.attributes().value("index").toInt();
+                                param.label = xml.attributes().hasAttribute("label")
+                                                  ? xml.attributes().value("label").toString()
+                                                  : QString("param%1").arg(param.index);
+                                cmd.params.append(param);
+                            }
+                        }
+                    }
+                    m_mapExternCMDs[cmd.name] = cmd;
+                }
+            }
+        }
+    }
+    if (xml.hasError()) {
+        qWarning() << "XML parse error:" << xml.errorString();
+    }
+    file.close();
+}
