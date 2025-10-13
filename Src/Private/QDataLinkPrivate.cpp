@@ -38,28 +38,38 @@ void QDataLinkPrivate::initializeMavsdk()
              << m_groundStationSystemId << "component ID:" << m_groundStationComponentId;
 }
 
-bool QDataLinkPrivate::connectToDataLink(int connectionType, const QString &address, int portOrBaudRate)
+void QDataLinkPrivate::setConnectionString(const QString &connectionString)
+{
+    m_connectionString = connectionString;
+    
+    qDebug() << "QDataLinkPrivate: Connection string set:" << connectionString;
+}
+
+bool QDataLinkPrivate::connectToDataLink()
 {
     if (!m_mavsdk) {
         qWarning() << "QDataLinkPrivate: MAVSDK not initialized";
         return false;
     }
     
-    QString connectionString = generateConnectionString(connectionType, address, portOrBaudRate);
-    qDebug() << "QDataLinkPrivate: Attempting to connect to" << connectionString;
+    if (m_connectionString.isEmpty()) {
+        qWarning() << "QDataLinkPrivate: Connection string not set";
+        return false;
+    }
+    
+    qDebug() << "QDataLinkPrivate: Attempting to connect to" << m_connectionString;
     
     // 检查是否已经连接
-    auto itorFind = m_connectionHandles.find(connectionString);
-    if (itorFind != m_connectionHandles.end()) {
-        qDebug() << "QDataLinkPrivate: Already connected to" << connectionString;
+    if (m_connectionHandle.valid()) {
+        qDebug() << "QDataLinkPrivate: Already connected to" << m_connectionString;
         return true;
     }
     
-    auto connectionResult = m_mavsdk->add_any_connection_with_handle(connectionString.toStdString());
+    auto connectionResult = m_mavsdk->add_any_connection_with_handle(m_connectionString.toStdString());
     
     if (connectionResult.first == mavsdk::ConnectionResult::Success) {
-        m_connectionHandles.insert(connectionString, connectionResult.second);
-        qDebug() << "QDataLinkPrivate: Connection successful to" << connectionString;
+        m_connectionHandle = connectionResult.second;
+        qDebug() << "QDataLinkPrivate: Connection successful to" << m_connectionString;
         return true;
     } else {
         std::ostringstream oss;
@@ -88,7 +98,9 @@ void QDataLinkPrivate::disconnect()
     }
     
     // 清理连接句柄
-    m_connectionHandles.clear();
+    if (m_connectionHandle.valid()) {
+        m_mavsdk->remove_connection(m_connectionHandle);
+    }
     
     // 清理飞控对象
     for (auto vehicle : m_vehicles) {
@@ -158,18 +170,7 @@ mavsdk::System* QDataLinkPrivate::getSystem(uint8_t systemId) const
 
 bool QDataLinkPrivate::isConnected() const
 {
-    if (!m_mavsdk) {
-        return false;
-    }
-    
-    auto systems = m_mavsdk->systems();
-    for (auto system : systems) {
-        if (system->is_connected()) {
-            return true;
-        }
-    }
-    
-    return false;
+    return (m_mavsdk && m_connectionHandle.valid());
 }
 
 int QDataLinkPrivate::getSystemCount() const
@@ -248,7 +249,7 @@ QVehicle* QDataLinkPrivate::createOrUpdateVehicle(void* system, QObject* parent)
     vehicle->updateFromSystem(system);
     
     // 发射飞控创建信号
-    QMetaObject::invokeMethod(parent, "vehicleCreated", Qt::QueuedConnection,
+    QMetaObject::invokeMethod(parent, "newVehicleFind", Qt::QueuedConnection,
                               Q_ARG(QVehicle*, vehicle));
     
     return vehicle;
@@ -347,28 +348,3 @@ void QDataLinkPrivate::setupSystemConnectionCallbacks(QObject* parent)
     }
 }
 
-QString QDataLinkPrivate::generateConnectionString(int connectionType, const QString &address, int portOrBaudRate) const
-{
-    QString result;
-    
-    switch (connectionType) {
-        case 0: // Serial
-            result = QString("serial://%1:%2").arg(address).arg(portOrBaudRate);
-            break;
-            
-        case 1: // TCP
-            result = QString("tcp://%1:%2").arg(address).arg(portOrBaudRate);
-            break;
-            
-        case 2: // UDP
-            if (address.isEmpty() || address == "0.0.0.0") {
-                // 如果地址为空或者是默认地址，使用端口号作为监听端口
-                result = QString("udp://0.0.0.0:%1").arg(portOrBaudRate);
-            } else {
-                result = QString("udp://%1:%2").arg(address).arg(portOrBaudRate);
-            }
-            break;
-    }
-    
-    return result;
-}
