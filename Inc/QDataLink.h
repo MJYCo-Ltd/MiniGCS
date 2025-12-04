@@ -2,83 +2,41 @@
 #define QDATALINK_H
 
 #include <QObject>
-#include <QString>
-#include <QMap>
-#include <QVector>
-
-// 前向声明
-class QDataLinkPrivate;
-class QVehicle;
+#include <QByteArray>
 
 /**
- * @brief QDataLink类 - 数据链路通信类
+ * @brief QDataLink类 - 数据链路基类
  * 
- * 该类负责管理MAVLink数据链路的连接、断开和通信
+ * 该类定义了数据链路的基本接口，包括接收消息的信号和发送数据的方法
  */
 class QDataLink : public QObject
 {
     Q_OBJECT
 
 public:
-    explicit QDataLink(QObject *parent = nullptr);
-    ~QDataLink();
+    explicit QDataLink(QObject *parent = nullptr):QObject(parent){}
+    virtual ~QDataLink(){}
 
     /**
-     * @brief 设置连接字符串
-     * @param connectionString 连接字符串
+     * @brief 发送数据
+     * @param data 要发送的数据
+     * @return 是否发送成功
      */
-    void setConnectionString(const QString &connectionString);
-
-    /**
-     * @brief 连接到数据链路
-     * @return 连接是否成功
-     */
-    bool connectToDataLink();
-
-    /**
-     * @brief 断开所有连接
-     */
-    void disconnect();
+    virtual bool sendData(const QByteArray &data) = 0;
 
     /**
      * @brief 检查是否已连接
      * @return 是否已连接
      */
-    bool isConnected() const;
-
-    /**
-     * @brief 获取飞机数量
-     */
-    int getVehicleCount() const;
-
-    /**
-     * @brief 获取所有飞控对象
-     * @return 飞控对象列表
-     */
-    QVector<QVehicle*> getAllVehicles() const;
+    virtual bool isConnected() const = 0;
 
 signals:
     /**
-     * @brief 连接错误信号
-     * @param error 错误描述
+     * @brief 接收到原始数据信号
+     * @param data 接收到的原始数据
      */
-    void connectionError(const QString &error);
-
-    /**
-     * @brief 新飞控对象创建信号
-     * @param vehicle 飞控对象指针
-     */
-    void newVehicleFind(QVehicle* vehicle);
-
-    /**
-     * @brief 系统连接状态变化信号
-     * @param systemId 系统ID
-     * @param connected 是否连接
-     */
-    void systemConnectionStatusChanged(uint8_t systemId, bool connected);
-
-private:
-    std::unique_ptr<QDataLinkPrivate> d_ptr;    ///< 私有实现指针
+    void messageReceived(const QByteArray &data);
 };
 
 #endif // QDATALINK_H
+

@@ -180,29 +180,7 @@ public:
      */
     QString toString() const;
 
-    /**
-     * @brief 发射通信链路断开信号
-     * @param error 错误描述
-     */
-    void emitCommunicationLost(const QString &error);
-
 signals:
-    /**
-     * @brief 飞控连接信号
-     */
-    void connected();
-
-    /**
-     * @brief 飞控断开信号
-     * @param reason 断开原因
-     */
-    void disconnected(const QString &reason);
-
-    /**
-     * @brief 通信链路断开信号
-     * @param error 错误描述
-     */
-    void communicationLost(const QString &error);
 
     /**
      * @brief 连接状态变化信号

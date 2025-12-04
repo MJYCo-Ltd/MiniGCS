@@ -12,6 +12,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(MAVSDK REQUIRED)
 find_package(Qt6 REQUIRED COMPONENTS
     Core
+    SerialPort
 )
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/Inc)
@@ -20,17 +21,21 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/Inc)
 set(SOURCES
     main.cpp
     Src/Extern/XmlToMavSDK.cpp
+    Src/QSerialDataLink.cpp
     Src/QVehicle.cpp
-    Src/QDataLink.cpp
     Src/QGroundControlStation.cpp
-    Src/Private/QDataLinkPrivate.cpp
+    Src/Private/QGroundControlStationPrivate.cpp
     Src/Private/QVehiclePrivate.cpp
 )
 
 set(HEADERS
+    Inc/Extern/XmlToMavSDK.h
+    Inc/QDataLink.h
+    Inc/QSerialDataLink.h
     Inc/QGroundControlStation.h
     Inc/QVehicle.h
-    Inc/QDataLink.h
+    Inc/Private/QGroundControlStationPrivate.h
+    Inc/Private/QVehiclePrivate.h
 )
 
 add_executable(${PROJECT_NAME} 
@@ -52,4 +57,5 @@ target_link_libraries(${PROJECT_NAME}
     PRIVATE
     MAVSDK::mavsdk
     Qt6::Core
+    Qt6::SerialPort
 )

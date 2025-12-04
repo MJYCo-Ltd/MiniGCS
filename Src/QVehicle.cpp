@@ -122,10 +122,6 @@ void QVehicle::setConnected(bool connected)
     if (d_ptr->isConnected() != connected) {
         d_ptr->setConnected(connected);
         
-        if (!connected) {
-            emit disconnected("Connection lost");
-        }
-        
         emit connectionStatusChanged(connected);
         emit infoUpdated();
     }
@@ -190,9 +186,4 @@ void QVehicle::updateFromSystem(void* system)
 QString QVehicle::toString() const
 {
     return d_ptr->toString();
-}
-
-void QVehicle::emitCommunicationLost(const QString &error)
-{
-    emit communicationLost(error);
 }

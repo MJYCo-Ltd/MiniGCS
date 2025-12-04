@@ -1,153 +1,121 @@
 #include "QGroundControlStation.h"
 #include "QVehicle.h"
 #include "QDataLink.h"
+#include "Private/QGroundControlStationPrivate.h"
 #include <QDebug>
-#include <QThread>
-#include <QDateTime>
-#include <chrono>
-#include <sstream>
-#include <mavsdk/mavsdk.h>
-#include <mavsdk/system.h>
-#include <mavsdk/plugins/telemetry/telemetry.h>
-#include <mavsdk/plugins/info/info.h>
 
 QGroundControlStation::QGroundControlStation(QObject *parent)
     : QObject(parent)
+    , d_ptr(std::make_unique<QGroundControlStationPrivate>())
 {
 }
 
 QGroundControlStation::~QGroundControlStation()
 {
-    disconnect();
+    ClearAllDataLink();
 }
 
-QDataLink* QGroundControlStation::createDataLink(ConnectionType connectionType, const QString &address, int portOrBaudRate)
+void QGroundControlStation::Init()
 {
-    // 生成连接字符串
-    QString connectionString = generateConnectionString(connectionType, address, portOrBaudRate);
+    d_ptr->initializeMavsdk();
+    d_ptr->setupConnectionErrorHandling(this);
+    d_ptr->setupNewSystemDiscoveryCallback(this);
     
-    // 使用内部实现创建数据链路
-    return createDataLinkInternal(connectionString);
+    // 设置RawBytes回调，用于将MAVSDK需要发送的数据通过DataLink发送出去
+    // 传递 this 指针确保线程安全
+    d_ptr->setupRawBytesToBeSentCallback([this](const QByteArray &data) {
+        this->sendDataToAllLinks(data);
+    }, this);
 }
 
-void QGroundControlStation::disconnect()
+bool QGroundControlStation::AddDataLink(const QDataLink* pDataLink)
 {
-    // 断开所有数据链路
-    for (auto dataLink : m_connectionStringMap) {
-        if (dataLink) {
-            dataLink->disconnect();
-        }
+    if (!pDataLink) {
+        qWarning() << "QGroundControlStation: Cannot add null DataLink";
+        return false;
     }
-    m_connectionStringMap.clear();
-    
-    // 发射数量变化信号
-    emitDataLinkCountChanged();
-    
-    qDebug() << "QGroundControlStation: Disconnected from all data links";
+
+    // 检查是否已经存在
+    if (m_setLink.contains(pDataLink)) {
+        qDebug() << "QGroundControlStation: DataLink already exists";
+        return false;
+    }
+
+    // 添加到集合
+    m_setLink.insert(pDataLink);
+
+    // 连接信号槽，处理接收到的消息
+    QObject::connect(pDataLink, &QDataLink::messageReceived, this, 
+                     [this](const QByteArray &data) {
+                         // 将接收到的数据传递给MAVSDK处理
+                         this->processDataLinkMessage(data);
+                     });
+
+    qDebug() << "QGroundControlStation: DataLink added, total:" << m_setLink.size();
+    return true;
 }
 
-void QGroundControlStation::removeDataLink(QDataLink* dataLink)
+void QGroundControlStation::RemoveDatLink(const QDataLink* pDataLink)
 {
-    if (!dataLink) {
+    if (!pDataLink) {
         return;
     }
-    
-    // 断开数据链路
-    dataLink->disconnect();
-    
-    // 从映射中移除（需要找到对应的连接字符串）
-    QString connectionStringToRemove;
-    for (auto it = m_connectionStringMap.begin(); it != m_connectionStringMap.end(); ++it) {
-        if (it.value() == dataLink) {
-            connectionStringToRemove = it.key();
-            break;
+
+    // 断开信号连接
+    QObject::disconnect(pDataLink, nullptr, this, nullptr);
+
+    // 从集合中移除
+    if (m_setLink.remove(pDataLink)) {
+        qDebug() << "QGroundControlStation: DataLink removed, remaining:" << m_setLink.size();
+    }
+}
+
+void QGroundControlStation::ClearAllDataLink()
+{
+    // 断开所有信号连接
+    for (const QDataLink* link : m_setLink) {
+        if (link) {
+            QObject::disconnect(link, nullptr, this, nullptr);
         }
     }
-    if (!connectionStringToRemove.isEmpty()) {
-        m_connectionStringMap.remove(connectionStringToRemove);
-    }
-    
-    // 删除对象
-    dataLink->deleteLater();
-    
-    // 发射数量变化信号
-    emitDataLinkCountChanged();
-    
-    qDebug() << "QGroundControlStation: Removed data link, remaining:" << m_connectionStringMap.size();
+
+    // 清空集合
+    m_setLink.clear();
+    qDebug() << "QGroundControlStation: All DataLinks cleared";
 }
 
-
-
-
-
-QVector<QDataLink*> QGroundControlStation::getAllDataLinks() const
+void QGroundControlStation::processDataLinkMessage(const QByteArray &data)
 {
-    QVector<QDataLink*> result;
-    for (auto dataLink : m_connectionStringMap) {
-        result.append(dataLink);
+    // 将接收到的数据传递给MAVSDK处理
+    if (d_ptr) {
+        d_ptr->processReceivedRawData(data);
     }
-    return result;
 }
 
-QString QGroundControlStation::generateConnectionString(ConnectionType connectionType, const QString &address, int portOrBaudRate) const
+void QGroundControlStation::sendDataToAllLinks(const QByteArray &data)
 {
-    QString result;
-    
-    switch (static_cast<int>(connectionType)) {
-        case 0: // Serial
-            result = QString("serial://%1:%2").arg(address).arg(portOrBaudRate);
-            break;
-            
-        case 1: // TCP
-            result = QString("tcp://%1:%2").arg(address).arg(portOrBaudRate);
-            break;
-            
-        case 2: // UDP
-            if (address.isEmpty() || address == "0.0.0.0") {
-                // 如果地址为空或者是默认地址，使用端口号作为监听端口
-                result = QString("udp://0.0.0.0:%1").arg(portOrBaudRate);
-            } else {
-                result = QString("udp://%1:%2").arg(address).arg(portOrBaudRate);
+    if (data.isEmpty()) {
+        return;
+    }
+
+    int sentCount = 0;
+    for (const QDataLink* link : m_setLink) {
+        if (link && link->isConnected()) {
+            // 使用const_cast因为sendData不是const方法，但我们需要发送数据
+            if (const_cast<QDataLink*>(link)->sendData(data)) {
+                sentCount++;
             }
-            break;
+        }
     }
-    
-    return result;
 }
 
-QDataLink* QGroundControlStation::findExistingDataLink(const QString &connectionString) const
+int QGroundControlStation::getVehicleCount() const
 {
-    return m_connectionStringMap.value(connectionString, nullptr);
+    return d_ptr->getSystemCount();
 }
 
-
-QDataLink* QGroundControlStation::createDataLinkInternal(const QString &connectionString)
+QVector<QVehicle*> QGroundControlStation::getAllVehicles() const
 {
-    // 检查是否已经存在相同的连接
-    QDataLink* existingDataLink = findExistingDataLink(connectionString);
-    if (existingDataLink) {
-        qDebug() << "QGroundControlStation: Found existing data link for" << connectionString;
-        return existingDataLink;
-    }
-    
-    // 创建新的数据链路
-    QDataLink* dataLink = new QDataLink(this);
-    
-    // 设置连接字符串
-    dataLink->setConnectionString(connectionString);
-    
-    // 添加到映射
-    m_connectionStringMap.insert(connectionString, dataLink);
-    
-    // 发射数量变化信号
-    emitDataLinkCountChanged();
-    
-    qDebug() << "QGroundControlStation: Created and connected new data link, total:" << m_connectionStringMap.size();
-    return dataLink;
-}
-
-void QGroundControlStation::emitDataLinkCountChanged()
-{
-    emit dataLinkCountChanged(m_connectionStringMap.size());
+    return d_ptr->getAllVehicles();
 }
 
