@@ -156,6 +156,7 @@ void QVehiclePrivate::updateFromSystem(void* system)
     
     // 将void*转换为mavsdk::System*
     auto mavsdkSystem = static_cast<mavsdk::System*>(system);
+    setSystem(mavsdkSystem);
     
     // 更新基本信息
     setUnID(mavsdkSystem->get_system_id());
@@ -227,17 +228,17 @@ QString QVehiclePrivate::toString() const
     return QString::fromStdString(oss.str());
 }
 
-void QVehiclePrivate::setSystem(std::shared_ptr<mavsdk::System> system)
-{
-    m_system = system;
-    
+void QVehiclePrivate::setSystem(mavsdk::System *system) {
+    m_system.reset(system);
     if (system) {
         // 创建插件实例
         m_telemetry = std::make_unique<mavsdk::Telemetry>(*system);
         m_info = std::make_unique<mavsdk::Info>(*system);
+        mavlinkDirect = std::make_unique<mavsdk::MavlinkDirect>(*system);
     } else {
         m_telemetry.reset();
         m_info.reset();
+        mavlinkDirect.reset();
     }
 }
 
@@ -261,16 +262,66 @@ void QVehiclePrivate::setupMessageHandling(QObject* parent)
     qDebug() << "QVehiclePrivate: Message handling setup for system" << m_unID;
 }
 
+#include <QDebug>
+
+void QVehiclePrivate::sendCommand()
+{
+    /// 设置通信频率
+    m_telemetry->set_rate_position_async(1,[](mavsdk::Telemetry::Result reqult){
+        std::ostringstream oss;
+        oss<<reqult;
+        qDebug()<<"set_rate_position_async "<<oss.str();
+    });
+    m_telemetry->set_rate_gps_info_async(1,[](mavsdk::Telemetry::Result reqult){
+        std::ostringstream oss;
+        oss<<reqult;
+        qDebug()<<"set_rate_gps_info_async "<<oss.str();
+    });
+    m_telemetry->set_rate_battery_async(1,[](mavsdk::Telemetry::Result reqult){
+        std::ostringstream oss;
+        oss<<reqult;
+        qDebug()<<"set_rate_battery_async "<<oss.str();
+    });
+    m_telemetry->set_rate_health_async(1,[](mavsdk::Telemetry::Result reqult){
+        std::ostringstream oss;
+        oss<<reqult;
+        qDebug()<<"set_rate_health_async "<<oss.str();
+    });
+
+    qDebug()<<m_system->get_system_id()<<','<<m_system->component_ids()<<','<<m_system->component_ids()[0];
+    qDebug()<<"sendCommand";
+    mavsdk::MavlinkDirect::MavlinkMessage cmd={"MAV_CMD_SET_MESSAGE_INTERVAL"};
+    // cmd.target_sysid = m_system->get_system_id();
+    // cmd.target_compid = m_system->component_ids()[0];
+    // cmd.command = MAV_CMD_SET_MESSAGE_INTERVAL;
+    // cmd.param1 = 147;
+    // cmd.param2 = 2000000;
+    // cmd.param3 = 0.0f;
+    // cmd.param4 = 0.0f;
+    // cmd.param5 = 0.0f;
+    // cmd.param6 = 0.0f;
+    // cmd.param7 = 0.0f;
+
+    // auto result = mavlinkPassthrough_->send_command_long(cmd);
+    // if (result == mavsdk::MavlinkPassthrough::Result::Success) {
+    //     qDebug()<<"sendCommand true";
+    // } else {
+    //     std::ostringstream oss;
+    //     oss<<result;
+    //     qDebug()<<"sendCommand false:"<<oss.str();
+    // }
+}
 void QVehiclePrivate::setupTelemetrySubscriptions(QObject* parent)
 {
     if (!m_telemetry || !parent) {
         return;
     }
-    
+
     // 订阅位置信息
     m_telemetry->subscribe_position([parent](mavsdk::Telemetry::Position position) {
-        // 这里可以发射位置更新信号
-        // QMetaObject::invokeMethod(parent, "positionUpdated", Qt::QueuedConnection, ...);
+        std::ostringstream oss;
+        oss<<position;
+        qDebug()<<"position:"<<oss.str();
     });
     
     // 订阅姿态信息
@@ -282,13 +333,35 @@ void QVehiclePrivate::setupTelemetrySubscriptions(QObject* parent)
     // 订阅电池状态
     m_telemetry->subscribe_battery([parent](mavsdk::Telemetry::Battery battery) {
         // 这里可以发射电池状态更新信号
+        std::ostringstream oss;
+        oss<<battery;
+        qDebug()<<"battery:"<<oss.str();
         // QMetaObject::invokeMethod(parent, "batteryUpdated", Qt::QueuedConnection, ...);
     });
     
     // 订阅飞行状态
     m_telemetry->subscribe_flight_mode([parent](mavsdk::Telemetry::FlightMode flightMode) {
+        std::ostringstream oss;
+        oss<<flightMode;
+        qDebug()<<"flightMode:"<<oss.str();
         // 这里可以发射飞行状态更新信号
         // QMetaObject::invokeMethod(parent, "flightModeUpdated", Qt::QueuedConnection, ...);
+    });
+
+    m_telemetry->subscribe_health([](mavsdk::Telemetry::Health h){
+        std::ostringstream oss;
+        oss<<h;
+        qDebug()<<"Health:"<<oss.str();
+    });
+    m_telemetry->subscribe_gps_info([](mavsdk::Telemetry::GpsInfo gps){
+        std::ostringstream oss;
+        oss<<gps;
+        qDebug()<<"GpsInfo:"<<oss.str();
+    });
+
+    m_telemetry->subscribe_raw_gps([](mavsdk::Telemetry::RawGps raw) {
+        std::cout << "Raw GPS fix type: " << raw.latitude_deg
+        << ", sats: " << raw.longitude_deg;
     });
     
     qDebug() << "QVehiclePrivate: Telemetry subscriptions setup for system" << m_unID;
@@ -307,13 +380,6 @@ void QVehiclePrivate::setupSystemStatusSubscriptions(QObject* parent)
         // 发射连接状态变化信号
         QMetaObject::invokeMethod(parent, "connectionStatusChanged", Qt::QueuedConnection,
                                   Q_ARG(bool, isConnected));
-        
-        if (isConnected) {
-            QMetaObject::invokeMethod(parent, "connected", Qt::QueuedConnection);
-        } else {
-            QMetaObject::invokeMethod(parent, "disconnected", Qt::QueuedConnection,
-                                      Q_ARG(QString, "System disconnected"));
-        }
     });
     
     // 订阅组件发现

@@ -2,23 +2,29 @@
 #include "Private/QVehiclePrivate.h"
 #include <QDebug>
 #include <QDateTime>
-#include <sstream>
 
 QVehicle::QVehicle(QObject *parent)
     : QObject(parent)
     , d_ptr(std::make_unique<QVehiclePrivate>())
 {
+    using namespace std::chrono_literals;
+    qDebug() << "createTimer "<<startTimer(10s);
 }
 
 QVehicle::QVehicle(uint8_t unID, QObject *parent)
-    : QObject(parent)
-    , d_ptr(std::make_unique<QVehiclePrivate>())
+    : QVehicle(parent)
 {
     d_ptr->setUnID(unID);
 }
 
 QVehicle::~QVehicle()
 {
+}
+
+void QVehicle::timerEvent(QTimerEvent *event)
+{
+    qDebug()<<"timer";
+    SendCommand();
 }
 
 uint8_t QVehicle::getUnID() const
@@ -181,6 +187,11 @@ void QVehicle::updateFromSystem(void* system)
     d_ptr->setupMessageHandling(this);
     
     emit infoUpdated();
+}
+
+void QVehicle::SendCommand()
+{
+    d_ptr->sendCommand();
 }
 
 QString QVehicle::toString() const

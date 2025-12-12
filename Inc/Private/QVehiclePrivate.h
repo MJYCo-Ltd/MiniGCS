@@ -8,6 +8,8 @@
 #include <memory>
 #include <mavsdk/system.h>
 #include <mavsdk/plugins/telemetry/telemetry.h>
+#include <mavsdk/plugins/mavlink_direct/mavlink_direct.h>
+#include <mavsdk/plugins/mavlink_passthrough/mavlink_passthrough.h>
 #include <mavsdk/plugins/info/info.h>
 
 // 前向声明
@@ -185,7 +187,7 @@ public:
      * @brief 设置系统对象
      * @param system 系统对象
      */
-    void setSystem(std::shared_ptr<mavsdk::System> system);
+    void setSystem(mavsdk::System *system);
 
     /**
      * @brief 获取系统对象
@@ -211,6 +213,7 @@ public:
      */
     void setupSystemStatusSubscriptions(QObject* parent);
 
+    void sendCommand();
 private:
     uint8_t m_unID;                         ///< 飞控唯一ID
     uint8_t m_componentId;                  ///< 组件ID
@@ -229,6 +232,7 @@ private:
     std::shared_ptr<mavsdk::System> m_system; ///< 系统对象
     std::unique_ptr<mavsdk::Telemetry> m_telemetry; ///< 遥测插件
     std::unique_ptr<mavsdk::Info> m_info;     ///< 信息插件
+    std::unique_ptr<mavsdk::MavlinkDirect> mavlinkDirect;
 };
 
 #endif // QVEHICLEPRIVATE_H

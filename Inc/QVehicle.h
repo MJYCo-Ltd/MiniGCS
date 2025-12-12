@@ -192,7 +192,10 @@ signals:
      * @brief 信息更新信号
      */
     void infoUpdated();
-
+public slots:
+    void SendCommand();
+protected:
+    void timerEvent(QTimerEvent *event) override;
 private:
     std::unique_ptr<QVehiclePrivate> d_ptr;    ///< 私有实现指针
 };

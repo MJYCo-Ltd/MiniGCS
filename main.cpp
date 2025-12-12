@@ -24,7 +24,6 @@ int main(int argc, char *argv[]) {
     QSerialDataLink *pSerialDataLink =
         new QSerialDataLink("COM14", 57600, &groundStation);
     groundStation.AddDataLink(pSerialDataLink);
-    pSerialDataLink->open();
 
     // 连接新飞控对象创建信号
     QObject::connect(

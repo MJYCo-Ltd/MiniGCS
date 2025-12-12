@@ -2,7 +2,8 @@
 #define QGROUNDCONTROLSTATION_H
 
 #include <QObject>
-#include <QSet>
+#include <QMap>
+#include <QThread>
 
 // 前向声明
 class QGroundControlStationPrivate;
@@ -30,14 +31,14 @@ public:
      * @param pDataLink
      * @return
      */
-    bool AddDataLink(const QDataLink* pDataLink);
+    bool AddDataLink(QDataLink *pDataLink);
 
     /**
      * @brief 移除数据链路
      * @param pDataLink
      * @return
      */
-    void RemoveDatLink(const QDataLink* pDataLink);
+    void RemoveDatLink(QDataLink *pDataLink);
 
     /**
      * @brief 清除所有数据链路
@@ -79,7 +80,7 @@ private:
 
 private:
     std::unique_ptr<QGroundControlStationPrivate> d_ptr;    ///< 私有实现指针
-    QSet<const QDataLink*> m_setLink;
+    QMap<QDataLink*,QThread*> m_mapLink;
 };
 
 #endif // QGROUNDCONTROLSTATION_H

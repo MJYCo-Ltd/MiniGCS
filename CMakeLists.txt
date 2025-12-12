@@ -15,13 +15,16 @@ find_package(Qt6 REQUIRED COMPONENTS
     SerialPort
 )
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/Inc)
+include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}/Inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/Inc/Link
+)
 
 # 设置源文件
 set(SOURCES
     main.cpp
     Src/Extern/XmlToMavSDK.cpp
-    Src/QSerialDataLink.cpp
+    Src/Link/QSerialDataLink.cpp
     Src/QVehicle.cpp
     Src/QGroundControlStation.cpp
     Src/Private/QGroundControlStationPrivate.cpp
@@ -30,8 +33,8 @@ set(SOURCES
 
 set(HEADERS
     Inc/Extern/XmlToMavSDK.h
-    Inc/QDataLink.h
-    Inc/QSerialDataLink.h
+    Inc/Link/QDataLink.h
+    Inc/Link/QSerialDataLink.h
     Inc/QGroundControlStation.h
     Inc/QVehicle.h
     Inc/Private/QGroundControlStationPrivate.h
