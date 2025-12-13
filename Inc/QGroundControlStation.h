@@ -60,7 +60,7 @@ signals:
      * @brief 新飞控对象创建信号
      * @param vehicle 飞控对象指针
      */
-    void newVehicleFind(QPlat* vehicle);
+    void newPlatFind(QPlat* vehicle);
     void mavConnectionError(const QString& error);
 
 private:

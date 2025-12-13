@@ -96,7 +96,7 @@ signals:
 protected slots:
     void updateConnection(bool bConnected);
 protected:
-    void SetPrivate(std::unique_ptr<QPlatPrivate> &pPlatPrivate);
+    void SetPrivate(QPlatPrivate* pPlatPrivate);
 
 protected:
     friend class QGroundControlStationPrivate;

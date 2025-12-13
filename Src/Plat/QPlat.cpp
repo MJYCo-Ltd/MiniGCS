@@ -7,8 +7,8 @@ QPlat::QPlat(QObject *parent)
 }
 
 
-void QPlat::SetPrivate(std::unique_ptr<QPlatPrivate> &pPlatPrivate) {
-    d_ptr.reset(pPlatPrivate.get());
+void QPlat::SetPrivate(QPlatPrivate *pPlatPrivate) {
+    d_ptr.reset(pPlatPrivate);
     d_ptr->setupMessageHandling(this);
 }
 

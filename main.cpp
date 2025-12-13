@@ -29,9 +29,10 @@ int main(int argc, char *argv[]) {
 
     // 连接新飞控对象创建信号
     QObject::connect(
-        &groundStation, &QGroundControlStation::newVehicleFind,
+        &groundStation, &QGroundControlStation::newPlatFind,
         [](QPlat *vehicle) {
-            qDebug() << "新飞控对象创建:" << vehicle->toString();
+
+            qDebug()<< " 新飞控对象创建:" << vehicle->toString();
 
             // 连接飞控对象的信号
             QObject::connect(vehicle, &QAutopilot::connectionStatusChanged,

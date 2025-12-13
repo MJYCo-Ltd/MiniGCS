@@ -163,18 +163,19 @@ void QGroundControlStationPrivate::setupNewSystemDiscoveryCallback(
                         qobject_cast<QGroundControlStation *>(parent);
                     if (nullptr != pQGCS) {
                         QPlat *pPlat = pQGCS->getOrCreatePlat(systemId, bHaveAutopilot);
+                        /// 如果平台的Private 指针没有设置 或者 Private的 system与现在的不一致
                         if (nullptr == pPlat->d_ptr.get() || pPlat->d_ptr.get()->getSystem() != system) {
                             if (bHaveAutopilot) {
-                                std::unique_ptr<QPlatPrivate> localQPlatPrivate =
-                                    std::make_unique<QAutopilotPrivate>();
+                                QPlatPrivate* localQPlatPrivate = new QAutopilotPrivate();
                                 localQPlatPrivate->setSystem(system);
                                 pPlat->SetPrivate(localQPlatPrivate);
                             } else {
-                                std::unique_ptr<QPlatPrivate> localQPlatPrivate =
-                                    std::make_unique<QPlatPrivate>();
+                                QPlatPrivate* localQPlatPrivate = new QPlatPrivate();
                                 localQPlatPrivate->setSystem(system);
                                 pPlat->SetPrivate(localQPlatPrivate);
                             }
+                            /// 发送信号给qt
+                            QMetaObject::invokeMethod(parent,"newPlatFind",Q_ARG(QPlat *, pPlat));
                         }
                     }
                 }

@@ -26,40 +26,22 @@ public:
     ~QPlatPrivate();
 
     /**
-     * @brief 设置固件版本
-     * @param firmwareVersion 固件版本
-     */
-    void setFirmwareVersion(const QString &firmwareVersion);
-
-    /**
      * @brief 获取固件版本
      * @return 固件版本
      */
-    QString getFirmwareVersion() const;
-
-    /**
-     * @brief 设置硬件版本
-     * @param hardwareVersion 硬件版本
-     */
-    void setHardwareVersion(const QString &hardwareVersion);
+    QString getFirmwareVersion() const { return m_firmwareVersion; }
 
     /**
      * @brief 获取硬件版本
      * @return 硬件版本
      */
-    QString getHardwareVersion() const;
-
-    /**
-     * @brief 设置软件版本
-     * @param softwareVersion 软件版本
-     */
-    void setSoftwareVersion(const QString &softwareVersion);
+    QString getHardwareVersion() const { return m_hardwareVersion; }
 
     /**
      * @brief 获取软件版本
      * @return 软件版本
      */
-    QString getSoftwareVersion() const;
+    QString getSoftwareVersion() const { return m_softwareVersion; }
 
     /**
      * @brief 检查是否有相机
