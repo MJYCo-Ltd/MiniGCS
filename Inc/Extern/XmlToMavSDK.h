@@ -44,12 +44,14 @@ public:
     void setSystem(std::shared_ptr<mavsdk::System> system);
 
     // 发送命令（参数数量不足时自动补0）
-    mavsdk::MavlinkDirect::Result sendCmd(const QString& name,const QVector<float>& params);
+    mavsdk::MavlinkDirect::Result sendCmd(const QString& name,uint32_t uComponentID,const QVector<float>& params);
 protected:
     void loadXml(const QString& xmlPath);
 private:
     QMap<QString, ExternCmd> m_mapExternCMDs;
     std::shared_ptr<mavsdk::MavlinkDirect> m_pMavlinkDirect;
+    std::shared_ptr<mavsdk::System> m_pSystem;
+    bool m_bLoadXml{false};
 };
 
 #endif // XMLTOMAVSDK_H

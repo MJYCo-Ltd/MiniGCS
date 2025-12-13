@@ -17,28 +17,38 @@ find_package(Qt6 REQUIRED COMPONENTS
 
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/Inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/Inc/Extern
     ${CMAKE_CURRENT_SOURCE_DIR}/Inc/Link
+    ${CMAKE_CURRENT_SOURCE_DIR}/Inc/Plat
 )
 
 # 设置源文件
 set(SOURCES
     main.cpp
     Src/Extern/XmlToMavSDK.cpp
+    Src/Extern/AsyncSendMavLink.cpp
     Src/Link/QSerialDataLink.cpp
-    Src/QVehicle.cpp
-    Src/QGroundControlStation.cpp
+    Src/Plat/QAutopilot.cpp
+    Src/Plat/QPlat.cpp
+    Src/Plat/Private/QAutopilotPrivate.cpp
+    Src/Plat/Private/QPlatPrivate.cpp
     Src/Private/QGroundControlStationPrivate.cpp
-    Src/Private/QVehiclePrivate.cpp
+    Src/QGroundControlStation.cpp
+    Src/QGCSConfig.cpp
 )
 
 set(HEADERS
     Inc/Extern/XmlToMavSDK.h
+    Inc/Extern/AsyncSendMavLink.h
     Inc/Link/QDataLink.h
     Inc/Link/QSerialDataLink.h
-    Inc/QGroundControlStation.h
-    Inc/QVehicle.h
+    Inc/Plat/QAutopilot.h
+    Inc/Plat/QPlat.h
+    Inc/Plat/Private/QAutopilotPrivate.h
+    Inc/Plat/Private/QPlatPrivate.h
     Inc/Private/QGroundControlStationPrivate.h
-    Inc/Private/QVehiclePrivate.h
+    Inc/QGroundControlStation.h
+    Inc/QGCSConfig.h
 )
 
 add_executable(${PROJECT_NAME} 

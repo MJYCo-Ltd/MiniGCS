@@ -1,0 +1,122 @@
+#ifndef QGCSCONFIG_H
+#define QGCSCONFIG_H
+
+#include <QObject>
+#include <QString>
+#include <QSettings>
+
+/**
+ * @brief QGCSConfig类 - 配置文件单例类
+ * 
+ * 该类使用单例模式管理应用程序的配置文件（INI格式）
+ * 提供对串口、波特率、地图等配置项的读写访问
+ * GCS系统ID和组件ID只能通过配置文件设置，不支持运行时修改
+ */
+class QGCSConfig : public QObject
+{
+    Q_OBJECT
+
+public:
+    /**
+     * @brief 获取配置单例实例
+     * @return 配置单例实例的引用
+     */
+    static QGCSConfig& instance();
+
+    /**
+     * @brief 获取默认串口名称
+     * @return 串口名称（如 "COM1", "/dev/ttyUSB0"）
+     */
+    QString defaultPortName() const;
+
+    /**
+     * @brief 设置默认串口名称
+     * @param portName 串口名称
+     */
+    void setDefaultPortName(const QString &portName);
+
+    /**
+     * @brief 获取默认波特率
+     * @return 波特率（如 57600, 115200）
+     */
+    int defaultBaudRate() const;
+
+    /**
+     * @brief 设置默认波特率
+     * @param baudRate 波特率
+     */
+    void setDefaultBaudRate(int baudRate);
+
+    /**
+     * @brief 获取地图名称
+     * @return 地图名称
+     */
+    QString mapName() const;
+
+    /**
+     * @brief 设置地图名称
+     * @param mapName 地图名称
+     */
+    void setMapName(const QString &mapName);
+
+    /**
+     * @brief 获取GCS系统ID
+     * @return 系统ID（只能通过配置文件设置）
+     */
+    uint8_t gcsSystemId() const;
+
+    /**
+     * @brief 获取GCS组件ID
+     * @return 组件ID（只能通过配置文件设置）
+     */
+    uint8_t gcsComponentId() const;
+
+    /**
+     * @brief 保存配置到文件
+     */
+    void save();
+
+    /**
+     * @brief 重新加载配置
+     */
+    void reload();
+
+    /**
+     * @brief 获取配置文件路径
+     * @return 配置文件路径
+     */
+    QString configFilePath() const;
+
+private:
+    /**
+     * @brief 私有构造函数（单例模式）
+     * @param parent 父对象
+     */
+    explicit QGCSConfig(QObject *parent = nullptr);
+
+    /**
+     * @brief 析构函数
+     */
+    ~QGCSConfig();
+
+    /**
+     * @brief 禁用拷贝构造函数
+     */
+    QGCSConfig(const QGCSConfig&) = delete;
+
+    /**
+     * @brief 禁用赋值运算符
+     */
+    QGCSConfig& operator=(const QGCSConfig&) = delete;
+
+    /**
+     * @brief 初始化默认值
+     */
+    void initializeDefaults();
+
+    QSettings* m_settings;        ///< QSettings实例，用于读写INI文件
+    QString m_configFilePath;     ///< 配置文件路径
+};
+
+#endif // QGCSCONFIG_H
+

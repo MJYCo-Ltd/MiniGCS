@@ -6,8 +6,7 @@
 #include <QThread>
 
 // 前向声明
-class QGroundControlStationPrivate;
-class QVehicle;
+class QPlat;
 class QDataLink;
 
 /**
@@ -54,16 +53,15 @@ public:
      * @brief 获取所有飞控对象
      * @return 飞控对象列表
      */
-    QVector<QVehicle*> getAllVehicles() const;
+    QVector<QPlat*> getAllStandalone() const;
 
 signals:
     /**
      * @brief 新飞控对象创建信号
      * @param vehicle 飞控对象指针
      */
-    void newVehicleFind(QVehicle* vehicle);
-    void connectionError(const QString& error);
-    void systemConnectionStatusChanged(uint8_t id,bool isConnected);
+    void newVehicleFind(QPlat* vehicle);
+    void mavConnectionError(const QString& error);
 
 private:
     /**
@@ -78,9 +76,19 @@ private:
      */
     void sendDataToAllLinks(const QByteArray &data);
 
+    /**
+     * @brief 创建或者获取ID
+     * @param uId
+     * @return
+     */
+    QPlat* getOrCreatePlat(uint8_t uId, bool bIsAutopilot);
+
 private:
+    friend class QGroundControlStationPrivate;
     std::unique_ptr<QGroundControlStationPrivate> d_ptr;    ///< 私有实现指针
     QMap<QDataLink*,QThread*> m_mapLink;
+    // 飞控对象管理
+    QMap<uint8_t, QPlat*> m_mapId2Standalone;///< 状态
 };
 
 #endif // QGROUNDCONTROLSTATION_H

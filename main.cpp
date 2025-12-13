@@ -7,7 +7,8 @@
 #include "Extern/XmlToMavSDK.h"
 #include "QGroundControlStation.h"
 #include "QSerialDataLink.h"
-#include "QVehicle.h"
+#include "QAutopilot.h"
+#include "QGCSConfig.h"
 int main(int argc, char *argv[]) {
     QCoreApplication app(argc, argv);
 
@@ -21,18 +22,19 @@ int main(int argc, char *argv[]) {
     // 尝试连接飞控（串口连接示例）
     groundStation.Init();
     // 创建 QSerialDataLink 时指定 parent，确保在正确的线程中
-    QSerialDataLink *pSerialDataLink =
-        new QSerialDataLink("COM14", 57600, &groundStation);
+    QSerialDataLink *pSerialDataLink = new QSerialDataLink(
+        QGCSConfig::instance().defaultPortName(),
+        QGCSConfig::instance().defaultBaudRate(), &groundStation);
     groundStation.AddDataLink(pSerialDataLink);
 
     // 连接新飞控对象创建信号
     QObject::connect(
         &groundStation, &QGroundControlStation::newVehicleFind,
-        [](QVehicle *vehicle) {
+        [](QPlat *vehicle) {
             qDebug() << "新飞控对象创建:" << vehicle->toString();
 
             // 连接飞控对象的信号
-            QObject::connect(vehicle, &QVehicle::connectionStatusChanged,
+            QObject::connect(vehicle, &QAutopilot::connectionStatusChanged,
                              [vehicle](bool bIsConnected) {
                                  if (bIsConnected)
                     qDebug() << "飞控已连接:" << vehicle->toString();
@@ -40,7 +42,7 @@ int main(int argc, char *argv[]) {
                                      qDebug() << "飞控失去连接:" << vehicle->toString();
             });
 
-            QObject::connect(vehicle, &QVehicle::infoUpdated, [vehicle]() {
+            QObject::connect(vehicle, &QAutopilot::infoUpdated, [vehicle]() {
                 qDebug() << "飞控信息更新:" << vehicle->toString();
             });
         });

@@ -11,7 +11,7 @@
 
 // 前向声明
 struct ConnectionConfig;
-class QVehicle;
+class QPlat;
 
 /**
  * @brief QGroundControlStation的私有实现类
@@ -55,36 +55,6 @@ public:
      */
     int getSystemCount() const;
 
-    /**
-     * @brief 获取地面站系统ID
-     * @return 地面站系统ID
-     */
-    uint8_t getGroundStationSystemId() const;
-
-    /**
-     * @brief 获取地面站组件ID
-     * @return 地面站组件ID
-     */
-    uint8_t getGroundStationComponentId() const;
-
-    /**
-     * @brief 获取所有飞控对象
-     * @return 飞控对象列表
-     */
-    QVector<QVehicle*> getAllVehicles() const;
-
-    /**
-     * @brief 获取指定系统ID的飞控对象
-     * @param systemId 系统ID
-     * @return 飞控对象指针，如果未找到则返回nullptr
-     */
-    QVehicle* getVehicle(uint8_t systemId) const;
-
-    /**
-     * @brief 获取所有已连接的系统ID
-     * @return 系统ID列表
-     */
-    QVector<uint8_t> getVehicleIDs() const;
 
     /**
      * @brief 设置连接错误处理
@@ -103,14 +73,6 @@ public:
      * @param parent QGroundControlStation实例指针，用于信号发射
      */
     void setupSystemConnectionCallbacks(QObject* parent);
-
-    /**
-     * @brief 创建或更新飞控对象
-     * @param system 系统指针
-     * @param parent QGroundControlStation实例指针，用于信号发射
-     * @return 飞控对象指针
-     */
-    QVehicle* createOrUpdateVehicle(void* system, QObject* parent);
 
     /**
      * @brief 处理接收到的原始数据
@@ -139,13 +101,6 @@ private:
     mavsdk::Mavsdk::ConnectionHandle m_connectionHandle; ///< 连接句柄
     mavsdk::Mavsdk::NewSystemHandle m_newSystemHandle; ///< 新系统订阅句柄
     mavsdk::Mavsdk::RawBytesHandle m_rawBytesHandle; ///< 原始字节发送回调句柄
-    
-    // 地面站ID配置
-    uint8_t m_groundStationSystemId;     ///< 地面站系统ID
-    uint8_t m_groundStationComponentId;  ///< 地面站组件ID
-    
-    // 飞控对象管理
-    QMap<uint8_t, QVehicle*> m_vehicles; ///< 飞控对象映射表
 };
 
 #endif // QGROUNDCONTROLSTATIONPRIVATE_H

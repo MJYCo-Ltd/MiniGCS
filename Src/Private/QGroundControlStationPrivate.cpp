@@ -1,5 +1,7 @@
 #include "Private/QGroundControlStationPrivate.h"
-#include "QVehicle.h"
+#include "Private/QAutopilotPrivate.h"
+#include "QGroundControlStation.h"
+#include "QAutopilot.h"
 #include <QDebug>
 #include <QMetaObject>
 #include <QMetaMethod>
@@ -7,16 +9,15 @@
 #include <sstream>
 #include <mavsdk/plugins/telemetry/telemetry.h>
 #include <mavsdk/plugins/info/info.h>
-
+#include "QGCSConfig.h"
 QGroundControlStationPrivate::QGroundControlStationPrivate()
     : m_isInitialized(false)
-    , m_groundStationSystemId(246)      // 默认地面站系统ID
-    , m_groundStationComponentId(191)   // 默认地面站组件ID
 {
 }
 
 QGroundControlStationPrivate::~QGroundControlStationPrivate()
 {
+    m_mavsdk->unsubscribe_on_new_system(m_newSystemHandle);
     unsubscribeRawBytesToBeSent();
 }
 
@@ -29,15 +30,14 @@ void QGroundControlStationPrivate::initializeMavsdk()
     // 创建MAVSDK实例，配置为地面站模式
     mavsdk::Mavsdk::Configuration config(
         mavsdk::ComponentType::GroundStation);
-    config.set_system_id(m_groundStationSystemId);
-    config.set_component_id(m_groundStationComponentId);
+    config.set_system_id(QGCSConfig::instance().gcsSystemId());
+    config.set_component_id(QGCSConfig::instance().gcsComponentId());
     m_mavsdk = std::make_shared<mavsdk::Mavsdk>(config);
 
     auto connectionResult = m_mavsdk->add_any_connection_with_handle("raw://");
 
     if (connectionResult.first == mavsdk::ConnectionResult::Success) {
         m_connectionHandle = connectionResult.second;
-        qDebug() << "QGroundControlStationPrivate: Connection successful";
     } else {
         std::ostringstream oss;
         oss << connectionResult.first;
@@ -46,8 +46,6 @@ void QGroundControlStationPrivate::initializeMavsdk()
     }
     
     m_isInitialized = true;
-    qDebug() << "QGroundControlStationPrivate: MAVSDK initialized with system ID:" 
-             << m_groundStationSystemId << "component ID:" << m_groundStationComponentId;
 }
 
 QVector<std::shared_ptr<mavsdk::System>> QGroundControlStationPrivate::getConnectedSystems() const
@@ -119,75 +117,6 @@ int QGroundControlStationPrivate::getSystemCount() const
     return count;
 }
 
-uint8_t QGroundControlStationPrivate::getGroundStationSystemId() const
-{
-    return m_groundStationSystemId;
-}
-
-uint8_t QGroundControlStationPrivate::getGroundStationComponentId() const
-{
-    return m_groundStationComponentId;
-}
-
-QVector<QVehicle*> QGroundControlStationPrivate::getAllVehicles() const
-{
-    QVector<QVehicle*> result;
-    for (auto vehicle : m_vehicles) {
-        result.append(vehicle);
-    }
-    return result;
-}
-
-QVehicle* QGroundControlStationPrivate::getVehicle(uint8_t systemId) const
-{
-    return m_vehicles.value(systemId, nullptr);
-}
-
-QVector<uint8_t> QGroundControlStationPrivate::getVehicleIDs() const
-{
-    QVector<uint8_t> result;
-    for (auto it = m_vehicles.begin(); it != m_vehicles.end(); ++it) {
-        result.append(it.key());
-    }
-    return result;
-}
-
-QVehicle* QGroundControlStationPrivate::createOrUpdateVehicle(void* system, QObject* parent)
-{
-    if (!system) {
-        return nullptr;
-    }
-    
-    // 将void*转换为mavsdk::System*
-    auto mavsdkSystem = static_cast<mavsdk::System*>(system);
-    uint8_t systemId = mavsdkSystem->get_system_id();
-    
-    // 检查是否已存在飞控对象
-    QVehicle* vehicle = m_vehicles.value(systemId, nullptr);
-    
-    if (!vehicle) {
-        // 创建新的飞控对象
-        vehicle = new QVehicle(systemId, parent);
-        mavsdkSystem->subscribe_is_connected([vehicle](bool isConnected) {
-            // MAVSDK 回调可能在非主线程中执行，需要通过队列连接确保在主线程中处理
-            QMetaObject::invokeMethod(vehicle, "connectionStatusChanged", Qt::QueuedConnection,
-                                      Q_ARG(bool, isConnected));
-        });
-        m_vehicles[systemId] = vehicle;
-        qDebug() << "QGroundControlStationPrivate: Created new vehicle for system" << systemId;
-    } else {
-        qDebug() << "QGroundControlStationPrivate: Updated existing vehicle for system" << systemId;
-    }
-
-    vehicle->updateFromSystem(system);
-    
-    // 发射飞控创建信号
-    QMetaObject::invokeMethod(parent, "newVehicleFind", Qt::QueuedConnection,
-                              Q_ARG(QVehicle*, vehicle));
-    
-    return vehicle;
-}
-
 void QGroundControlStationPrivate::setupConnectionErrorHandling(QObject* parent)
 {
     if (!m_mavsdk || !parent) {
@@ -199,7 +128,6 @@ void QGroundControlStationPrivate::setupConnectionErrorHandling(QObject* parent)
         std::ostringstream oss;
         oss << error.error_description;
         QString errorMsg = QString("Connection error: %1").arg(QString::fromStdString(oss.str()));
-        qWarning() << "QGroundControlStationPrivate:" << errorMsg;
         
         // 移除有问题的连接
         m_mavsdk->remove_connection(error.connection_handle);
@@ -208,33 +136,47 @@ void QGroundControlStationPrivate::setupConnectionErrorHandling(QObject* parent)
         }
 
         // 发射错误信号
-        QMetaObject::invokeMethod(parent, "connectionError", Qt::QueuedConnection,
+        QMetaObject::invokeMethod(parent, "mavConnectionError", Qt::QueuedConnection,
                                   Q_ARG(QString, errorMsg));
     });
 }
 
-void QGroundControlStationPrivate::setupNewSystemDiscoveryCallback(QObject* parent)
-{
+void QGroundControlStationPrivate::setupNewSystemDiscoveryCallback(
+    QObject *parent) {
     if (!m_mavsdk || !parent) {
         return;
     }
-    
+
     // 订阅新系统发现
     m_newSystemHandle = m_mavsdk->subscribe_on_new_system([this, parent]() {
-        // MAVSDK 回调可能在非主线程中执行，需要通过队列连接确保在主线程中处理
         QMetaObject::invokeMethod(parent, [this, parent]() {
             // 获取所有系统
             auto systems = m_mavsdk->systems();
 
             // 检查是否有新系统
             for (auto system : systems) {
-                uint8_t systemId = system->get_system_id();
-                
-                // 如果还没有为这个系统设置回调，则设置
-                if (!m_vehicles.contains(systemId)) {
-                    QMetaObject::invokeMethod(parent, [this, parent, system]() {
-                        createOrUpdateVehicle(system.get(), parent);
-                    });
+                /// system 断开也会触发subscribe_on_new_system
+                if (system->is_connected()) {
+                    uint8_t systemId = system->get_system_id();
+                    bool bHaveAutopilot = system->has_autopilot();
+                    QGroundControlStation *pQGCS =
+                        qobject_cast<QGroundControlStation *>(parent);
+                    if (nullptr != pQGCS) {
+                        QPlat *pPlat = pQGCS->getOrCreatePlat(systemId, bHaveAutopilot);
+                        if (nullptr == pPlat->d_ptr.get() || pPlat->d_ptr.get()->getSystem() != system) {
+                            if (bHaveAutopilot) {
+                                std::unique_ptr<QPlatPrivate> localQPlatPrivate =
+                                    std::make_unique<QAutopilotPrivate>();
+                                localQPlatPrivate->setSystem(system);
+                                pPlat->SetPrivate(localQPlatPrivate);
+                            } else {
+                                std::unique_ptr<QPlatPrivate> localQPlatPrivate =
+                                    std::make_unique<QPlatPrivate>();
+                                localQPlatPrivate->setSystem(system);
+                                pPlat->SetPrivate(localQPlatPrivate);
+                            }
+                        }
+                    }
                 }
             }
         });
@@ -247,19 +189,12 @@ void QGroundControlStationPrivate::processReceivedRawData(const QByteArray &data
         return;
     }
     
-    // 将接收到的数据传递给MAVSDK处理
     m_mavsdk->pass_received_raw_bytes(data.constData(), data.size());
 }
 
 void QGroundControlStationPrivate::setupRawBytesToBeSentCallback(std::function<void(const QByteArray&)> callback, QObject* parent)
 {
-    if (!m_mavsdk) {
-        qWarning() << "QGroundControlStationPrivate: MAVSDK not initialized, cannot setup RawBytes callback";
-        return;
-    }
-
-    if (!parent) {
-        qWarning() << "QGroundControlStationPrivate: Parent object is null, cannot setup RawBytes callback safely";
+    if (!m_mavsdk || !parent) {
         return;
     }
 
@@ -277,19 +212,16 @@ void QGroundControlStationPrivate::setupRawBytesToBeSentCallback(std::function<v
                     if (callback) {
                         callback(data);
                     }
-                }, Qt::QueuedConnection);
+                });
             }
         }
     );
-
-    qDebug() << "QGroundControlStationPrivate: RawBytes callback setup successfully";
 }
 
 void QGroundControlStationPrivate::unsubscribeRawBytesToBeSent()
 {
     if (m_mavsdk && m_rawBytesHandle.valid()) {
         m_mavsdk->unsubscribe_raw_bytes_to_be_sent(m_rawBytesHandle);
-        qDebug() << "QGroundControlStationPrivate: RawBytes callback unsubscribed";
     }
 }
 

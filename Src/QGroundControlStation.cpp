@@ -1,5 +1,5 @@
 #include "QGroundControlStation.h"
-#include "QVehicle.h"
+#include "QAutopilot.h"
 #include "QDataLink.h"
 #include "Private/QGroundControlStationPrivate.h"
 #include <QDebug>
@@ -126,13 +126,47 @@ void QGroundControlStation::sendDataToAllLinks(const QByteArray &data)
     }
 }
 
+QPlat *QGroundControlStation::getOrCreatePlat(uint8_t uId,bool bIsAutopilot)
+{
+    QPlat * pPlat = m_mapId2Standalone.value(uId,nullptr);
+    if (nullptr == pPlat) {
+        if (bIsAutopilot) {
+            pPlat = new QAutopilot(this);
+        } else {
+            pPlat = new QPlat(this);
+        }
+        m_mapId2Standalone.insert(uId,pPlat);
+    }else{
+        /// 如果系统与之前保存的类型不一致，删除原来的重新构建
+        if (!bIsAutopilot) {
+            if (nullptr != qobject_cast<QAutopilot *>(pPlat)) {
+                pPlat->deleteLater();
+                pPlat = new QPlat(this);
+                m_mapId2Standalone[uId] = pPlat;
+            }
+        }else{
+            if(nullptr == qobject_cast<QAutopilot*>(pPlat)){
+                pPlat->deleteLater();
+                pPlat = new QAutopilot(this);
+                m_mapId2Standalone[uId] = pPlat;
+            }
+        }
+    }
+
+    return(pPlat);
+}
+
 int QGroundControlStation::getVehicleCount() const
 {
     return d_ptr->getSystemCount();
 }
 
-QVector<QVehicle*> QGroundControlStation::getAllVehicles() const
+QVector<QPlat *> QGroundControlStation::getAllStandalone() const
 {
-    return d_ptr->getAllVehicles();
+    QVector<QPlat*> result;
+    for (auto standalone : m_mapId2Standalone) {
+        result.append(standalone);
+    }
+    return result;
 }
 
