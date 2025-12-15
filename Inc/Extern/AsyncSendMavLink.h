@@ -5,7 +5,7 @@
 namespace CAsyncSendMavLink {
 
 void send_command_long_async(
-    std::shared_ptr<mavsdk::MavlinkPassthrough> passthrough,
+    mavsdk::MavlinkPassthrough* passthrough,
     const mavsdk::MavlinkPassthrough::CommandLong &command,
     std::function<void(mavsdk::MavlinkPassthrough::Result)> callback);
 };

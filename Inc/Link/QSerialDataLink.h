@@ -39,7 +39,7 @@ public:
     /**
      * @brief 关闭串口连接
      */
-    void disConnectLink() override;
+    Q_INVOKABLE void disConnectLink() override;
 
     /**
      * @brief 发送数据

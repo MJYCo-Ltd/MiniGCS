@@ -30,8 +30,8 @@ void QGroundControlStationPrivate::initializeMavsdk()
     // 创建MAVSDK实例，配置为地面站模式
     mavsdk::Mavsdk::Configuration config(
         mavsdk::ComponentType::GroundStation);
-    config.set_system_id(QGCSConfig::instance().gcsSystemId());
-    config.set_component_id(QGCSConfig::instance().gcsComponentId());
+    config.set_system_id(QGCSConfig::instance()->gcsSystemId());
+    config.set_component_id(QGCSConfig::instance()->gcsComponentId());
     m_mavsdk = std::make_shared<mavsdk::Mavsdk>(config);
 
     auto connectionResult = m_mavsdk->add_any_connection_with_handle("raw://");

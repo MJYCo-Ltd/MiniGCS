@@ -63,8 +63,8 @@ mavsdk::MavlinkDirect::Result XmlToMavSDK::sendCmd(const QString& name, uint32_t
 
     mavsdk::MavlinkDirect::MavlinkMessage message;
     message.message_name = cmd->name.toStdString();
-    message.component_id = QGCSConfig::instance().gcsComponentId();
-    message.system_id = QGCSConfig::instance().gcsSystemId();
+    message.component_id = QGCSConfig::instance()->gcsComponentId();
+    message.system_id = QGCSConfig::instance()->gcsSystemId();
     message.target_system_id = m_pSystem->get_system_id();
     message.target_component_id = uComponentID;
     message.fields_json = fieldsJson.toStdString();

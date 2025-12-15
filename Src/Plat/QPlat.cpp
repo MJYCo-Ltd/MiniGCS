@@ -47,11 +47,6 @@ void QPlat::updateConnection(bool bConnected)
     }
 }
 
-bool QPlat::hasCamera() const
-{
-    return d_ptr->hasCamera();
-}
-
 QDateTime QPlat::getLastConnectedTime() const
 {
     return (m_lastConnectedTime);

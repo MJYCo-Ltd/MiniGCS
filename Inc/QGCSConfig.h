@@ -1,27 +1,58 @@
 #ifndef QGCSCONFIG_H
 #define QGCSCONFIG_H
 
-#include <QObject>
 #include <QString>
 #include <QSettings>
+#include <plugins/events/events.h>
+/// <summary>
+/// 前置声明 spdlog 命名空间和 sink 类
+/// </summary>
+namespace spdlog {
+    namespace sinks {
+        class sink;
+    }
+    using sink_ptr = std::shared_ptr<sinks::sink>;
+};
+
+namespace mavsdk {
+	class Events;
+	struct Events::Event;
+}; // namespace mavsdk
 
 /**
  * @brief QGCSConfig类 - 配置文件单例类
- * 
+ *
  * 该类使用单例模式管理应用程序的配置文件（INI格式）
  * 提供对串口、波特率、地图等配置项的读写访问
  * GCS系统ID和组件ID只能通过配置文件设置，不支持运行时修改
  */
-class QGCSConfig : public QObject
+class QGCSConfig
 {
-    Q_OBJECT
-
 public:
     /**
      * @brief 获取配置单例实例
      * @return 配置单例实例的引用
      */
-    static QGCSConfig& instance();
+    static QGCSConfig* instance();
+
+    /**
+     * @brief 处理QtLog
+     * @param type
+     * @param ctx
+     * @param msg
+     */
+    static void qtLogHandler(QtMsgType type,
+        const QMessageLogContext& ctx,
+        const QString& msg);
+
+    void init();
+    void release();
+
+    /**
+     * @brief 处理mavsdk消息
+     * @param event
+     */
+    void dealMavsdkLog(mavsdk::Events::Event& event);
 
     /**
      * @brief 获取默认串口名称
@@ -33,7 +64,7 @@ public:
      * @brief 设置默认串口名称
      * @param portName 串口名称
      */
-    void setDefaultPortName(const QString &portName);
+    void setDefaultPortName(const QString& portName);
 
     /**
      * @brief 获取默认波特率
@@ -57,7 +88,18 @@ public:
      * @brief 设置地图名称
      * @param mapName 地图名称
      */
-    void setMapName(const QString &mapName);
+    void setMapName(const QString& mapName);
+
+    /**
+     * @brief 获取日志等级字符串（例如 "debug","info","warn","error"）
+     */
+    QString logLevel() const;
+
+    /**
+     * @brief 设置日志等级（会写入配置并立即生效）
+     * @param level 日志等级字符串（小写或大写都可）
+     */
+    void setLogLevel(const QString& level);
 
     /**
      * @brief 获取GCS系统ID
@@ -88,35 +130,25 @@ public:
     QString configFilePath() const;
 
 private:
-    /**
-     * @brief 私有构造函数（单例模式）
-     * @param parent 父对象
-     */
-    explicit QGCSConfig(QObject *parent = nullptr);
-
-    /**
-     * @brief 析构函数
-     */
+    QGCSConfig();
     ~QGCSConfig();
-
-    /**
-     * @brief 禁用拷贝构造函数
-     */
-    QGCSConfig(const QGCSConfig&) = delete;
-
-    /**
-     * @brief 禁用赋值运算符
-     */
-    QGCSConfig& operator=(const QGCSConfig&) = delete;
+    Q_DISABLE_COPY(QGCSConfig)
 
     /**
      * @brief 初始化默认值
      */
     void initializeDefaults();
 
+    /**
+     * @brief 初始化日志系统
+     */
+    void init_logging();
+
     QSettings* m_settings;        ///< QSettings实例，用于读写INI文件
     QString m_configFilePath;     ///< 配置文件路径
+
+    std::vector<spdlog::sink_ptr> sinks;
+    static QGCSConfig* m_pSInsatance;
 };
 
 #endif // QGCSCONFIG_H
-

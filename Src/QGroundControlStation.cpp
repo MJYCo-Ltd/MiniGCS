@@ -7,13 +7,18 @@
 
 QGroundControlStation::QGroundControlStation(QObject *parent)
     : QObject(parent)
-    , d_ptr(std::make_unique<QGroundControlStationPrivate>())
+    , d_ptr(new QGroundControlStationPrivate)
 {
 }
 
 QGroundControlStation::~QGroundControlStation()
 {
     ClearAllDataLink();
+
+    // 如果有 d_ptr 的清理需要，确保删除
+    if (d_ptr) {
+        d_ptr.release();
+    }
 }
 
 void QGroundControlStation::Init()
@@ -71,13 +76,30 @@ void QGroundControlStation::RemoveDatLink(QDataLink* pDataLink)
     if (!pDataLink) {
         return;
     }
-    pDataLink->disConnectLink();
+
+    // 请求在 link 所在线程断开（异步、安全）
+    QMetaObject::invokeMethod(pDataLink, "disConnectLink", Qt::QueuedConnection);
+
     // 断开信号连接
     QObject::disconnect(pDataLink, nullptr, this, nullptr);
+
     auto itor = m_mapLink.find(pDataLink);
-    if(m_mapLink.end() != itor)
+    if (m_mapLink.end() != itor)
     {
-        itor.value()->exit();
+        QThread* thread = itor.value();
+        // 请求线程退出并等待（优雅）
+        if (thread) {
+            thread->quit();
+            if (!thread->wait(2000)) {
+                qWarning() << "Thread did not exit in time, terminating.";
+                thread->terminate();
+                thread->wait();
+            }
+            // 线程是 this 的子对象，deleteLater 保持安全
+            thread->deleteLater();
+        }
+
+        // 确保对象在主线程并恢复父对象
         pDataLink->moveToThread(QThread::currentThread());
         pDataLink->setParent(this);
     }
@@ -87,13 +109,30 @@ void QGroundControlStation::RemoveDatLink(QDataLink* pDataLink)
 
 void QGroundControlStation::ClearAllDataLink()
 {
-    // 断开所有信号连接
-    for (auto itor = m_mapLink.begin(); itor != m_mapLink.end();++itor) {
-            itor.key()->disConnectLink();
-            QObject::disconnect(itor.key(), nullptr, this, nullptr);
-            itor.value()->exit();
-            itor.key()->moveToThread(QThread::currentThread());
-            itor.key()->setParent(this);
+    // 断开并停止所有链接与线程
+    for (auto itor = m_mapLink.begin(); itor != m_mapLink.end(); ++itor) {
+        QDataLink* link = itor.key();
+        QThread* thread = itor.value();
+
+        if (link) {
+            // 在 link 所在线程安全地断开
+            QMetaObject::invokeMethod(link, "disConnectLink", Qt::QueuedConnection);
+            QObject::disconnect(link, nullptr, this, nullptr);
+
+            // 将 link 移回主线程并设回父对象，确保之后可被析构
+            link->moveToThread(QThread::currentThread());
+            link->setParent(this);
+        }
+
+        if (thread) {
+            thread->quit();
+            if (!thread->wait(2000)) {
+                qWarning() << "Thread did not exit in time during ClearAllDataLink(), terminating.";
+                thread->terminate();
+                thread->wait();
+            }
+            thread->deleteLater();
+        }
     }
 
     // 清空集合

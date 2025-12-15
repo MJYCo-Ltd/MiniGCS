@@ -8,7 +8,10 @@
 #include <mavsdk/system.h>
 #include <mavsdk/plugins/telemetry/telemetry.h>
 #include <mavsdk/plugins/mavlink_passthrough/mavlink_passthrough.h>
+#include <mavsdk/plugins/mavlink_direct/mavlink_direct.h>
+#include <mavsdk/plugins/events/events.h>
 #include <mavsdk/plugins/info/info.h>
+#include <mavsdk/plugins/log_files/log_files.h>
 
 // 前向声明
 class QPlat;
@@ -44,12 +47,6 @@ public:
     QString getSoftwareVersion() const { return m_softwareVersion; }
 
     /**
-     * @brief 检查是否有相机
-     * @return 是否有相机
-     */
-    bool hasCamera() const;
-
-    /**
      * @brief 转换为字符串表示
      * @return 字符串表示
      */
@@ -78,9 +75,14 @@ protected:
     QString m_softwareVersion;              ///< 软件版本
     
     // MAVSDK相关
-    std::shared_ptr<mavsdk::System> m_system; ///< 系统对象
-    std::unique_ptr<mavsdk::Info> m_info;     ///< 信息插件
-    std::unique_ptr<mavsdk::MavlinkPassthrough> mavlinkPassthrough;
+    std::shared_ptr<mavsdk::System> m_pSystem; ///< 系统对象
+    std::unique_ptr<mavsdk::Info> m_pInfo;     ///< 信息插件
+	std::unique_ptr<mavsdk::Events> m_pEvents; ///< 事件插件
+    std::unique_ptr<mavsdk::MavlinkPassthrough> m_pMavlinkPassthrough;
+    std::unique_ptr<mavsdk::MavlinkDirect> m_pMavlinkDirect;
+
+    mavsdk::System::IsConnectedHandle m_hConntecd;
+    mavsdk::System::ComponentDiscoveredHandle m_hCommonpentDiscovered;
 };
 
 #endif // QPLATPRIVATE_H

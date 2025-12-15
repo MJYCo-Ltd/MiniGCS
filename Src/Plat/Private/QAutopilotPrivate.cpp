@@ -1,5 +1,7 @@
+
 #include <QDebug>
 #include "Private/QAutopilotPrivate.h"
+
 QAutopilotPrivate::QAutopilotPrivate()
 {
 }
@@ -82,9 +84,9 @@ void QAutopilotPrivate::setupMessageHandling(QObject *parent) {
     // 订阅飞行状态
     m_telemetry->subscribe_flight_mode(
         [parent](mavsdk::Telemetry::FlightMode flightMode) {
-        std::ostringstream oss;
-        oss << flightMode;
-        qDebug() << "flightMode:" << oss.str();
+        // std::ostringstream oss;
+        // oss << flightMode;
+        // qDebug() << "flightMode:" << oss.str();
         // 这里可以发射飞行状态更新信号
         // QMetaObject::invokeMethod(parent, "flightModeUpdated",
         // Qt::QueuedConnection, ...);

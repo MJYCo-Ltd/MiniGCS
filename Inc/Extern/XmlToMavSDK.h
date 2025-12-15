@@ -45,7 +45,7 @@ public:
 
     // 发送命令（参数数量不足时自动补0）
     mavsdk::MavlinkDirect::Result sendCmd(const QString& name,uint32_t uComponentID,const QVector<float>& params);
-protected:
+
     void loadXml(const QString& xmlPath);
 private:
     QMap<QString, ExternCmd> m_mapExternCMDs;

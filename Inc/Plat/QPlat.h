@@ -75,12 +75,6 @@ public:
      */
     QString toString() const;
 
-    /**
-     * @brief 检查是否有相机
-     * @return 是否有相机
-     */
-    bool hasCamera() const;
-
 signals:
 
     /**

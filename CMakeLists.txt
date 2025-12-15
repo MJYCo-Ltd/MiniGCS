@@ -1,7 +1,12 @@
 cmake_minimum_required(VERSION 3.16)
 
 if(WIN32)
-    set(MAVSDK_DIR ${CMAKE_SOURCE_DIR}/Depends/lib/cmake/MAVSDK)
+    set(MAVSDK_DIR ${CMAKE_SOURCE_DIR}/Depends/mavsdk/lib/cmake/MAVSDK)
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        set(spdlog_DIR ${CMAKE_SOURCE_DIR}/Depends/spdlog/x64-Debug/lib/cmake/spdlog)
+    elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
+        set(spdlog_DIR ${CMAKE_SOURCE_DIR}/Depends/spdlog/x64-Release/lib/cmake/spdlog)
+    endif()
 endif()
 
 project(MiniGCS LANGUAGES CXX)
@@ -10,10 +15,14 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(MAVSDK REQUIRED)
+find_package(spdlog REQUIRED)
 find_package(Qt6 REQUIRED COMPONENTS
     Core
+    Quick
     SerialPort
 )
+
+qt_standard_project_setup(REQUIRES 6.9)
 
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/Inc
@@ -51,9 +60,15 @@ set(HEADERS
     Inc/QGCSConfig.h
 )
 
-add_executable(${PROJECT_NAME} 
+qt_add_executable(${PROJECT_NAME}
     ${SOURCES}
     ${HEADERS}
+)
+
+qt_add_qml_module(${PROJECT_NAME}
+    URI ${PROJECT_NAME}
+    QML_FILES
+        qml/Main.qml
 )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
@@ -70,5 +85,7 @@ target_link_libraries(${PROJECT_NAME}
     PRIVATE
     MAVSDK::mavsdk
     Qt6::Core
+    Qt6::Quick
     Qt6::SerialPort
+    spdlog::spdlog
 )
