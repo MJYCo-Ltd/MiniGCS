@@ -1,2 +1,8 @@
 # MiniGCS
-基于Qt和MavSDK的飞控地面站
+基于Qt6.9和MavSDK3.11的飞控地面站
+## UI
+QT6 qml
+## mavlink
+mavsdk
+## log
+spdlog
