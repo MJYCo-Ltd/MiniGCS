@@ -1,9 +1,10 @@
+#include <QCoreApplication>
+#include <QDebug>
+#include <QTimer>
 #include "QGroundControlStation.h"
 #include "QAutopilot.h"
 #include "QDataLink.h"
 #include "Private/QGroundControlStationPrivate.h"
-#include <QDebug>
-#include <QTimer>
 
 QGroundControlStation::QGroundControlStation(QObject *parent)
     : QObject(parent)
@@ -77,31 +78,10 @@ void QGroundControlStation::RemoveDatLink(QDataLink* pDataLink)
         return;
     }
 
-    // 请求在 link 所在线程断开（异步、安全）
-    QMetaObject::invokeMethod(pDataLink, "disConnectLink", Qt::QueuedConnection);
-
-    // 断开信号连接
-    QObject::disconnect(pDataLink, nullptr, this, nullptr);
-
     auto itor = m_mapLink.find(pDataLink);
     if (m_mapLink.end() != itor)
     {
-        QThread* thread = itor.value();
-        // 请求线程退出并等待（优雅）
-        if (thread) {
-            thread->quit();
-            if (!thread->wait(2000)) {
-                qWarning() << "Thread did not exit in time, terminating.";
-                thread->terminate();
-                thread->wait();
-            }
-            // 线程是 this 的子对象，deleteLater 保持安全
-            thread->deleteLater();
-        }
-
-        // 确保对象在主线程并恢复父对象
-        pDataLink->moveToThread(QThread::currentThread());
-        pDataLink->setParent(this);
+        dealDataLinkThread(itor);
     }
     // 从集合中移除
     m_mapLink.erase(itor);
@@ -111,28 +91,7 @@ void QGroundControlStation::ClearAllDataLink()
 {
     // 断开并停止所有链接与线程
     for (auto itor = m_mapLink.begin(); itor != m_mapLink.end(); ++itor) {
-        QDataLink* link = itor.key();
-        QThread* thread = itor.value();
-
-        if (link) {
-            // 在 link 所在线程安全地断开
-            QMetaObject::invokeMethod(link, "disConnectLink", Qt::QueuedConnection);
-            QObject::disconnect(link, nullptr, this, nullptr);
-
-            // 将 link 移回主线程并设回父对象，确保之后可被析构
-            link->moveToThread(QThread::currentThread());
-            link->setParent(this);
-        }
-
-        if (thread) {
-            thread->quit();
-            if (!thread->wait(2000)) {
-                qWarning() << "Thread did not exit in time during ClearAllDataLink(), terminating.";
-                thread->terminate();
-                thread->wait();
-            }
-            thread->deleteLater();
-        }
+        dealDataLinkThread(itor);
     }
 
     // 清空集合
@@ -193,6 +152,31 @@ QPlat *QGroundControlStation::getOrCreatePlat(uint8_t uId,bool bIsAutopilot)
     }
 
     return(pPlat);
+}
+
+void QGroundControlStation::dealDataLinkThread(
+    QMap<QDataLink *, QThread *>::Iterator itor) {
+    QDataLink *pDataLink = itor.key();
+    QThread *thread = itor.value();
+
+    // 在 link 所在线程安全地断开
+    QMetaObject::invokeMethod(pDataLink, "disConnectLink", Qt::QueuedConnection);
+    QObject::disconnect(pDataLink, nullptr, this, nullptr);
+
+    QMetaObject::invokeMethod(
+        pDataLink, [&]() { pDataLink->moveToThread(QCoreApplication::instance()->thread()); });
+
+    pDataLink->deleteLater();
+
+    thread->quit();
+    if (!thread->wait(2000)) {
+        qWarning() << "Thread did not exit in time during ClearAllDataLink(), "
+                      "terminating.";
+        thread->terminate();
+        thread->wait();
+    }
+
+    thread->deleteLater();
 }
 
 int QGroundControlStation::getVehicleCount() const

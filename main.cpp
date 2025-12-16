@@ -37,10 +37,10 @@ int main(int argc, char *argv[]) {
             QObject::connect(vehicle, &QAutopilot::connectionStatusChanged,
                              [vehicle](bool bIsConnected) {
                                  if (bIsConnected)
-                    qDebug() << "飞控已连接:" << vehicle->toString();
+                                     qDebug() << "飞控已连接:" << vehicle->toString();
                                  else
                                      qDebug() << "飞控失去连接:" << vehicle->toString();
-            });
+                             });
 
             QObject::connect(vehicle, &QAutopilot::infoUpdated, [vehicle]() {
                 qDebug() << "飞控信息更新:" << vehicle->toString();

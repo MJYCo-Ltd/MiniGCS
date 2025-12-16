@@ -83,6 +83,12 @@ private:
      */
     QPlat* getOrCreatePlat(uint8_t uId, bool bIsAutopilot);
 
+    /**
+     * @brief 处理datalink的线程
+     * @param itor
+     */
+    void dealDataLinkThread(QMap<QDataLink*,QThread*>::Iterator itor);
+
 private:
     friend class QGroundControlStationPrivate;
     std::unique_ptr<QGroundControlStationPrivate> d_ptr;    ///< 私有实现指针
