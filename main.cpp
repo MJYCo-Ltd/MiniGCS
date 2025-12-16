@@ -13,7 +13,7 @@ int main(int argc, char *argv[]) {
     QGuiApplication app(argc, argv);
 
     QGCSConfig::instance()->init();
-    qInstallMessageHandler(&QGCSConfig::qtLogHandler);
+    auto oldHandler = qInstallMessageHandler(&QGCSConfig::qtLogHandler);
 
     // 创建QGroundControlStation实例
     QGroundControlStation* pGroundStation = new QGroundControlStation;
@@ -54,6 +54,7 @@ int main(int argc, char *argv[]) {
         pGroundStation = nullptr;
 
         QGCSConfig::instance()->release();
+        qInstallMessageHandler(oldHandler);
     });
 
     QQmlApplicationEngine engine;
