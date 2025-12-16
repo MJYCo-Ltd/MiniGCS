@@ -20,6 +20,7 @@ find_package(Qt6 REQUIRED COMPONENTS
     Core
     Quick
     SerialPort
+    Location
 )
 
 qt_standard_project_setup(REQUIRES 6.9)
@@ -83,9 +84,10 @@ endif()
 
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
-    MAVSDK::mavsdk
     Qt6::Core
     Qt6::Quick
     Qt6::SerialPort
+    Qt6::Location
+    MAVSDK::mavsdk
     spdlog::spdlog
 )
