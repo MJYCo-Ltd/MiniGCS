@@ -33,12 +33,12 @@ public:
     /**
      * @brief 开始连接
      */
-    virtual bool connectLink()=0;
+    Q_INVOKABLE virtual bool connectLink()=0;
 
     /**
      * @brief 断开连接
      */
-    virtual void disConnectLink()=0;
+    Q_INVOKABLE virtual void disConnectLink()=0;
 
 private slots:
     /**

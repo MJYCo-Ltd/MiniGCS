@@ -1,6 +1,5 @@
 #include <QCoreApplication>
 #include <QDebug>
-#include <QTimer>
 #include "QGroundControlStation.h"
 #include "QAutopilot.h"
 #include "QDataLink.h"
@@ -62,12 +61,8 @@ bool QGroundControlStation::AddDataLink(QDataLink* pDataLink)
     
     // 启动线程
     pThread->start();
-    
-    // 在目标线程的事件循环中调用 connectLink()，确保 QSerialPort 在正确的线程中创建
-    // 使用 QTimer::singleShot 确保在目标线程的事件循环中执行
-    QTimer::singleShot(0, pDataLink, [pDataLink]() {
-        pDataLink->connectLink();
-    });
+    QMetaObject::invokeMethod(pDataLink, "connectLink",
+                              Qt::QueuedConnection);
 
     return true;
 }
@@ -160,13 +155,11 @@ void QGroundControlStation::dealDataLinkThread(
     QThread *thread = itor.value();
 
     // 在 link 所在线程安全地断开
-    QMetaObject::invokeMethod(pDataLink, "disConnectLink", Qt::QueuedConnection);
+    QMetaObject::invokeMethod(pDataLink, "disConnectLink",
+                              Qt::QueuedConnection);
     QObject::disconnect(pDataLink, nullptr, this, nullptr);
 
-    QMetaObject::invokeMethod(
-        pDataLink, [&]() { pDataLink->moveToThread(QCoreApplication::instance()->thread()); });
-
-    pDataLink->deleteLater();
+    QMetaObject::invokeMethod(pDataLink, "deleteLater", Qt::QueuedConnection);
 
     thread->quit();
     if (!thread->wait(2000)) {
