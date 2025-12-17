@@ -47,6 +47,18 @@ void QAutopilotPrivate::setTelemetryRate(QObject* parent)
     });
     m_telemetry->set_rate_health_async(1, [](mavsdk::Telemetry::Result reqult) {
     });
+    m_telemetry->set_rate_imu_async(1, [](mavsdk::Telemetry::Result reqult) {
+    });
+    m_telemetry->set_rate_magnetometer_async(1, [](mavsdk::Telemetry::Result reqult) {
+    });
+    m_telemetry->set_rate_wind_async(1, [](mavsdk::Telemetry::Result reqult) {
+    });
+    m_telemetry->set_rate_distance_sensor_async(1, [](mavsdk::Telemetry::Result reqult) {
+    });
+    m_telemetry->set_rate_rc_channels_async(1, [](mavsdk::Telemetry::Result reqult) {
+    });
+    m_telemetry->set_rate_gimbal_async(1, [](mavsdk::Telemetry::Result reqult) {
+    });
 }
 
 void QAutopilotPrivate::setupMessageHandling(QObject *parent) {
@@ -101,5 +113,20 @@ void QAutopilotPrivate::setupMessageHandling(QObject *parent) {
         std::ostringstream oss;
         oss << gps;
         qDebug() << "GpsInfo:" << oss.str();
+    });
+    m_telemetry->subscribe_imu([](mavsdk::Telemetry::Imu imu) {
+        std::ostringstream oss;
+        oss << imu;
+        qDebug() << "Imu:" << oss.str();
+    });
+    m_telemetry->subscribe_magnetometer([](mavsdk::Telemetry::Magnetometer magnetometer) {
+        std::ostringstream oss;
+        oss << magnetometer;
+        qDebug() << "Magnetometer:" << oss.str();
+    });
+    m_telemetry->subscribe_wind([](mavsdk::Telemetry::Wind wind) {
+        std::ostringstream oss;
+        oss << wind;
+        qDebug() << "Wind:" << oss.str();
     });
 }
