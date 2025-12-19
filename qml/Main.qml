@@ -12,12 +12,19 @@ Window {
         anchors.fill: parent
         plugin: Plugin {
             name: "QGroundControl"   // 使用 OpenStreetMap 插件
+            PluginParameter {
+                name: "TiandiTuKey"
+                value: "cbc71550f33685acbd0bff46a661e63d"
+            }
         }
 
         // 设置初始中心点
-        center: QtPositioning.coordinate(39.9042, 116.4074) // 北京
-        zoomLevel: 12
-        activeMapType:supportedMapTypes[6];
+        center: QtPositioning.coordinate(38.045474, 114.502461) // 北京
+        zoomLevel: 8
+        activeMapType:supportedMapTypes[0]
+        minimumZoomLevel: 1
+        maximumZoomLevel:23
+
         // 地图控制
         PinchHandler {
             id: pinch
@@ -26,7 +33,9 @@ Window {
                                  map.startCentroid = map.toCoordinate(pinch.centroid.position, false)
                              }
             onScaleChanged: (delta) => {
-                                map.zoomLevel += Math.log2(delta)
+                                let z = map.zoomLevel + Math.log2(delta)
+                                z = Math.max(minimumZoomLevel, Math.min(maximumZoomLevel, z))
+                                map.zoomLevel = z
                                 map.alignCoordinateToPoint(map.startCentroid, pinch.centroid.position)
                             }
             onRotationChanged: (delta) => {
@@ -42,7 +51,13 @@ Window {
                              ? PointerDevice.Mouse | PointerDevice.TouchPad
                              : PointerDevice.Mouse
             rotationScale: 1/120
-            property: "zoomLevel"
+            onWheel: (event) => {
+                         let z = map.zoomLevel + event.angleDelta.y * rotationScale
+                         z = Math.max(map.minimumZoomLevel,
+                                      Math.min(map.maximumZoomLevel, z))
+                         map.zoomLevel = z
+                         event.accepted = true
+                     }
         }
 
         DragHandler {
@@ -63,6 +78,7 @@ Window {
                             t.description,
                             t.style
                             )
+                console.log(activeMapType.metadata.maximumZoomLevel)
             }
         }
     }

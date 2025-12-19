@@ -34,7 +34,9 @@ set(SOURCES
     main.cpp
     Src/AirLine/QAirLine.cpp
     Src/AirLine/QAirLineManager.cpp
-    Src/AirLine/QDronePosition.cpp
+    Src/AirLine/QGpsPosition.cpp
+    Src/AirLine/QNEDPosition.cpp
+    Src/Plat/QAutopilotStatus.cpp
     Src/Extern/XmlToMavSDK.cpp
     Src/Extern/AsyncSendMavLink.cpp
     Src/Link/QSerialDataLink.cpp
@@ -50,7 +52,9 @@ set(SOURCES
 set(HEADERS
     Inc/AirLine/QAirLine.h
     Inc/AirLine/QAirLineManager.h
-    Inc/AirLine/QDronePosition.h
+    Inc/AirLine/QGpsPosition.h
+    Inc/AirLine/QNEDPosition.h
+    Inc/Plat/QAutopilotStatus.h
     Inc/Extern/XmlToMavSDK.h
     Inc/Extern/AsyncSendMavLink.h
     Inc/Link/QDataLink.h

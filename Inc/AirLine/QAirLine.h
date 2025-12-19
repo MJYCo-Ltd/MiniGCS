@@ -5,7 +5,7 @@
 #include <QString>
 #include <QList>
 #include <QMetaType>
-#include "QDronePosition.h"
+#include "QGpsPosition.h"
 
 /**
  * @brief 航线类
@@ -16,7 +16,7 @@ class QAirLine : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(QString name READ name WRITE setName NOTIFY nameChanged)
-    Q_PROPERTY(QList<QDronePosition> waypoints READ waypoints WRITE setWaypoints NOTIFY waypointsChanged)
+    Q_PROPERTY(QList<QGpsPosition> waypoints READ waypoints WRITE setWaypoints NOTIFY waypointsChanged)
     Q_PROPERTY(int waypointCount READ waypointCount NOTIFY waypointsChanged)
 
 public:
@@ -40,13 +40,13 @@ public:
      * @brief 获取航点列表
      * @return 航点列表
      */
-    QList<QDronePosition> waypoints() const;
+    QList<QGpsPosition> waypoints() const;
 
     /**
      * @brief 设置航点列表
      * @param waypoints 航点列表
      */
-    void setWaypoints(const QList<QDronePosition> &waypoints);
+    void setWaypoints(const QList<QGpsPosition> &waypoints);
 
     /**
      * @brief 获取航点数量
@@ -58,14 +58,14 @@ public:
      * @brief 添加航点
      * @param position 航点位置
      */
-    Q_INVOKABLE void addWaypoint(const QDronePosition &position);
+    Q_INVOKABLE void addWaypoint(const QGpsPosition &position);
 
     /**
      * @brief 在指定索引插入航点
      * @param index 索引
      * @param position 航点位置
      */
-    Q_INVOKABLE void insertWaypoint(int index, const QDronePosition &position);
+    Q_INVOKABLE void insertWaypoint(int index, const QGpsPosition &position);
 
     /**
      * @brief 移除指定索引的航点
@@ -78,7 +78,7 @@ public:
      * @param index 索引
      * @return 航点位置
      */
-    Q_INVOKABLE QDronePosition getWaypoint(int index) const;
+    Q_INVOKABLE QGpsPosition getWaypoint(int index) const;
 
     /**
      * @brief 清空所有航点
@@ -99,7 +99,7 @@ signals:
 
 private:
     QString m_name;                          ///< 航线名称
-    QList<QDronePosition> m_waypoints;        ///< 航点列表
+    QList<QGpsPosition> m_waypoints;        ///< 航点列表
 };
 
 Q_DECLARE_METATYPE(QAirLine*)

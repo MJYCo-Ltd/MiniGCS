@@ -30,12 +30,12 @@ void QAirLine::setName(const QString &name)
     }
 }
 
-QList<QDronePosition> QAirLine::waypoints() const
+QList<QGpsPosition> QAirLine::waypoints() const
 {
     return m_waypoints;
 }
 
-void QAirLine::setWaypoints(const QList<QDronePosition> &waypoints)
+void QAirLine::setWaypoints(const QList<QGpsPosition> &waypoints)
 {
     if (m_waypoints != waypoints) {
         m_waypoints = waypoints;
@@ -48,13 +48,13 @@ int QAirLine::waypointCount() const
     return m_waypoints.size();
 }
 
-void QAirLine::addWaypoint(const QDronePosition &position)
+void QAirLine::addWaypoint(const QGpsPosition &position)
 {
     m_waypoints.append(position);
     emit waypointsChanged();
 }
 
-void QAirLine::insertWaypoint(int index, const QDronePosition &position)
+void QAirLine::insertWaypoint(int index, const QGpsPosition &position)
 {
     if (index < 0 || index > m_waypoints.size()) {
         qWarning() << "QAirLine::insertWaypoint: 索引超出范围" << index;
@@ -74,11 +74,11 @@ void QAirLine::removeWaypoint(int index)
     emit waypointsChanged();
 }
 
-QDronePosition QAirLine::getWaypoint(int index) const
+QGpsPosition QAirLine::getWaypoint(int index) const
 {
     if (index < 0 || index >= m_waypoints.size()) {
         qWarning() << "QAirLine::getWaypoint: 索引超出范围" << index;
-        return QDronePosition();
+        return QGpsPosition();
     }
     return m_waypoints.at(index);
 }
