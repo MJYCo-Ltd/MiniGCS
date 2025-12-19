@@ -10,6 +10,7 @@ QAutopilotPrivate::QAutopilotPrivate()
 
 QAutopilotPrivate::~QAutopilotPrivate() {}
 
+
 void QAutopilotPrivate::setAutopilotType(const QString &autopilotType) {
     m_autopilotType = autopilotType;
 }
@@ -26,23 +27,34 @@ QString QAutopilotPrivate::getVehicleType() const { return m_vehicleType; }
 void QAutopilotPrivate::setSystem(std::shared_ptr<mavsdk::System> system) {
     QPlatPrivate::setSystem(system);
     m_telemetry = std::make_unique<mavsdk::Telemetry>(*system);
+    m_action = std::make_unique<mavsdk::Action>(*system);
+    arm();
 }
 
 #include <spdlog/fmt/ostr.h>
 #include <spdlog/spdlog.h>
-template <>
-struct fmt::formatter<mavsdk::Telemetry::Result> : ostream_formatter {};
+template<>struct fmt::formatter<mavsdk::Action::Result>:ostream_formatter{};
+
+void QAutopilotPrivate::arm()
+{
+    m_action->arm_async([this](mavsdk::Action::Result reqult) {
+        spdlog::debug("[mavsdk] systemid={} arm_async:{}",
+                      m_pSystem->get_system_id(), reqult);
+    });
+}
+
+template<>struct fmt::formatter<mavsdk::Telemetry::Result>:ostream_formatter{};
 
 void QAutopilotPrivate::setTelemetryRate(QObject *parent) {
     /// 设置 位置信息 频率
     m_telemetry->set_rate_position_async(
-        1, [&](mavsdk::Telemetry::Result reqult) {
+        1, [this](mavsdk::Telemetry::Result reqult) {
         spdlog::debug("[mavsdk] systemid={} set_rate_position_async:{}",
                           m_pSystem->get_system_id(), reqult);
         });
 
     m_telemetry->set_rate_position_velocity_ned_async(
-        1, [&](mavsdk::Telemetry::Result reqult) {
+        1, [this](mavsdk::Telemetry::Result reqult) {
         spdlog::debug(
                 "[mavsdk] systemid={} set_rate_position_velocity_ned_async:{}",
                 m_pSystem->get_system_id(), reqult);
@@ -50,72 +62,61 @@ void QAutopilotPrivate::setTelemetryRate(QObject *parent) {
 
     /// 设置 gps 状态 发送频率
     m_telemetry->set_rate_gps_info_async(
-        1, [&](mavsdk::Telemetry::Result reqult) {
+        1, [this](mavsdk::Telemetry::Result reqult) {
         spdlog::debug("[mavsdk] systemid={} set_rate_gps_info_async:{}",
                       m_pSystem->get_system_id(), reqult);
         });
 
     /// 设置 电池信息 发送频率
-    m_telemetry->set_rate_battery_async(1, [&](mavsdk::Telemetry::Result reqult) {
+    m_telemetry->set_rate_battery_async(1, [this](mavsdk::Telemetry::Result reqult) {
         spdlog::debug("[mavsdk] systemid={} set_rate_battery_async:{}",
                       m_pSystem->get_system_id(), reqult);
     });
 
     /// 设置 健康度 发送频率
     m_telemetry->set_rate_health_async(
-        0.5, [&](mavsdk::Telemetry::Result reqult) {
+        0.5, [this](mavsdk::Telemetry::Result reqult) {
         spdlog::debug("[mavsdk] systemid={} set_rate_health_async:{}",
                       m_pSystem->get_system_id(), reqult);
         });
 
     /// 设置 陀螺仪 发送频率
-    m_telemetry->set_rate_imu_async(1, [&](mavsdk::Telemetry::Result reqult) {
+    m_telemetry->set_rate_imu_async(1, [this](mavsdk::Telemetry::Result reqult) {
         spdlog::debug("[mavsdk] systemid={} set_rate_imu_async:{}",
                       m_pSystem->get_system_id(), reqult);
     });
 
     /// 设置 home 发送频率
-    m_telemetry->set_rate_home_async(0.1, [&](mavsdk::Telemetry::Result reqult) {
+    m_telemetry->set_rate_home_async(0.1, [this](mavsdk::Telemetry::Result reqult) {
             spdlog::debug("[mavsdk] systemid={} set_rate_home_async:{}",
                           m_pSystem->get_system_id(), reqult);
         });
 
     /// 设置 距离传感器 发送频率
     m_telemetry->set_rate_distance_sensor_async(
-        1, [&](mavsdk::Telemetry::Result reqult) {
+        1, [this](mavsdk::Telemetry::Result reqult) {
         spdlog::debug("[mavsdk] systemid={} set_rate_distance_sensor_async:{}",
                       m_pSystem->get_system_id(), reqult);
         });
 
-    /// 设置 遥控器状态 发送频率
-    m_telemetry->set_rate_rc_status_async(
-        0.2, [&](mavsdk::Telemetry::Result reqult) {
-        spdlog::debug("[mavsdk] systemid={} set_rate_rc_status_async:{}",
-                      m_pSystem->get_system_id(), reqult);
-        });
+    /// 设置 遥控器状态 发送频率 Unsupported and System status is usually fixed at 1 Hz
+    // m_telemetry->set_rate_rc_status_async(
+    //     0.2, [this](mavsdk::Telemetry::Result reqult) {
+    //     spdlog::debug("[mavsdk] systemid={} set_rate_rc_status_async:{}",
+    //                   m_pSystem->get_system_id(), reqult);
+    //     });
 }
 
-template <>
-struct fmt::formatter<mavsdk::Telemetry::Position> : ostream_formatter {};
-template <>
-struct fmt::formatter<mavsdk::Telemetry::Heading> : ostream_formatter {};
-template <>
-struct fmt::formatter<mavsdk::Telemetry::Battery> : ostream_formatter {};
-template <>
-struct fmt::formatter<mavsdk::Telemetry::FlightMode> : ostream_formatter {};
-template <>
-struct fmt::formatter<mavsdk::Telemetry::Health> : ostream_formatter {};
-template <>
-struct fmt::formatter<mavsdk::Telemetry::GpsInfo> : ostream_formatter {};
-template <>
-struct fmt::formatter<mavsdk::Telemetry::Imu> : ostream_formatter {};
-template <>
-struct fmt::formatter<mavsdk::Telemetry::PositionVelocityNed>
-    : ostream_formatter {};
-template <>
-struct fmt::formatter<mavsdk::Telemetry::DistanceSensor> : ostream_formatter {};
-template <>
-struct fmt::formatter<mavsdk::Telemetry::RcStatus> : ostream_formatter {};
+template<>struct fmt::formatter<mavsdk::Telemetry::Position>:ostream_formatter{};
+template<>struct fmt::formatter<mavsdk::Telemetry::Heading>:ostream_formatter{};
+template<>struct fmt::formatter<mavsdk::Telemetry::Battery>:ostream_formatter{};
+template<>struct fmt::formatter<mavsdk::Telemetry::FlightMode>:ostream_formatter{};
+template<>struct fmt::formatter<mavsdk::Telemetry::Health>:ostream_formatter{};
+template<>struct fmt::formatter<mavsdk::Telemetry::GpsInfo>:ostream_formatter{};
+template<>struct fmt::formatter<mavsdk::Telemetry::Imu>:ostream_formatter{};
+template<>struct fmt::formatter<mavsdk::Telemetry::PositionVelocityNed>:ostream_formatter{};
+template<>struct fmt::formatter<mavsdk::Telemetry::DistanceSensor>:ostream_formatter{};
+template<>struct fmt::formatter<mavsdk::Telemetry::RcStatus>:ostream_formatter{};
 
 void QAutopilotPrivate::setupMessageHandling(QObject *parent) {
     if (!m_telemetry || !parent) {

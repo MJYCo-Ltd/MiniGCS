@@ -48,6 +48,11 @@ public:
      */
     void setVehicleType(const QString &vehicleType);
 
+    /**
+     * @brief 解锁无人机
+     */
+    void arm();
+
 
 signals:
     /**

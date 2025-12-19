@@ -25,6 +25,10 @@ Window {
         minimumZoomLevel: 1
         maximumZoomLevel:23
 
+        function clampZoom(delta){
+            map.zoomLevel = Math.max(map.minimumZoomLevel, Math.min(map.maximumZoomLevel, map.zoomLevel + delta))
+        }
+
         // 地图控制
         PinchHandler {
             id: pinch
@@ -33,9 +37,7 @@ Window {
                                  map.startCentroid = map.toCoordinate(pinch.centroid.position, false)
                              }
             onScaleChanged: (delta) => {
-                                let z = map.zoomLevel + Math.log2(delta)
-                                z = Math.max(minimumZoomLevel, Math.min(maximumZoomLevel, z))
-                                map.zoomLevel = z
+                                map.clampZoom(Math.log2(delta))
                                 map.alignCoordinateToPoint(map.startCentroid, pinch.centroid.position)
                             }
             onRotationChanged: (delta) => {
@@ -52,10 +54,7 @@ Window {
                              : PointerDevice.Mouse
             rotationScale: 1/120
             onWheel: (event) => {
-                         let z = map.zoomLevel + event.angleDelta.y * rotationScale
-                         z = Math.max(map.minimumZoomLevel,
-                                      Math.min(map.maximumZoomLevel, z))
-                         map.zoomLevel = z
+                         map.clampZoom(event.angleDelta.y * rotationScale)
                          event.accepted = true
                      }
         }
@@ -67,19 +66,6 @@ Window {
                                       // 允许拖动地图（锁定飞机时，地图会自动跟随飞机回中）
                                       map.pan(-delta.x, -delta.y)
                                   }
-        }
-        Component.onCompleted: {
-            console.log("Supported map types:")
-            for (var i = 0; i < supportedMapTypes.length; ++i) {
-                var t = supportedMapTypes[i]
-                console.log(
-                            i,
-                            t.name,
-                            t.description,
-                            t.style
-                            )
-                console.log(activeMapType.metadata.maximumZoomLevel)
-            }
         }
     }
 }

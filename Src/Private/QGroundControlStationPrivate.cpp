@@ -37,6 +37,10 @@ void QGroundControlStationPrivate::initializeMavsdk()
 
     auto connectionResult = m_mavsdk->add_any_connection_with_handle("raw://");
 
+    m_mavsdk->subscribe_incoming_messages_json([](mavsdk::Mavsdk::MavlinkMessage msg) {
+        qDebug()<<msg.message_name.c_str()<<','<<msg.fields_json.c_str();
+        return(true);
+    });
     if (connectionResult.first == mavsdk::ConnectionResult::Success) {
         m_connectionHandle = connectionResult.second;
     } else {

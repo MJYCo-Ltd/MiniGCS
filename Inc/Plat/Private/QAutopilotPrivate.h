@@ -1,6 +1,7 @@
 #ifndef Q_SUTOPILOT_PRIVATE_H
 #define Q_SUTOPILOT_PRIVATE_H
 
+#include <mavsdk/plugins/action/action.h>
 #include "QPlatPrivate.h"
 
 /**
@@ -23,6 +24,11 @@ class QAutopilotPrivate:public QPlatPrivate
 public:
     QAutopilotPrivate();
     ~QAutopilotPrivate();
+
+    /**
+     * @brief 解锁
+     */
+    void arm();
 
     /**
      * @brief 设置自动驾驶仪类型
@@ -77,6 +83,7 @@ protected:
     QString m_autopilotType;                ///< 自动驾驶仪类型
     QString m_vehicleType;                  ///< 载具类型
     std::unique_ptr<mavsdk::Telemetry> m_telemetry; ///< 遥测插件
+    std::unique_ptr<mavsdk::Action>    m_action;
     mavsdk::Telemetry::Imu m_lastImu;      ///< 最后一次IMU数据
     
     // 位置滤波相关

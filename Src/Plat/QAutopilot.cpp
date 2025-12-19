@@ -60,6 +60,11 @@ void QAutopilot::setVehicleType(const QString &vehicleType) {
     }
 }
 
+void QAutopilot::arm()
+{
+    d_func()->arm();
+}
+
 void QAutopilot::positionUpdate(double dLon, double dLat, float dH) {
     if (!qFuzzyCompare(m_gpsPosition.longitude(), dLon) ||
         !qFuzzyCompare(m_gpsPosition.latitude(), dLat) ||
