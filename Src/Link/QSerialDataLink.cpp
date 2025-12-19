@@ -1,6 +1,6 @@
-#include "QSerialDataLink.h"
 #include <QSerialPort>
 #include <QDebug>
+#include "Link/QSerialDataLink.h"
 
 QSerialDataLink::QSerialDataLink(const QString &portName, int baudRate, QObject *parent)
     : QDataLink(parent)
@@ -53,14 +53,6 @@ bool QSerialDataLink::connectLink()
         emit linkStatusChanged(false);
         emit linkError(errorMsg);
         return (false);
-    }
-}
-
-void QSerialDataLink::disConnectLink()
-{
-    if (m_serialPort && m_serialPort->isOpen()) {
-        m_serialPort->close();
-        emit linkStatusChanged(false);
     }
 }
 
@@ -178,4 +170,12 @@ void QSerialDataLink::onSendDataRequested(const QByteArray &data)
 {
     // 在正确的线程中调用 sendLinkData
     sendLinkData(data);
+}
+
+void QSerialDataLink::closeOpenSerialPort()
+{
+    if (m_serialPort && m_serialPort->isOpen()) {
+        m_serialPort->close();
+        emit linkStatusChanged(false);
+    }
 }

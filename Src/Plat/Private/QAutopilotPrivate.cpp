@@ -1,132 +1,148 @@
-
 #include <QDebug>
-#include "Private/QAutopilotPrivate.h"
+#include <QMetaObject>
+#include "Plat/Private/QAutopilotPrivate.h"
 
-QAutopilotPrivate::QAutopilotPrivate()
-{
-}
+QAutopilotPrivate::QAutopilotPrivate() {}
 
-QAutopilotPrivate::~QAutopilotPrivate()
-{
-}
+QAutopilotPrivate::~QAutopilotPrivate() {}
 
-void QAutopilotPrivate::setAutopilotType(const QString &autopilotType)
-{
+void QAutopilotPrivate::setAutopilotType(const QString &autopilotType) {
     m_autopilotType = autopilotType;
 }
 
-QString QAutopilotPrivate::getAutopilotType() const
-{
-    return m_autopilotType;
-}
+QString QAutopilotPrivate::getAutopilotType() const { return m_autopilotType; }
 
-void QAutopilotPrivate::setVehicleType(const QString &vehicleType)
-{
+void QAutopilotPrivate::setVehicleType(const QString &vehicleType) {
     m_vehicleType = vehicleType;
 }
 
-QString QAutopilotPrivate::getVehicleType() const
-{
-    return m_vehicleType;
-}
+QString QAutopilotPrivate::getVehicleType() const { return m_vehicleType; }
 
-void QAutopilotPrivate::setSystem(std::shared_ptr<mavsdk::System> system)
-{
+/// 设置mavsdk的飞控系统
+void QAutopilotPrivate::setSystem(std::shared_ptr<mavsdk::System> system) {
     QPlatPrivate::setSystem(system);
     m_telemetry = std::make_unique<mavsdk::Telemetry>(*system);
 }
 
-void QAutopilotPrivate::setTelemetryRate(QObject* parent)
-{
+#include <spdlog/fmt/ostr.h>
+#include <spdlog/spdlog.h>
+template <> struct fmt::formatter<mavsdk::Telemetry::Result> : ostream_formatter {};
+
+void QAutopilotPrivate::setTelemetryRate(QObject *parent) {
     /// 设置通信频率
-    m_telemetry->set_rate_position_async(1, [](mavsdk::Telemetry::Result reqult) {
+    m_telemetry->set_rate_position_async(1,[&](mavsdk::Telemetry::Result reqult) {
+        spdlog::debug("[mavsdk] systemid={} set_rate_position_async:{}", m_pSystem->get_system_id(),
+                      reqult);
     });
-    m_telemetry->set_rate_gps_info_async(1, [](mavsdk::Telemetry::Result reqult) {
+
+    m_telemetry->set_rate_gps_info_async(1,[&](mavsdk::Telemetry::Result reqult) {
+        spdlog::debug("[mavsdk] systemid={} set_rate_gps_info_async:{}", m_pSystem->get_system_id(),
+                      reqult);
     });
-    m_telemetry->set_rate_battery_async(1, [](mavsdk::Telemetry::Result reqult) {
+
+    m_telemetry->set_rate_battery_async(1,[&](mavsdk::Telemetry::Result reqult) {
+        spdlog::debug("[mavsdk] systemid={} set_rate_battery_async:{}", m_pSystem->get_system_id(),
+                      reqult);
     });
-    m_telemetry->set_rate_health_async(1, [](mavsdk::Telemetry::Result reqult) {
+
+    m_telemetry->set_rate_health_async(1,[&](mavsdk::Telemetry::Result reqult) {
+        spdlog::debug("[mavsdk] systemid={} set_rate_health_async:{}", m_pSystem->get_system_id(),
+                      reqult);
     });
-    m_telemetry->set_rate_imu_async(1, [](mavsdk::Telemetry::Result reqult) {
+
+    m_telemetry->set_rate_imu_async(1,[&](mavsdk::Telemetry::Result reqult) {
+        spdlog::debug("[mavsdk] systemid={} set_rate_imu_async:{}", m_pSystem->get_system_id(),
+                      reqult);
     });
-    m_telemetry->set_rate_magnetometer_async(1, [](mavsdk::Telemetry::Result reqult) {
-    });
-    m_telemetry->set_rate_wind_async(1, [](mavsdk::Telemetry::Result reqult) {
-    });
-    m_telemetry->set_rate_distance_sensor_async(1, [](mavsdk::Telemetry::Result reqult) {
-    });
-    m_telemetry->set_rate_rc_channels_async(1, [](mavsdk::Telemetry::Result reqult) {
-    });
-    m_telemetry->set_rate_gimbal_async(1, [](mavsdk::Telemetry::Result reqult) {
+
+    m_telemetry->set_rate_distance_sensor_async(1,[&](mavsdk::Telemetry::Result reqult) {
+        spdlog::debug("[mavsdk] systemid={} set_rate_distance_sensor_async:{}", m_pSystem->get_system_id(),
+                      reqult);
     });
 }
+
+template <> struct fmt::formatter<mavsdk::Telemetry::Position> : ostream_formatter {};
+template <> struct fmt::formatter<mavsdk::Telemetry::Heading> : ostream_formatter {};
+template <> struct fmt::formatter<mavsdk::Telemetry::Battery> : ostream_formatter {};
+template <> struct fmt::formatter<mavsdk::Telemetry::FlightMode> : ostream_formatter {};
+template <> struct fmt::formatter<mavsdk::Telemetry::Health> : ostream_formatter {};
+template <> struct fmt::formatter<mavsdk::Telemetry::GpsInfo> : ostream_formatter {};
+template <> struct fmt::formatter<mavsdk::Telemetry::Imu> : ostream_formatter {};
+template <> struct fmt::formatter<mavsdk::Telemetry::PositionVelocityNed> : ostream_formatter {};
+template <> struct fmt::formatter<mavsdk::Telemetry::DistanceSensor> : ostream_formatter {};
 
 void QAutopilotPrivate::setupMessageHandling(QObject *parent) {
     if (!m_telemetry || !parent) {
         return;
     }
     QPlatPrivate::setupMessageHandling(parent);
+    setTelemetryRate(parent);
 
-    // 订阅位置信息
-    m_telemetry->subscribe_position(
-        [parent](mavsdk::Telemetry::Position position) {
-        std::ostringstream oss;
-        oss << position;
-        qDebug() << "position:" << oss.str();
-        });
-
-    // 订阅姿态信息
-    m_telemetry->subscribe_attitude_euler(
-        [parent](mavsdk::Telemetry::EulerAngle attitude) {
-        // 这里可以发射姿态更新信号
-        // QMetaObject::invokeMethod(parent, "attitudeUpdated",
-        // Qt::QueuedConnection, ...);
-        });
-
-    // 订阅电池状态
-    m_telemetry->subscribe_battery([parent](mavsdk::Telemetry::Battery battery) {
-        // 这里可以发射电池状态更新信号
-        std::ostringstream oss;
-        oss << battery;
-        qDebug() << "battery:" << oss.str();
-        // QMetaObject::invokeMethod(parent, "batteryUpdated", Qt::QueuedConnection,
-        // ...);
+    /// 位置信息
+    m_telemetry->subscribe_position([this, parent](mavsdk::Telemetry::Position position) {
+        spdlog::info("[Position] systemid={} {}",m_pSystem->get_system_id(),position);
+        
+        // 通过Qt元系统调用parent的positionUpdate方法
+        QMetaObject::invokeMethod(parent, "positionUpdate", Qt::AutoConnection,
+                                  position.longitude_deg,
+                                  position.latitude_deg,
+                                  position.absolute_altitude_m);
     });
 
-    // 订阅飞行状态
+    /// 航向
+    m_telemetry->subscribe_heading([&](mavsdk::Telemetry::Heading heading) {
+        spdlog::info("[Heading] systemid={} {}", m_pSystem->get_system_id(),
+                      heading);
+    });
+
+    /// 电池状态
+    m_telemetry->subscribe_battery([&](mavsdk::Telemetry::Battery battery) {
+        spdlog::info("[Battery] systemid={} {}", m_pSystem->get_system_id(),
+                      battery);
+    });
+
+    /// 飞行状态
     m_telemetry->subscribe_flight_mode(
-        [parent](mavsdk::Telemetry::FlightMode flightMode) {
-        // std::ostringstream oss;
-        // oss << flightMode;
-        // qDebug() << "flightMode:" << oss.str();
-        // 这里可以发射飞行状态更新信号
-        // QMetaObject::invokeMethod(parent, "flightModeUpdated",
-        // Qt::QueuedConnection, ...);
+        [&](mavsdk::Telemetry::FlightMode flightMode) {
+        spdlog::info("[FlightMode] systemid={} {}", m_pSystem->get_system_id(),
+                          flightMode);
         });
 
-    m_telemetry->subscribe_health([](mavsdk::Telemetry::Health h) {
-        std::ostringstream oss;
-        oss << h;
-        qDebug() << "Health:" << oss.str();
+    /// 健康状态
+    m_telemetry->subscribe_health([&](mavsdk::Telemetry::Health h) {
+        spdlog::info("[Health] systemid={} {}", m_pSystem->get_system_id(), h);
     });
-    m_telemetry->subscribe_gps_info([](mavsdk::Telemetry::GpsInfo gps) {
-        std::ostringstream oss;
-        oss << gps;
-        qDebug() << "GpsInfo:" << oss.str();
+
+    /// GPS状态
+    m_telemetry->subscribe_gps_info([&](mavsdk::Telemetry::GpsInfo gps) {
+        spdlog::info("[GpsInfo] systemid={} {}", m_pSystem->get_system_id(), gps);
     });
-    m_telemetry->subscribe_imu([](mavsdk::Telemetry::Imu imu) {
-        std::ostringstream oss;
-        oss << imu;
-        qDebug() << "Imu:" << oss.str();
+
+    /// 陀螺仪状态
+    m_telemetry->subscribe_imu([&](mavsdk::Telemetry::Imu imu) {
+        spdlog::info("[Imu] systemid={} {}", m_pSystem->get_system_id(), imu);
     });
-    m_telemetry->subscribe_magnetometer([](mavsdk::Telemetry::Magnetometer magnetometer) {
-        std::ostringstream oss;
-        oss << magnetometer;
-        qDebug() << "Magnetometer:" << oss.str();
+
+    /// 本地坐标
+    m_telemetry->subscribe_position_velocity_ned([this, parent](mavsdk::Telemetry::PositionVelocityNed pvNed) {
+        spdlog::info("[PositionVelocityNed] systemid={} {}",
+                      m_pSystem->get_system_id(),pvNed);
+        
+        // 通过Qt元系统调用parent的nedUpdate方法
+        QMetaObject::invokeMethod(parent, "nedUpdate", Qt::AutoConnection,
+                                  pvNed.position.north_m,
+                                  pvNed.position.east_m,
+                                  pvNed.position.down_m);
     });
-    m_telemetry->subscribe_wind([](mavsdk::Telemetry::Wind wind) {
-        std::ostringstream oss;
-        oss << wind;
-        qDebug() << "Wind:" << oss.str();
+
+    /// 距离传感器
+    m_telemetry->subscribe_distance_sensor([&](mavsdk::Telemetry::DistanceSensor sensor) {
+        spdlog::info("[DistanceSensor] systemid={} {}", m_pSystem->get_system_id(),
+                      sensor);
+    });
+
+    m_telemetry->subscribe_home([&](mavsdk::Telemetry::Position home){
+        spdlog::info("[Home] systemid={} {}", m_pSystem->get_system_id(),
+                      home);
     });
 }

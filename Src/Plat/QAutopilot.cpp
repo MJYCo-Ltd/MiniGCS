@@ -1,7 +1,7 @@
-#include "QAutopilot.h"
-#include "Private/QAutopilotPrivate.h"
 #include <QDebug>
 #include <QDateTime>
+#include "Plat/QAutopilot.h"
+#include "Plat/Private/QAutopilotPrivate.h"
 
 QAutopilot::QAutopilot(QObject *parent)
 {
@@ -45,4 +45,18 @@ void QAutopilot::setVehicleType(const QString &vehicleType)
         d_func()->setVehicleType(vehicleType);
         emit infoUpdated();
     }
+}
+
+void QAutopilot::positionUpdate(double dLon, double dLat, float dH)
+{
+    m_recPostion.setLongitude(dLon);
+    m_recPostion.setLatitude(dLat);
+    m_recPostion.setAltitude(dH);
+}
+
+void QAutopilot::nedUpdate(float dNorth, float dEast, float dDown)
+{
+    m_recPostion.setNedX(dNorth);
+    m_recPostion.setNedY(dEast);
+    m_recPostion.setNedZ(dDown);
 }

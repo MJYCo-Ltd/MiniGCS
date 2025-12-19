@@ -5,9 +5,7 @@
 #include <QStandardPaths>
 
 #include <mavsdk/plugins/events/events.h>
-#include <spdlog/fmt/ostr.h>
-#include <spdlog/sinks/rotating_file_sink.h>
-#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/sinks/daily_file_sink.h>
 #include <spdlog/spdlog.h>
 
 QGCSConfig *QGCSConfig::m_pSInsatance = nullptr;
@@ -53,6 +51,7 @@ static spdlog::level::level_enum levelFromString(const QString &levelStr) {
 QGCSConfig::QGCSConfig() : m_settings(nullptr) {}
 
 QGCSConfig::~QGCSConfig() {
+    spdlog::warn("[MiniGCS] {}","系统正在清理资源，即将退出……");
     sinks.clear();
     if (m_settings) {
         save();
@@ -71,9 +70,9 @@ QGCSConfig *QGCSConfig::instance() {
 
 void QGCSConfig::init_logging() {
     // 先建立 sinks
-    auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-    auto file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
-        "minigcs.log", 5 * 1024 * 1024, 3);
+    // auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+    auto file_sink = std::make_shared<spdlog::sinks::daily_file_sink_mt>(
+        "log/minigcs.log", 0,0,false,7);
 
     // 从配置读取日志级别
     QString configuredLevel = DEFAULT_LOG_LEVEL;
@@ -84,11 +83,9 @@ void QGCSConfig::init_logging() {
     spdlog::level::level_enum lvl = levelFromString(configuredLevel);
 
     // 将级别应用到 sink（并保留原来的按用途设置可选，这里统一使用配置级别）
-    console_sink->set_level(lvl);
     file_sink->set_level(lvl);
 
     sinks.clear();
-    sinks.push_back(console_sink);
     sinks.push_back(file_sink);
 
     auto logger =
@@ -98,13 +95,13 @@ void QGCSConfig::init_logging() {
     spdlog::set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%^%l%$] [%t] %v");
     spdlog::set_level(lvl); // 全局级别
 
-    spdlog::info("Logging initialized with level: {}",
-                 configuredLevel.toStdString());
+    spdlog::info("[MiniGCS] {} Logging initialized with level: {}",
+                 "系统启动",configuredLevel.toStdString());
 }
 
 void QGCSConfig::qtLogHandler(QtMsgType type, const QMessageLogContext &ctx,
                               const QString &msg) {
-    std::string logMsg(msg.toLocal8Bit().constData());
+    std::string logMsg(msg.toUtf8().constData());
     // 拼接上下文信息
     std::string ctxInfo = fmt::format(
         "[{}:{} {}] {}", ctx.file ? ctx.file : "", ctx.line,

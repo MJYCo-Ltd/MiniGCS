@@ -3,8 +3,8 @@
 #include <QQuickWindow>
 
 #include "QGroundControlStation.h"
-#include "QSerialDataLink.h"
-#include "QAutopilot.h"
+#include "Link/QSerialDataLink.h"
+#include "Plat/QAutopilot.h"
 #include "QGCSConfig.h"
 
 int main(int argc, char *argv[]) {
@@ -49,12 +49,13 @@ int main(int argc, char *argv[]) {
 
     // aboutToQuit 在主线程同步执行，用于做必要的善后工作（短且快速）
     QObject::connect(&app, &QCoreApplication::aboutToQuit, [&]() {
+        qInstallMessageHandler(oldHandler);
         // 尽量在这里执行快速、确定性的清理，避免耗时阻塞
+        // 顺序必须
         delete pGroundStation;
         pGroundStation = nullptr;
 
         QGCSConfig::instance()->release();
-        qInstallMessageHandler(oldHandler);
     });
 
     QQmlApplicationEngine engine;

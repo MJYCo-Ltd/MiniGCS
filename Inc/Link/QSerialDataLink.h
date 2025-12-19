@@ -39,7 +39,7 @@ public:
     /**
      * @brief 关闭串口连接
      */
-    Q_INVOKABLE void disConnectLink() override;
+    void disConnectLink() override{closeOpenSerialPort();}
 
     /**
      * @brief 发送数据
@@ -82,7 +82,8 @@ private slots:
      * @param data 要发送的数据
      */
     void onSendDataRequested(const QByteArray &data) override;
-
+protected:
+    void closeOpenSerialPort();
 private:
     QSerialPort* m_serialPort;    ///< 串口对象
     QString m_portName;            ///< 串口名称

@@ -1,7 +1,3 @@
-#include "Private/QGroundControlStationPrivate.h"
-#include "Private/QAutopilotPrivate.h"
-#include "QGroundControlStation.h"
-#include "QAutopilot.h"
 #include <QDebug>
 #include <QMetaObject>
 #include <QMetaMethod>
@@ -9,6 +5,11 @@
 #include <sstream>
 #include <mavsdk/plugins/telemetry/telemetry.h>
 #include <mavsdk/plugins/info/info.h>
+
+#include "Private/QGroundControlStationPrivate.h"
+#include "Plat/Private/QAutopilotPrivate.h"
+#include "QGroundControlStation.h"
+#include "Plat/QAutopilot.h"
 #include "QGCSConfig.h"
 QGroundControlStationPrivate::QGroundControlStationPrivate()
     : m_isInitialized(false)

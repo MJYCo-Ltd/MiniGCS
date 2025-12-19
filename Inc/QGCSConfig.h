@@ -4,6 +4,7 @@
 #include <QString>
 #include <QSettings>
 #include <plugins/events/events.h>
+
 /// <summary>
 /// 前置声明 spdlog 命名空间和 sink 类
 /// </summary>

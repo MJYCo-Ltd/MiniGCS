@@ -27,14 +27,14 @@ qt_standard_project_setup(REQUIRES 6.9)
 
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/Inc
-    ${CMAKE_CURRENT_SOURCE_DIR}/Inc/Extern
-    ${CMAKE_CURRENT_SOURCE_DIR}/Inc/Link
-    ${CMAKE_CURRENT_SOURCE_DIR}/Inc/Plat
 )
 
 # 设置源文件
 set(SOURCES
     main.cpp
+    Src/AirLine/QAirLine.cpp
+    Src/AirLine/QAirLineManager.cpp
+    Src/AirLine/QDronePosition.cpp
     Src/Extern/XmlToMavSDK.cpp
     Src/Extern/AsyncSendMavLink.cpp
     Src/Link/QSerialDataLink.cpp
@@ -48,6 +48,9 @@ set(SOURCES
 )
 
 set(HEADERS
+    Inc/AirLine/QAirLine.h
+    Inc/AirLine/QAirLineManager.h
+    Inc/AirLine/QDronePosition.h
     Inc/Extern/XmlToMavSDK.h
     Inc/Extern/AsyncSendMavLink.h
     Inc/Link/QDataLink.h

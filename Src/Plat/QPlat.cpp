@@ -1,5 +1,5 @@
-#include "QPlat.h"
-#include "Private/QPlatPrivate.h"
+#include "Plat/QPlat.h"
+#include "Plat/Private/QPlatPrivate.h"
 #include <QDateTime>
 
 QPlat::QPlat(QObject *parent)

@@ -1,8 +1,8 @@
 #include <QCoreApplication>
 #include <QDebug>
 #include "QGroundControlStation.h"
-#include "QAutopilot.h"
-#include "QDataLink.h"
+#include "Plat/QAutopilot.h"
+#include "Link/QDataLink.h"
 #include "Private/QGroundControlStationPrivate.h"
 
 QGroundControlStation::QGroundControlStation(QObject *parent)

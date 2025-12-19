@@ -1,5 +1,5 @@
 #include <thread>
-#include "AsyncSendMavLink.h"
+#include "Extern/AsyncSendMavLink.h"
 
 void CAsyncSendMavLink::send_command_long_async(
     mavsdk::MavlinkPassthrough *passthrough,

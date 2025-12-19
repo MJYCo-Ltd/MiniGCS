@@ -1,8 +1,9 @@
-#include "Private/QPlatPrivate.h"
-
 #include <QDateTime>
 #include <QDebug>
 #include <sstream>
+
+#include "Plat/Private/QPlatPrivate.h"
+
 #include "QGCSConfig.h"
 QPlatPrivate::QPlatPrivate()
     : m_firmwareVersion("Unknown"), m_hardwareVersion("Unknown"),
