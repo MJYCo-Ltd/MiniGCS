@@ -1,16 +1,15 @@
-#include <QDebug>
 #include <QMetaObject>
 #include <QMetaMethod>
 #include <QByteArray>
-#include <sstream>
-#include <mavsdk/plugins/telemetry/telemetry.h>
-#include <mavsdk/plugins/info/info.h>
 
 #include "Private/QGroundControlStationPrivate.h"
 #include "Plat/Private/QAutopilotPrivate.h"
+#include "Plat/QPlat.h"
 #include "QGroundControlStation.h"
-#include "Plat/QAutopilot.h"
+
 #include "QGCSConfig.h"
+#include "QGCSLog.h"
+
 QGroundControlStationPrivate::QGroundControlStationPrivate()
     : m_isInitialized(false)
 {
@@ -21,6 +20,8 @@ QGroundControlStationPrivate::~QGroundControlStationPrivate()
     m_mavsdk->unsubscribe_on_new_system(m_newSystemHandle);
     unsubscribeRawBytesToBeSent();
 }
+
+template<>struct fmt::formatter<mavsdk::ConnectionResult>:ostream_formatter{};
 
 void QGroundControlStationPrivate::initializeMavsdk()
 {
@@ -35,21 +36,22 @@ void QGroundControlStationPrivate::initializeMavsdk()
     config.set_component_id(QGCSConfig::instance()->gcsComponentId());
     m_mavsdk = std::make_shared<mavsdk::Mavsdk>(config);
 
+    /// 创建连接
     auto connectionResult = m_mavsdk->add_any_connection_with_handle("raw://");
 
-    m_mavsdk->subscribe_incoming_messages_json([](mavsdk::Mavsdk::MavlinkMessage msg) {
-        qDebug()<<msg.message_name.c_str()<<','<<msg.fields_json.c_str();
-        return(true);
-    });
     if (connectionResult.first == mavsdk::ConnectionResult::Success) {
         m_connectionHandle = connectionResult.second;
+        m_mavsdk->subscribe_incoming_messages_json(
+            [](mavsdk::Mavsdk::MavlinkMessage msg) {
+                QGCSConfig::instance()->dealMavsdkMessage(msg.system_id,
+                                                          msg.fields_json);
+                return (true);
+            });
     } else {
-        std::ostringstream oss;
-        oss << connectionResult.first;
-        QString errorMsg = QString("Connection failed: %1").arg(QString::fromStdString(oss.str()));
-        qWarning() << "QGroundControlStationPrivate:" << errorMsg;
+        spdlog::critical(MAV_FMT_STR, "add_raw_connection_with_handle",
+                         connectionResult.first);
     }
-    
+
     m_isInitialized = true;
 }
 
@@ -130,9 +132,9 @@ void QGroundControlStationPrivate::setupConnectionErrorHandling(QObject* parent)
     
     // 订阅连接错误
     m_mavsdk->subscribe_connection_errors([this, parent](mavsdk::Mavsdk::ConnectionError error) {
-        std::ostringstream oss;
-        oss << error.error_description;
-        QString errorMsg = QString("Connection error: %1").arg(QString::fromStdString(oss.str()));
+
+        spdlog::critical(MAV_FMT_STR, "Connection error",
+                         error.error_description);
         
         // 移除有问题的连接
         m_mavsdk->remove_connection(error.connection_handle);
@@ -142,7 +144,7 @@ void QGroundControlStationPrivate::setupConnectionErrorHandling(QObject* parent)
 
         // 发射错误信号
         QMetaObject::invokeMethod(parent, "mavConnectionError", Qt::QueuedConnection,
-                                  Q_ARG(QString, errorMsg));
+                                  Q_ARG(QString, QString::fromStdString(error.error_description)));
     });
 }
 
@@ -221,7 +223,7 @@ void QGroundControlStationPrivate::setupRawBytesToBeSentCallback(std::function<v
                 });
             }
         }
-    );
+        );
 }
 
 void QGroundControlStationPrivate::unsubscribeRawBytesToBeSent()

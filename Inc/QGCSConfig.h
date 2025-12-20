@@ -2,8 +2,9 @@
 #define QGCSCONFIG_H
 
 #include <QString>
-#include <QSettings>
-#include <plugins/events/events.h>
+
+class QSettings;
+
 
 /// <summary>
 /// 前置声明 spdlog 命名空间和 sink 类
@@ -14,11 +15,6 @@ namespace spdlog {
     }
     using sink_ptr = std::shared_ptr<sinks::sink>;
 };
-
-namespace mavsdk {
-	class Events;
-	struct Events::Event;
-}; // namespace mavsdk
 
 /**
  * @brief QGCSConfig类 - 配置文件单例类
@@ -53,7 +49,7 @@ public:
      * @brief 处理mavsdk消息
      * @param event
      */
-    void dealMavsdkLog(mavsdk::Events::Event& event);
+    void dealMavsdkMessage(uint32_t systemID, const std::string& fields_json);
 
     /**
      * @brief 获取默认串口名称

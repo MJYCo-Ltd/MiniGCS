@@ -4,7 +4,6 @@
 
 #include "Plat/Private/QPlatPrivate.h"
 
-#include "QGCSConfig.h"
 QPlatPrivate::QPlatPrivate()
     : m_firmwareVersion("Unknown"), m_hardwareVersion("Unknown"),
     m_softwareVersion("Unknown") {}
@@ -76,9 +75,4 @@ void QPlatPrivate::setupMessageHandling(QObject *parent) {
             qDebug() << "QVehiclePrivate: Component discovered:"
                      << static_cast<int>(componentType);
         });
-
-    m_pEvents->subscribe_events([](mavsdk::Events::Event event){
-        qDebug()<<event.event_name;
-        QGCSConfig::instance()->dealMavsdkLog(event);
-    });
 }

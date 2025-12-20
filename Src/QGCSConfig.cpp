@@ -1,12 +1,14 @@
-#include "QGCSConfig.h"
 #include <QCoreApplication>
 #include <QDebug>
 #include <QDir>
 #include <QStandardPaths>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QSettings>
+#include "QGCSConfig.h"
 
-#include <mavsdk/plugins/events/events.h>
 #include <spdlog/sinks/daily_file_sink.h>
-#include <spdlog/spdlog.h>
+#include "QGCSLog.h"
 
 QGCSConfig *QGCSConfig::m_pSInsatance = nullptr;
 // 配置项键名常量
@@ -51,7 +53,7 @@ static spdlog::level::level_enum levelFromString(const QString &levelStr) {
 QGCSConfig::QGCSConfig() : m_settings(nullptr) {}
 
 QGCSConfig::~QGCSConfig() {
-    spdlog::warn("[MiniGCS] {}","系统正在清理资源，即将退出……");
+    spdlog::warn(SYS_FMT_STR,"系统正在清理资源","即将退出……");
     sinks.clear();
     if (m_settings) {
         save();
@@ -95,8 +97,8 @@ void QGCSConfig::init_logging() {
     spdlog::set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%^%l%$] [%t] %v");
     spdlog::set_level(lvl); // 全局级别
 
-    spdlog::info("[MiniGCS] {} Logging initialized with level: {}",
-                 "系统启动",configuredLevel.toStdString());
+    spdlog::warn(SYS_FMT_STR,
+                 "系统启动 日志级别",configuredLevel.toStdString());
 }
 
 void QGCSConfig::qtLogHandler(QtMsgType type, const QMessageLogContext &ctx,
@@ -104,7 +106,7 @@ void QGCSConfig::qtLogHandler(QtMsgType type, const QMessageLogContext &ctx,
     std::string logMsg(msg.toUtf8().constData());
     // 拼接上下文信息
     std::string ctxInfo = fmt::format(
-        "[{}:{} {}] {}", ctx.file ? ctx.file : "", ctx.line,
+        "[{}:{} {}] {}", ctx.file ? strrchr(ctx.file,'\\')+1 : "", ctx.line,
         ctx.function ? ctx.function : "", logMsg);
 
     switch (type) {
@@ -149,43 +151,48 @@ void QGCSConfig::release() {
     m_pSInsatance = nullptr;
 }
 
-void QGCSConfig::dealMavsdkLog(mavsdk::Events::Event &event) {
-    switch (event.log_level) {
-    case mavsdk::Events::LogLevel::Emergency:
-        spdlog::critical("[MAVSDK][EMERGENCY] {}", event.compid, event.message,
-                         event.description, event.event_namespace,
-                         event.event_name);
-        break;
-    case mavsdk::Events::LogLevel::Alert:
-        spdlog::critical("[MAVSDK][Alert] {}", event.compid, event.message,
-                         event.description, event.event_namespace,
-                         event.event_name);
-        break;
-    case mavsdk::Events::LogLevel::Critical:
-        spdlog::critical("[MAVSDK][Critical] {}", event.compid, event.message,
-                         event.description, event.event_namespace,
-                         event.event_name);
-        break;
-    case mavsdk::Events::LogLevel::Error:
-        spdlog::error("[MAVSDK][Error] {}", event.compid, event.message,
-                      event.description, event.event_namespace, event.event_name);
-        break;
-    case mavsdk::Events::LogLevel::Warning:
-        spdlog::warn("[MAVSDK][Warning] {}", event.compid, event.message,
-                     event.description, event.event_namespace, event.event_name);
-        break;
-    case mavsdk::Events::LogLevel::Notice:
-        spdlog::info("[MAVSDK][Notice] {}", event.compid, event.message,
-                     event.description, event.event_namespace, event.event_name);
-        break;
-    case mavsdk::Events::LogLevel::Info:
-        spdlog::info("[MAVSDK][Info] {}", event.compid, event.message,
-                     event.description, event.event_namespace, event.event_name);
-        break;
-    case mavsdk::Events::LogLevel::Debug:
-        spdlog::info("[MAVSDK][Debug] {}", event.compid, event.message,
-                     event.description, event.event_namespace, event.event_name);
-        break;
+void QGCSConfig::dealMavsdkMessage(uint32_t systemID,
+                                   const std::string &jsonMessage) {
+    QJsonParseError err;
+    QJsonDocument doc = QJsonDocument::fromJson(jsonMessage.c_str(), &err);
+    if (err.error != QJsonParseError::NoError || !doc.isObject())
+        return;
+    const QJsonObject obj = doc.object();
+    if (obj.value("message_name").toString() == "STATUSTEXT") {
+        switch (obj.value("severity").toInt()) {
+        case 0:
+            spdlog::critical(PLAT_FMT_STR, systemID, "text",
+                             obj.value("text").toString().toUtf8().data());
+            break;
+        case 1:
+            spdlog::critical(PLAT_FMT_STR, systemID, "text",
+                             obj.value("text").toString().toUtf8().data());
+            break;
+        case 2:
+            spdlog::critical(PLAT_FMT_STR, systemID, "text",
+                             obj.value("text").toString().toUtf8().data());
+            break;
+        case 3:
+            spdlog::error(PLAT_FMT_STR, systemID, "text",
+                          obj.value("text").toString().toUtf8().data());
+            break;
+        case 4:
+            spdlog::warn(PLAT_FMT_STR, systemID, "text",
+                         obj.value("text").toString().toUtf8().data());
+            break;
+        case 5:
+            spdlog::info(PLAT_FMT_STR, systemID, "text",
+                         obj.value("text").toString().toUtf8().data());
+            break;
+        case 6:
+            spdlog::info(PLAT_FMT_STR, systemID, "text",
+                         obj.value("text").toString().toUtf8().data());
+            break;
+        case 7:
+            spdlog::debug(PLAT_FMT_STR, systemID, "text",
+                          obj.value("text").toString().toUtf8().data());
+            break;
+        }
     }
 }
 
@@ -256,14 +263,12 @@ uint8_t QGCSConfig::gcsComponentId() const {
 void QGCSConfig::save() {
     if (m_settings) {
         m_settings->sync();
-        qDebug() << "QGCSConfig: 配置已保存到" << m_configFilePath;
     }
 }
 
 void QGCSConfig::reload() {
     if (m_settings) {
         m_settings->sync();
-        qDebug() << "QGCSConfig: 配置已重新加载";
     }
 }
 
