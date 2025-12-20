@@ -3,6 +3,8 @@
 #include <QDebug>
 #include <sstream>
 #include <thread>
+#include <QJsonDocument>
+#include <QJsonObject>
 
 #include "QGCSLog.h"
 #include "QGCSConfig.h"
@@ -47,8 +49,24 @@ void QPlatPrivate::setSystem(std::shared_ptr<mavsdk::System> system) {
     }
     // 创建插件实例
     m_pInfo = std::make_unique<mavsdk::Info>(*system);
+    m_pParam = std::make_unique<mavsdk::Param>(*system);
     m_pMavlinkDirect = std::make_unique<mavsdk::MavlinkDirect>(*system);
-    
+
+    m_pMavlinkDirect->subscribe_message(
+        "STATUSTEXT", [this](mavsdk::MavlinkDirect::MavlinkMessage msg) {
+            QJsonParseError err;
+            QJsonDocument doc =
+                QJsonDocument::fromJson(msg.fields_json.c_str(), &err);
+            if (err.error != QJsonParseError::NoError || !doc.isObject())
+                return;
+            const QJsonObject obj = doc.object();
+            if (obj.value("severity").toInt() < 5) {
+                QMetaObject::invokeMethod(
+                    q_ptr, "errorInfo", Qt::QueuedConnection,
+                    Q_ARG(QString, obj.value("text").toString()));
+            }
+        });
+
     // 通过 Info 插件获取版本信息
     updateVersionInfo();
 

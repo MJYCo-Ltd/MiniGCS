@@ -43,6 +43,9 @@ int main(int argc, char *argv[]) {
             QObject::connect(vehicle, &QAutopilot::infoUpdated, [vehicle]() {
                 qDebug() << "飞控信息更新:" << vehicle->toString();
             });
+            QObject::connect(vehicle,&QAutopilot::errorInfo,[](const QString& sErrorInfo){
+                qDebug()<< "异常消息："<<sErrorInfo;
+            });
         });
 
     // aboutToQuit 在主线程同步执行，用于做必要的善后工作（短且快速）

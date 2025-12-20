@@ -2,6 +2,9 @@
 #define Q_SUTOPILOT_PRIVATE_H
 
 #include <mavsdk/plugins/action/action.h>
+#include <mavsdk/plugins/telemetry/telemetry.h>
+#include <mavsdk/plugins/mission/mission.h>
+#include <mavsdk/plugins/mission_raw/mission_raw.h>
 #include "QPlatPrivate.h"
 
 /**
@@ -35,6 +38,10 @@ public:
 
     void setTelemetryRate();
 
+    void updateAirLine();
+
+    void downAirLine();
+
 private:
     /**
      * @brief 判断是否静止（IMU数值较小时）
@@ -65,6 +72,8 @@ protected:
 
     std::unique_ptr<mavsdk::Telemetry> m_telemetry; ///< 遥测插件
     std::unique_ptr<mavsdk::Action>    m_action;
+    std::unique_ptr<mavsdk::Mission>   m_mission; /// 任务
+    std::unique_ptr<mavsdk::MissionRaw> m_rawMission;
     mavsdk::Telemetry::Imu m_lastImu;      ///< 最后一次IMU数据
     
     // 位置滤波相关

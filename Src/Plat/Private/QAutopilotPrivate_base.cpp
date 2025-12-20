@@ -21,11 +21,15 @@ void QAutopilotPrivate::setSystem(std::shared_ptr<mavsdk::System> system) {
 
     m_telemetry = std::make_unique<mavsdk::Telemetry>(*system);
     m_action = std::make_unique<mavsdk::Action>(*system);
+    m_mission = std::make_unique<mavsdk::Mission>(*system);
+    m_rawMission = std::make_unique<mavsdk::MissionRaw>(*system);
+
+    downAirLine();
 
     q_func()->setAutopilotType(static_cast<QAutoVehicleType::Autopilot>(system->autopilot_type()));
     q_func()->setVehicleType(static_cast<QAutoVehicleType::Vehicle>(system->vehicle_type()));
 
-    arm();
+    // arm();
 }
 
 #include "QGCSLog.h"

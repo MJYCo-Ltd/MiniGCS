@@ -80,6 +80,12 @@ signals:
      * @brief 信息更新信号
      */
     void infoUpdated();
+
+    /**
+     * @brief 有错误发生
+     * @param sError
+     */
+    void errorInfo(const QString& sError);
 protected slots:
     void updateConnection(bool bConnected);
 protected:

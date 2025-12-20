@@ -4,9 +4,9 @@
 #include <QString>
 #include <memory>
 #include <mavsdk/system.h>
-#include <mavsdk/plugins/telemetry/telemetry.h>
 #include <mavsdk/plugins/mavlink_direct/mavlink_direct.h>
 #include <mavsdk/plugins/info/info.h>
+#include <mavsdk/plugins/param/param.h>
 
 // 前向声明
 class QPlat;
@@ -73,7 +73,7 @@ protected:
     // MAVSDK相关
     std::shared_ptr<mavsdk::System> m_pSystem; ///< 系统对象
     std::unique_ptr<mavsdk::Info> m_pInfo;     ///< 信息插件
-
+    std::unique_ptr<mavsdk::Param> m_pParam;
     std::unique_ptr<mavsdk::MavlinkDirect> m_pMavlinkDirect;
 
     mavsdk::System::IsConnectedHandle m_hConntecd;

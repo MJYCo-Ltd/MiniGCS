@@ -43,7 +43,7 @@ set(SOURCES
     Src/Plat/QAutopilot.cpp
     Src/Plat/QAutoVehicleType.cpp
     Src/Plat/QPlat.cpp
-    Src/Plat/Private/QAutopilotPrivate.cpp
+    Src/Plat/Private/QAutopilotPrivate_base.cpp
     Src/Plat/Private/QPlatPrivate.cpp
     Src/Private/QGroundControlStationPrivate.cpp
     Src/QGroundControlStation.cpp
@@ -79,6 +79,7 @@ qt_add_qml_module(${PROJECT_NAME}
     URI ${PROJECT_NAME}
     QML_FILES
         qml/Main.qml
+        SOURCES Src/Plat/Private/QAutopilotPrivate_control.cpp
 )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES

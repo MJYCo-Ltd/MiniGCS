@@ -27,115 +27,114 @@ class QGCSConfig
 {
 public:
     /**
-     * @brief 获取配置单例实例
-     * @return 配置单例实例的引用
-     */
-    static QGCSConfig* instance();
+   * @brief 获取配置单例实例
+   * @return 配置单例实例的引用
+   */
+    static QGCSConfig *instance();
 
     /**
-     * @brief 处理QtLog
-     * @param type
-     * @param ctx
-     * @param msg
-     */
-    static void qtLogHandler(QtMsgType type,
-        const QMessageLogContext& ctx,
-        const QString& msg);
+   * @brief 处理QtLog
+   * @param type
+   * @param ctx
+   * @param msg
+   */
+    static void qtLogHandler(QtMsgType type, const QMessageLogContext &ctx,
+                             const QString &msg);
 
     void init();
     void release();
 
     /**
-     * @brief 处理mavsdk消息
-     * @param event
-     */
-    void dealMavsdkMessage(uint32_t systemID, const std::string& fields_json);
+   * @brief 处理mavsdk消息
+   * @param event
+   */
+    void dealMavsdkMessage(uint32_t systemID, const std::string &fields_json);
 
     /**
-     * @brief 获取默认串口名称
-     * @return 串口名称（如 "COM1", "/dev/ttyUSB0"）
-     */
+   * @brief 获取默认串口名称
+   * @return 串口名称（如 "COM1", "/dev/ttyUSB0"）
+   */
     QString defaultPortName() const;
 
     /**
-     * @brief 设置默认串口名称
-     * @param portName 串口名称
-     */
-    void setDefaultPortName(const QString& portName);
+   * @brief 设置默认串口名称
+   * @param portName 串口名称
+   */
+    void setDefaultPortName(const QString &portName);
 
     /**
-     * @brief 获取默认波特率
-     * @return 波特率（如 57600, 115200）
-     */
+   * @brief 获取默认波特率
+   * @return 波特率（如 57600, 115200）
+   */
     int defaultBaudRate() const;
 
     /**
-     * @brief 设置默认波特率
-     * @param baudRate 波特率
-     */
+   * @brief 设置默认波特率
+   * @param baudRate 波特率
+   */
     void setDefaultBaudRate(int baudRate);
 
     /**
-     * @brief 获取地图名称
-     * @return 地图名称
-     */
+   * @brief 获取地图名称
+   * @return 地图名称
+   */
     QString mapName() const;
 
     /**
-     * @brief 设置地图名称
-     * @param mapName 地图名称
-     */
-    void setMapName(const QString& mapName);
+   * @brief 设置地图名称
+   * @param mapName 地图名称
+   */
+    void setMapName(const QString &mapName);
 
     /**
-     * @brief 获取日志等级字符串（例如 "debug","info","warn","error"）
-     */
+   * @brief 获取日志等级字符串（例如 "debug","info","warn","error"）
+   */
     QString logLevel() const;
 
     /**
-     * @brief 获取GCS系统ID
-     * @return 系统ID（只能通过配置文件设置）
-     */
+   * @brief 获取GCS系统ID
+   * @return 系统ID（只能通过配置文件设置）
+   */
     uint8_t gcsSystemId() const;
 
     /**
-     * @brief 获取GCS组件ID
-     * @return 组件ID（只能通过配置文件设置）
-     */
+   * @brief 获取GCS组件ID
+   * @return 组件ID（只能通过配置文件设置）
+   */
     uint8_t gcsComponentId() const;
 
     /**
-     * @brief 获取MAV消息扩展文件名
-     * @return MAV消息扩展文件名（如 "ardupilotmega.xml"）
-     */
+   * @brief 获取MAV消息扩展文件名
+   * @return MAV消息扩展文件名（如 "ardupilotmega.xml"）
+   */
     QString mavMessageExtension() const;
 
     /**
-     * @brief 获取是否开启时间同步
-     * @return 是否开启时间同步（默认 true）
-     */
+   * @brief 获取是否开启时间同步
+   * @return 是否开启时间同步（默认 true）
+   */
     bool timeSyncEnabled() const;
 
     /**
-     * @brief 设置是否开启时间同步
-     * @param enabled 是否开启
-     */
+   * @brief 设置是否开启时间同步
+   * @param enabled 是否开启
+   */
     void setTimeSyncEnabled(bool enabled);
 
     /**
-     * @brief 保存配置到文件
-     */
+   * @brief 保存配置到文件
+   */
     void save();
 
     /**
-     * @brief 重新加载配置
-     */
+   * @brief 重新加载配置
+   */
     void reload();
 
     /**
-     * @brief 获取配置文件路径
-     * @return 配置文件路径
-     */
+   * @brief 获取配置文件路径
+   * @return 配置文件路径
+   */
     QString configFilePath() const;
 
 private:
