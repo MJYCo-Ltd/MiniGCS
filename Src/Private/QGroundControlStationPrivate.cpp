@@ -173,11 +173,11 @@ void QGroundControlStationPrivate::setupNewSystemDiscoveryCallback(
                         /// 如果平台的Private 指针没有设置 或者 Private的 system与现在的不一致
                         if (nullptr == pPlat->d_ptr.get() || pPlat->d_ptr.get()->getSystem() != system) {
                             if (bHaveAutopilot) {
-                                QPlatPrivate* localQPlatPrivate = new QAutopilotPrivate();
+                                QPlatPrivate* localQPlatPrivate = new QAutopilotPrivate(pPlat);
                                 localQPlatPrivate->setSystem(system);
                                 pPlat->SetPrivate(localQPlatPrivate);
                             } else {
-                                QPlatPrivate* localQPlatPrivate = new QPlatPrivate();
+                                QPlatPrivate* localQPlatPrivate = new QPlatPrivate(pPlat);
                                 localQPlatPrivate->setSystem(system);
                                 pPlat->SetPrivate(localQPlatPrivate);
                             }

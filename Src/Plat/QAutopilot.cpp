@@ -38,31 +38,58 @@ const QAutopilotPrivate *QAutopilot::d_func() const {
     return static_cast<const QAutopilotPrivate *>(d_ptr.get());
 }
 
-QString QAutopilot::getAutopilotType() const {
-    return d_func()->getAutopilotType();
-}
-
-void QAutopilot::setAutopilotType(const QString &autopilotType) {
-    if (d_func()->getAutopilotType() != autopilotType) {
-        d_func()->setAutopilotType(autopilotType);
-        emit infoUpdated();
-    }
-}
-
-QString QAutopilot::getVehicleType() const {
-    return d_func()->getVehicleType();
-}
-
-void QAutopilot::setVehicleType(const QString &vehicleType) {
-    if (d_func()->getVehicleType() != vehicleType) {
-        d_func()->setVehicleType(vehicleType);
-        emit infoUpdated();
-    }
-}
-
 void QAutopilot::arm()
 {
     d_func()->arm();
+}
+
+void QAutopilot::setGpsPosition(const QGpsPosition &position) {
+    if (m_gpsPosition != position) {
+        m_gpsPosition = position;
+        emit gpsPositionChanged(m_gpsPosition);
+    }
+}
+
+void QAutopilot::setNedPosition(const QNEDPosition &position) {
+    if (m_nedPosition != position) {
+        m_nedPosition = position;
+        emit nedPositionChanged(m_nedPosition);
+    }
+}
+
+void QAutopilot::setHomePosition(const QGpsPosition &position) {
+    if (m_homePosition != position) {
+        m_homePosition = position;
+        emit homePositionChanged(m_homePosition);
+    }
+}
+
+void QAutopilot::setStatus(const QAutopilotStatus &status) {
+    if (m_status != status) {
+        m_status = status;
+        emit statusChanged(m_status);
+    }
+}
+
+void QAutopilot::setHeading(double heading) {
+    if (!qFuzzyCompare(m_heading, heading)) {
+        m_heading = heading;
+        emit headingChanged(m_heading);
+    }
+}
+
+void QAutopilot::setVehicleType(QAutoVehicleType::Vehicle vehicleType) {
+    if (m_vehicleType != vehicleType) {
+        m_vehicleType = vehicleType;
+        emit vehicleTypeChanged(m_vehicleType);
+    }
+}
+
+void QAutopilot::setAutopilotType(QAutoVehicleType::Autopilot autopilotType) {
+    if (m_autopilotType != autopilotType) {
+        m_autopilotType = autopilotType;
+        emit autopilotTypeChanged(m_autopilotType);
+    }
 }
 
 void QAutopilot::positionUpdate(double dLon, double dLat, float dH) {
@@ -89,17 +116,18 @@ void QAutopilot::nedUpdate(float dNorth, float dEast, float dDown) {
 
 void QAutopilot::gpsInfoUpdate(int gpsCount, int gpsStatus) {
     bool changed = false;
+    
     if (m_status.gpsCount() != gpsCount) {
         m_status.setGpsCount(gpsCount);
         changed = true;
     }
-
+    
     QString chineseStatus = QString::fromUtf8(fixTypeToChinese(gpsStatus));
     if (m_status.gpsStatus() != chineseStatus) {
         m_status.setGpsStatus(chineseStatus);
         changed = true;
     }
-
+    
     if (changed) {
         emit statusChanged(m_status);
     }
@@ -140,10 +168,7 @@ void QAutopilot::rcStatusUpdate(bool isAvailable, float signalStrengthPercent) {
 }
 
 void QAutopilot::headingUpdate(double heading) {
-    if (!qFuzzyCompare(m_heading, heading)) {
-        m_heading = heading;
-        emit headingChanged(m_heading);
-    }
+    setHeading(heading);
 }
 
 void QAutopilot::healthUpdate(bool isGyrometerCalibrationOk, bool isAccelerometerCalibrationOk,

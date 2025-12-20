@@ -20,6 +20,7 @@ const char *KEY_GCS_SYSTEM_ID = "GCS/SystemId";
 const char *KEY_GCS_COMPONENT_ID = "GCS/ComponentId";
 const char *KEY_LOG_LEVEL = "Logging/Level";
 const char *KEY_MAV_MESSAGE_EXTENSION = "MavMessage/Extension";
+const char *KEY_TIME_SYNC_ENABLED = "TimeSync/Enabled";
 
 // 默认值
 const char *DEFAULT_PORT_NAME = "COM14";
@@ -29,6 +30,7 @@ const uint8_t DEFAULT_GCS_SYSTEM_ID = 246;
 const uint8_t DEFAULT_GCS_COMPONENT_ID = 191;
 const char *DEFAULT_LOG_LEVEL = "debug";
 const char *DEFAULT_MAV_MESSAGE_EXTENSION = "ardupilotmega.xml";
+const bool DEFAULT_TIME_SYNC_ENABLED = true;
 } // namespace
 
 // 将 QString（名称）映射到 spdlog 的 level_enum
@@ -247,6 +249,14 @@ QString QGCSConfig::mavMessageExtension() const {
     return m_settings->value(KEY_MAV_MESSAGE_EXTENSION, DEFAULT_MAV_MESSAGE_EXTENSION).toString();
 }
 
+bool QGCSConfig::timeSyncEnabled() const {
+    return m_settings->value(KEY_TIME_SYNC_ENABLED, DEFAULT_TIME_SYNC_ENABLED).toBool();
+}
+
+void QGCSConfig::setTimeSyncEnabled(bool enabled) {
+    m_settings->setValue(KEY_TIME_SYNC_ENABLED, enabled);
+}
+
 void QGCSConfig::save() {
     if (m_settings) {
         m_settings->sync();
@@ -285,6 +295,9 @@ void QGCSConfig::initializeDefaults() {
     }
     if (!m_settings->contains(KEY_MAV_MESSAGE_EXTENSION)) {
         m_settings->setValue(KEY_MAV_MESSAGE_EXTENSION, DEFAULT_MAV_MESSAGE_EXTENSION);
+    }
+    if (!m_settings->contains(KEY_TIME_SYNC_ENABLED)) {
+        m_settings->setValue(KEY_TIME_SYNC_ENABLED, DEFAULT_TIME_SYNC_ENABLED);
     }
 
     // 立即保存默认值

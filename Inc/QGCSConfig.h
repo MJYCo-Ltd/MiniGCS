@@ -111,6 +111,18 @@ public:
     QString mavMessageExtension() const;
 
     /**
+     * @brief 获取是否开启时间同步
+     * @return 是否开启时间同步（默认 true）
+     */
+    bool timeSyncEnabled() const;
+
+    /**
+     * @brief 设置是否开启时间同步
+     * @param enabled 是否开启
+     */
+    void setTimeSyncEnabled(bool enabled);
+
+    /**
      * @brief 保存配置到文件
      */
     void save();

@@ -22,40 +22,16 @@ struct FilteredPosition {
 class QAutopilotPrivate:public QPlatPrivate
 {
 public:
-    QAutopilotPrivate();
-    ~QAutopilotPrivate();
+    QAutopilotPrivate(QPlat*pPlat);
+    ~QAutopilotPrivate(){}
 
     /**
      * @brief 解锁
      */
     void arm();
 
-    /**
-     * @brief 设置自动驾驶仪类型
-     * @param autopilotType 自动驾驶仪类型
-     */
-    void setAutopilotType(const QString &autopilotType);
-
-    /**
-     * @brief 获取自动驾驶仪类型
-     * @return 自动驾驶仪类型
-     */
-    QString getAutopilotType() const;
-
-    /**
-     * @brief 设置载具类型
-     * @param vehicleType 载具类型
-     */
-    void setVehicleType(const QString &vehicleType);
-
-    /**
-     * @brief 获取载具类型
-     * @return 载具类型
-     */
-    QString getVehicleType() const;
-
     void setSystem(std::shared_ptr<mavsdk::System> system);
-    void setupMessageHandling(QObject* parent);
+    void setupMessageHandling();
 
     void setTelemetryRate();
 
@@ -80,8 +56,13 @@ private:
                       bool is_static) const;
 
 protected:
-    QString m_autopilotType;                ///< 自动驾驶仪类型
-    QString m_vehicleType;                  ///< 载具类型
+    /**
+     * @brief 获取QAutopilotPrivate指针的辅助方法
+     * @return QAutopilotPrivate指针
+     */
+    class QAutopilot* q_func();
+    const  class QAutopilot* q_func() const;
+
     std::unique_ptr<mavsdk::Telemetry> m_telemetry; ///< 遥测插件
     std::unique_ptr<mavsdk::Action>    m_action;
     mavsdk::Telemetry::Imu m_lastImu;      ///< 最后一次IMU数据

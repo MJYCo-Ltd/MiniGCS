@@ -5,7 +5,6 @@
 #include <QString>
 #include <QVector>
 #include <QDateTime>
-#include <memory>
 
 class QPlatPrivate;
 /**
@@ -85,12 +84,12 @@ protected slots:
     void updateConnection(bool bConnected);
 protected:
     void SetPrivate(QPlatPrivate* pPlatPrivate);
-
 protected:
     friend class QGroundControlStationPrivate;
     QDateTime m_lastConnectedTime;          ///< 最后连接时间
     QDateTime m_lastDisconnectedTime;       ///< 最后断开时间
     bool      m_bConnected{true};
+
     std::unique_ptr<QPlatPrivate> d_ptr;    ///< 私有实现指针
 };
 

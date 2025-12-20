@@ -1,32 +1,30 @@
-#include "Plat/Private/QAutopilotPrivate.h"
-#include <QDebug>
-#include <QMetaObject>
 #include <cmath>
+#include "Plat/QAutopilot.h"
+#include "Plat/Private/QAutopilotPrivate.h"
 
-QAutopilotPrivate::QAutopilotPrivate()
-    : m_filteredState{0.0, 0.0, 10.0} // 初始不确定度（米级）
+QAutopilotPrivate::QAutopilotPrivate(QPlat *pPlat)
+    : QPlatPrivate(pPlat),
+    m_filteredState{0.0, 0.0, 10.0} // 初始不确定度（米级）
 {}
 
-QAutopilotPrivate::~QAutopilotPrivate() {}
-
-
-void QAutopilotPrivate::setAutopilotType(const QString &autopilotType) {
-    m_autopilotType = autopilotType;
+QAutopilot *QAutopilotPrivate::q_func() {
+    return static_cast<QAutopilot *>(q_ptr);
 }
 
-QString QAutopilotPrivate::getAutopilotType() const { return m_autopilotType; }
-
-void QAutopilotPrivate::setVehicleType(const QString &vehicleType) {
-    m_vehicleType = vehicleType;
+const QAutopilot *QAutopilotPrivate::q_func() const {
+    return static_cast<const QAutopilot *>(q_ptr);
 }
-
-QString QAutopilotPrivate::getVehicleType() const { return m_vehicleType; }
 
 /// 设置mavsdk的飞控系统
 void QAutopilotPrivate::setSystem(std::shared_ptr<mavsdk::System> system) {
     QPlatPrivate::setSystem(system);
+
     m_telemetry = std::make_unique<mavsdk::Telemetry>(*system);
     m_action = std::make_unique<mavsdk::Action>(*system);
+
+    q_func()->setAutopilotType(static_cast<QAutoVehicleType::Autopilot>(system->autopilot_type()));
+    q_func()->setVehicleType(static_cast<QAutoVehicleType::Vehicle>(system->vehicle_type()));
+
     arm();
 }
 
@@ -135,15 +133,15 @@ template<>struct fmt::formatter<mavsdk::Telemetry::PositionVelocityNed>:ostream_
 template<>struct fmt::formatter<mavsdk::Telemetry::DistanceSensor>:ostream_formatter{};
 template<>struct fmt::formatter<mavsdk::Telemetry::RcStatus>:ostream_formatter{};
 
-void QAutopilotPrivate::setupMessageHandling(QObject *parent) {
-    if (!m_telemetry || !parent) {
+void QAutopilotPrivate::setupMessageHandling() {
+    if (!m_telemetry) {
         return;
     }
 
-    QPlatPrivate::setupMessageHandling(parent);
+    QPlatPrivate::setupMessageHandling();
 
     /// 位置信息
-    m_telemetry->subscribe_position([this, parent](
+    m_telemetry->subscribe_position([this](
                                         mavsdk::Telemetry::Position position) {
         spdlog::info(PLAT_FMT_STR, m_pSystem->get_system_id(), "position",
                      position);
@@ -155,13 +153,13 @@ void QAutopilotPrivate::setupMessageHandling(QObject *parent) {
                          position.longitude_deg, static_state);
 
             // 使用滤波后的位置
-            QMetaObject::invokeMethod(parent, "positionUpdate", Qt::QueuedConnection,
+            QMetaObject::invokeMethod(q_ptr, "positionUpdate", Qt::QueuedConnection,
                                       Q_ARG(double, m_filteredState.lon),
                                       Q_ARG(double, m_filteredState.lat),
                                       Q_ARG(float, position.absolute_altitude_m));
         } else {
             // 运动状态直接使用原始GPS数据
-            QMetaObject::invokeMethod(parent, "positionUpdate", Qt::QueuedConnection,
+            QMetaObject::invokeMethod(q_ptr, "positionUpdate", Qt::QueuedConnection,
                                       Q_ARG(double, position.longitude_deg),
                                       Q_ARG(double, position.latitude_deg),
                                       Q_ARG(float, position.absolute_altitude_m));
@@ -173,17 +171,15 @@ void QAutopilotPrivate::setupMessageHandling(QObject *parent) {
     });
 
     /// 航向
-    m_telemetry->subscribe_heading([this,
-                                    parent](mavsdk::Telemetry::Heading heading) {
-        QMetaObject::invokeMethod(parent, "headingUpdate", Qt::QueuedConnection,
+    m_telemetry->subscribe_heading([this](mavsdk::Telemetry::Heading heading) {
+        QMetaObject::invokeMethod(q_ptr, "headingUpdate", Qt::QueuedConnection,
                                   Q_ARG(double, heading.heading_deg));
         spdlog::info(PLAT_FMT_STR, m_pSystem->get_system_id(), "heading", heading);
     });
 
     /// 电池状态
-    m_telemetry->subscribe_battery([this,
-                                    parent](mavsdk::Telemetry::Battery battery) {
-        QMetaObject::invokeMethod(parent, "batteryUpdate", Qt::QueuedConnection,
+    m_telemetry->subscribe_battery([this](mavsdk::Telemetry::Battery battery) {
+        QMetaObject::invokeMethod(q_ptr, "batteryUpdate", Qt::QueuedConnection,
                                   Q_ARG(float, battery.voltage_v),
                                   Q_ARG(float, battery.remaining_percent));
         spdlog::info(PLAT_FMT_STR, m_pSystem->get_system_id(), "battery", battery);
@@ -197,8 +193,8 @@ void QAutopilotPrivate::setupMessageHandling(QObject *parent) {
         });
 
     /// 健康状态
-    m_telemetry->subscribe_health([this, parent](mavsdk::Telemetry::Health h) {
-        QMetaObject::invokeMethod(parent, "healthUpdate", Qt::QueuedConnection,
+    m_telemetry->subscribe_health([this](mavsdk::Telemetry::Health h) {
+        QMetaObject::invokeMethod(q_ptr, "healthUpdate", Qt::QueuedConnection,
                                   Q_ARG(bool, h.is_gyrometer_calibration_ok),
                                   Q_ARG(bool, h.is_accelerometer_calibration_ok),
                                   Q_ARG(bool, h.is_magnetometer_calibration_ok),
@@ -211,8 +207,8 @@ void QAutopilotPrivate::setupMessageHandling(QObject *parent) {
 
     /// GPS状态
     m_telemetry->subscribe_gps_info(
-        [this, parent](mavsdk::Telemetry::GpsInfo gps) {
-        QMetaObject::invokeMethod(parent, "gpsInfoUpdate", Qt::QueuedConnection,
+        [this](mavsdk::Telemetry::GpsInfo gps) {
+        QMetaObject::invokeMethod(q_ptr, "gpsInfoUpdate", Qt::QueuedConnection,
                                   Q_ARG(int, gps.num_satellites),
                                   Q_ARG(int, (int)gps.fix_type));
         spdlog::info(PLAT_FMT_STR, m_pSystem->get_system_id(), "gpsInfo", gps);
@@ -227,12 +223,12 @@ void QAutopilotPrivate::setupMessageHandling(QObject *parent) {
 
     /// 本地坐标
     m_telemetry->subscribe_position_velocity_ned(
-        [this, parent](mavsdk::Telemetry::PositionVelocityNed pvNed) {
+        [this](mavsdk::Telemetry::PositionVelocityNed pvNed) {
             spdlog::info(PLAT_FMT_STR, m_pSystem->get_system_id(),
                          "positionVelocityNed", pvNed);
 
             // 通过Qt元系统调用parent的nedUpdate方法
-            QMetaObject::invokeMethod(parent, "nedUpdate", Qt::QueuedConnection,
+            QMetaObject::invokeMethod(q_ptr, "nedUpdate", Qt::QueuedConnection,
                                       Q_ARG(float, pvNed.position.north_m),
                                       Q_ARG(float, pvNed.position.east_m),
                                       Q_ARG(float, pvNed.position.down_m));
@@ -246,24 +242,24 @@ void QAutopilotPrivate::setupMessageHandling(QObject *parent) {
         });
 
     /// 订阅home点
-    m_telemetry->subscribe_home([this, parent](mavsdk::Telemetry::Position home) {
+    m_telemetry->subscribe_home([this](mavsdk::Telemetry::Position home) {
         spdlog::info(PLAT_FMT_STR, m_pSystem->get_system_id(), "home", home);
 
         // 通过Qt元系统调用parent的homeUpdate方法
-        QMetaObject::invokeMethod(parent, "homeUpdate", Qt::QueuedConnection,
+        QMetaObject::invokeMethod(q_ptr, "homeUpdate", Qt::QueuedConnection,
                                   Q_ARG(double, home.longitude_deg),
                                   Q_ARG(double, home.latitude_deg),
                                   Q_ARG(float, home.absolute_altitude_m));
     });
 
     /// 订阅 rc状态
-    m_telemetry->subscribe_rc_status([this, parent](
+    m_telemetry->subscribe_rc_status([this](
                                          mavsdk::Telemetry::RcStatus rcStatus) {
         spdlog::info(PLAT_FMT_STR, m_pSystem->get_system_id(), "rcStatus",
                      rcStatus);
 
         // 通过Qt元系统调用parent的rcStatusUpdate方法
-        QMetaObject::invokeMethod(parent, "rcStatusUpdate", Qt::QueuedConnection,
+        QMetaObject::invokeMethod(q_ptr, "rcStatusUpdate", Qt::QueuedConnection,
                                   Q_ARG(bool, rcStatus.is_available),
                                   Q_ARG(float, rcStatus.signal_strength_percent));
     });

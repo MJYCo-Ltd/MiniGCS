@@ -1,9 +1,7 @@
 #ifndef QPLATPRIVATE_H
 #define QPLATPRIVATE_H
 
-#include <QObject>
 #include <QString>
-#include <QVector>
 #include <memory>
 #include <mavsdk/system.h>
 #include <mavsdk/plugins/telemetry/telemetry.h>
@@ -22,8 +20,8 @@ class QPlat;
 class QPlatPrivate
 {
 public:
-    QPlatPrivate();
-    ~QPlatPrivate();
+    QPlatPrivate(QPlat* pPlat);
+    ~QPlatPrivate(){}
 
     /**
      * @brief 获取固件版本
@@ -59,7 +57,7 @@ public:
      * @brief 设置消息处理回调
      * @param parent QVehicle实例指针，用于信号发射
      */
-    virtual void setupMessageHandling(QObject* parent);
+    virtual void setupMessageHandling();
 
 private:
     /**
@@ -68,6 +66,7 @@ private:
     void updateVersionInfo();
 
 protected:
+    QPlat*  q_ptr;
     QString m_firmwareVersion;              ///< 固件版本
     QString m_softwareVersion;              ///< 软件版本
     

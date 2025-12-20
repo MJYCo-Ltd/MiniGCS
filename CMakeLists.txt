@@ -41,6 +41,7 @@ set(SOURCES
     Src/Extern/AsyncSendMavLink.cpp
     Src/Link/QSerialDataLink.cpp
     Src/Plat/QAutopilot.cpp
+    Src/Plat/QAutoVehicleType.cpp
     Src/Plat/QPlat.cpp
     Src/Plat/Private/QAutopilotPrivate.cpp
     Src/Plat/Private/QPlatPrivate.cpp
@@ -60,6 +61,7 @@ set(HEADERS
     Inc/Link/QDataLink.h
     Inc/Link/QSerialDataLink.h
     Inc/Plat/QAutopilot.h
+    Inc/Plat/QAutoVehicleType.h
     Inc/Plat/QPlat.h
     Inc/Plat/Private/QAutopilotPrivate.h
     Inc/Plat/Private/QPlatPrivate.h

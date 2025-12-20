@@ -9,7 +9,7 @@ QPlat::QPlat(QObject *parent)
 
 void QPlat::SetPrivate(QPlatPrivate *pPlatPrivate) {
     d_ptr.reset(pPlatPrivate);
-    d_ptr->setupMessageHandling(this);
+    d_ptr->setupMessageHandling();
 }
 
 QPlat::~QPlat()

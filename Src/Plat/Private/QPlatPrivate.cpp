@@ -7,11 +7,11 @@
 #include "QGCSLog.h"
 #include "QGCSConfig.h"
 #include "Plat/Private/QPlatPrivate.h"
+#include "Plat/QPlat.h"
 
-QPlatPrivate::QPlatPrivate()
-    : m_firmwareVersion("Unknown"), m_softwareVersion("Unknown") {}
-
-QPlatPrivate::~QPlatPrivate() {}
+QPlatPrivate::QPlatPrivate(QPlat *pPlat)
+    : q_ptr(pPlat), m_firmwareVersion("Unknown"), m_softwareVersion("Unknown") {
+}
 
 QString QPlatPrivate::toString() const {
     std::ostringstream oss;
@@ -41,6 +41,10 @@ void QPlatPrivate::setSystem(std::shared_ptr<mavsdk::System> system) {
     }
     m_pSystem = system;
 
+    /// 根据配置文件配置是否开启时间同步
+    if(QGCSConfig::instance()->timeSyncEnabled()){
+        m_pSystem->enable_timesync();
+    }
     // 创建插件实例
     m_pInfo = std::make_unique<mavsdk::Info>(*system);
     m_pMavlinkDirect = std::make_unique<mavsdk::MavlinkDirect>(*system);
@@ -68,15 +72,15 @@ std::shared_ptr<mavsdk::System> QPlatPrivate::getSystem() const {
     return m_pSystem;
 }
 
-void QPlatPrivate::setupMessageHandling(QObject *parent) {
-    if (!m_pSystem || !parent) {
+void QPlatPrivate::setupMessageHandling() {
+    if (!m_pSystem) {
         return;
     }
 
     // 订阅系统连接状态变化
-    m_hConntecd = m_pSystem->subscribe_is_connected([this, parent](bool isConnected) {
+    m_hConntecd = m_pSystem->subscribe_is_connected([this](bool isConnected) {
         // 发射连接状态变化信号
-        QMetaObject::invokeMethod(parent, "connectionStatusChanged",
+        QMetaObject::invokeMethod(q_ptr, "connectionStatusChanged",
                                   Qt::QueuedConnection, Q_ARG(bool, isConnected));
         
         // 连接时更新版本信息
@@ -87,7 +91,7 @@ void QPlatPrivate::setupMessageHandling(QObject *parent) {
 
     // 订阅组件发现
     m_hCommonpentDiscovered = m_pSystem->subscribe_component_discovered(
-        [this, parent](mavsdk::ComponentType componentType) {
+        [this](mavsdk::ComponentType componentType) {
             // 这里可以处理新组件发现
             qDebug() << "QVehiclePrivate: Component discovered:"
                      << static_cast<int>(componentType);
@@ -105,6 +109,7 @@ void QPlatPrivate::updateVersionInfo() {
     
     // 异步获取版本信息，避免阻塞
     std::thread([this]() {
+        bool bUpdate=false;
         // 获取版本信息
         auto version_result = m_pInfo->get_version();
         if (version_result.first == mavsdk::Info::Result::Success) {
@@ -124,7 +129,7 @@ void QPlatPrivate::updateVersionInfo() {
                 }
             };
 
-            m_firmwareVersion = QString("Flight SW: v%1.%2.%3 (Vendor v%4.%5.%6, git %7, %8)"
+            m_softwareVersion = QString("Flight SW: v%1.%2.%3 (Vendor v%4.%5.%6, git %7, %8)"
                                         "OS SW: v%9.%10.%11 (git %12)")
                                     .arg(version.flight_sw_major)
                                     .arg(version.flight_sw_minor)
@@ -138,6 +143,7 @@ void QPlatPrivate::updateVersionInfo() {
                                     .arg(version.os_sw_minor)
                                     .arg(version.os_sw_patch)
                                     .arg(QString::fromStdString(version.os_sw_git_hash));
+            bUpdate = true;
         } else {
             spdlog::warn(PLAT_FMT_STR, m_pSystem->get_system_id(),
                         "get_version", version_result.first);
@@ -172,10 +178,15 @@ void QPlatPrivate::updateVersionInfo() {
             } else {
                 m_firmwareVersion = "Unknown";
             }
+            bUpdate = true;
         } else {
             spdlog::warn(PLAT_FMT_STR, m_pSystem->get_system_id(),
                         "get_product", product_result.first);
             m_firmwareVersion = "Unknown";
+        }
+
+        if(bUpdate){
+            QMetaObject::invokeMethod(q_ptr,"infoUpdated",Qt::QueuedConnection);
         }
     }).detach();
 }
