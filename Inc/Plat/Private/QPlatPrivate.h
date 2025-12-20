@@ -7,11 +7,8 @@
 #include <memory>
 #include <mavsdk/system.h>
 #include <mavsdk/plugins/telemetry/telemetry.h>
-#include <mavsdk/plugins/mavlink_passthrough/mavlink_passthrough.h>
 #include <mavsdk/plugins/mavlink_direct/mavlink_direct.h>
-#include <mavsdk/plugins/events/events.h>
 #include <mavsdk/plugins/info/info.h>
-#include <mavsdk/plugins/log_files/log_files.h>
 
 // 前向声明
 class QPlat;
@@ -33,12 +30,6 @@ public:
      * @return 固件版本
      */
     QString getFirmwareVersion() const { return m_firmwareVersion; }
-
-    /**
-     * @brief 获取硬件版本
-     * @return 硬件版本
-     */
-    QString getHardwareVersion() const { return m_hardwareVersion; }
 
     /**
      * @brief 获取软件版本
@@ -69,16 +60,21 @@ public:
      * @param parent QVehicle实例指针，用于信号发射
      */
     virtual void setupMessageHandling(QObject* parent);
+
+private:
+    /**
+     * @brief 更新版本信息（通过 Info 插件）
+     */
+    void updateVersionInfo();
+
 protected:
     QString m_firmwareVersion;              ///< 固件版本
-    QString m_hardwareVersion;              ///< 硬件版本
     QString m_softwareVersion;              ///< 软件版本
     
     // MAVSDK相关
     std::shared_ptr<mavsdk::System> m_pSystem; ///< 系统对象
     std::unique_ptr<mavsdk::Info> m_pInfo;     ///< 信息插件
-	std::unique_ptr<mavsdk::Events> m_pEvents; ///< 事件插件
-    std::unique_ptr<mavsdk::MavlinkPassthrough> m_pMavlinkPassthrough;
+
     std::unique_ptr<mavsdk::MavlinkDirect> m_pMavlinkDirect;
 
     mavsdk::System::IsConnectedHandle m_hConntecd;

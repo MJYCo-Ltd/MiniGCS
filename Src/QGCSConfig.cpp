@@ -19,6 +19,7 @@ const char *KEY_MAP_NAME = "Map/Name";
 const char *KEY_GCS_SYSTEM_ID = "GCS/SystemId";
 const char *KEY_GCS_COMPONENT_ID = "GCS/ComponentId";
 const char *KEY_LOG_LEVEL = "Logging/Level";
+const char *KEY_MAV_MESSAGE_EXTENSION = "MavMessage/Extension";
 
 // 默认值
 const char *DEFAULT_PORT_NAME = "COM14";
@@ -27,6 +28,7 @@ const char *DEFAULT_MAP_NAME = "OpenStreetMap";
 const uint8_t DEFAULT_GCS_SYSTEM_ID = 246;
 const uint8_t DEFAULT_GCS_COMPONENT_ID = 191;
 const char *DEFAULT_LOG_LEVEL = "debug";
+const char *DEFAULT_MAV_MESSAGE_EXTENSION = "ardupilotmega.xml";
 } // namespace
 
 // 将 QString（名称）映射到 spdlog 的 level_enum
@@ -226,25 +228,6 @@ QString QGCSConfig::logLevel() const {
     return m_settings->value(KEY_LOG_LEVEL, DEFAULT_LOG_LEVEL).toString();
 }
 
-void QGCSConfig::setLogLevel(const QString &level) {
-    if (!m_settings)
-        return;
-    QString l = level.trimmed();
-    if (l.isEmpty())
-        return;
-    m_settings->setValue(KEY_LOG_LEVEL, l);
-    m_settings->sync();
-
-    // 立即应用到 spdlog 全局级别
-    spdlog::level::level_enum lvl = levelFromString(l);
-    spdlog::set_level(lvl);
-    for (auto &s : sinks) {
-        if (s)
-            s->set_level(lvl);
-    }
-    spdlog::info("Log level changed to {}", l.toStdString());
-}
-
 uint8_t QGCSConfig::gcsSystemId() const {
     return static_cast<uint8_t>(
         m_settings
@@ -258,6 +241,10 @@ uint8_t QGCSConfig::gcsComponentId() const {
             ->value(KEY_GCS_COMPONENT_ID,
                     static_cast<int>(DEFAULT_GCS_COMPONENT_ID))
             .toInt());
+}
+
+QString QGCSConfig::mavMessageExtension() const {
+    return m_settings->value(KEY_MAV_MESSAGE_EXTENSION, DEFAULT_MAV_MESSAGE_EXTENSION).toString();
 }
 
 void QGCSConfig::save() {
@@ -295,6 +282,9 @@ void QGCSConfig::initializeDefaults() {
     }
     if (!m_settings->contains(KEY_LOG_LEVEL)) {
         m_settings->setValue(KEY_LOG_LEVEL, DEFAULT_LOG_LEVEL);
+    }
+    if (!m_settings->contains(KEY_MAV_MESSAGE_EXTENSION)) {
+        m_settings->setValue(KEY_MAV_MESSAGE_EXTENSION, DEFAULT_MAV_MESSAGE_EXTENSION);
     }
 
     // 立即保存默认值

@@ -57,7 +57,7 @@ public:
     void setSystem(std::shared_ptr<mavsdk::System> system);
     void setupMessageHandling(QObject* parent);
 
-    void setTelemetryRate(QObject* parent);
+    void setTelemetryRate();
 
 private:
     /**

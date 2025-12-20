@@ -93,12 +93,6 @@ public:
     QString logLevel() const;
 
     /**
-     * @brief 设置日志等级（会写入配置并立即生效）
-     * @param level 日志等级字符串（小写或大写都可）
-     */
-    void setLogLevel(const QString& level);
-
-    /**
      * @brief 获取GCS系统ID
      * @return 系统ID（只能通过配置文件设置）
      */
@@ -109,6 +103,12 @@ public:
      * @return 组件ID（只能通过配置文件设置）
      */
     uint8_t gcsComponentId() const;
+
+    /**
+     * @brief 获取MAV消息扩展文件名
+     * @return MAV消息扩展文件名（如 "ardupilotmega.xml"）
+     */
+    QString mavMessageExtension() const;
 
     /**
      * @brief 保存配置到文件

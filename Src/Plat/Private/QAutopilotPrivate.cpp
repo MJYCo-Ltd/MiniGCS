@@ -44,7 +44,7 @@ void QAutopilotPrivate::arm() {
 
 template<>struct fmt::formatter<mavsdk::Telemetry::Result>:ostream_formatter{};
 
-void QAutopilotPrivate::setTelemetryRate(QObject *parent) {
+void QAutopilotPrivate::setTelemetryRate() {
     /// 设置 位置信息 频率
     m_telemetry->set_rate_position_async(
         1, [this](mavsdk::Telemetry::Result result) {
@@ -141,7 +141,6 @@ void QAutopilotPrivate::setupMessageHandling(QObject *parent) {
     }
 
     QPlatPrivate::setupMessageHandling(parent);
-    setTelemetryRate(parent);
 
     /// 位置信息
     m_telemetry->subscribe_position([this, parent](
@@ -268,6 +267,9 @@ void QAutopilotPrivate::setupMessageHandling(QObject *parent) {
                                   Q_ARG(bool, rcStatus.is_available),
                                   Q_ARG(float, rcStatus.signal_strength_percent));
     });
+
+    /// 开始订阅消息
+    setTelemetryRate();
 }
 
 bool QAutopilotPrivate::isStatic(const mavsdk::Telemetry::Imu &imu) const {

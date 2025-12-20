@@ -21,11 +21,6 @@ QString QPlat::getFirmwareVersion() const
     return d_ptr->getFirmwareVersion();
 }
 
-QString QPlat::getHardwareVersion() const
-{
-    return d_ptr->getHardwareVersion();
-}
-
 QString QPlat::getSoftwareVersion() const
 {
     return d_ptr->getSoftwareVersion();

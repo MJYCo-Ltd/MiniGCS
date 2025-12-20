@@ -28,12 +28,6 @@ public:
     QString getFirmwareVersion() const;
 
     /**
-     * @brief 获取硬件版本
-     * @return 硬件版本
-     */
-    QString getHardwareVersion() const;
-
-    /**
      * @brief 获取软件版本
      * @return 软件版本
      */
