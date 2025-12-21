@@ -159,8 +159,6 @@ void QGroundControlStation::dealDataLinkThread(
                               Qt::QueuedConnection);
     QObject::disconnect(pDataLink, nullptr, this, nullptr);
 
-    QMetaObject::invokeMethod(pDataLink, "deleteLater", Qt::QueuedConnection);
-
     thread->quit();
     if (!thread->wait(2000)) {
         qWarning() << "Thread did not exit in time during ClearAllDataLink(), "

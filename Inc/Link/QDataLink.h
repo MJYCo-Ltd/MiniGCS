@@ -15,7 +15,10 @@ class MINIGCS_EXPORT QDataLink : public QObject
     Q_OBJECT
 
 public:
-    explicit QDataLink(QObject *parent = nullptr):QObject(parent){}
+    explicit QDataLink(QObject *parent = nullptr):QObject(parent){
+        connect(this,&QDataLink::needReLink,this,&QDataLink::onReLink);
+    }
+
     virtual ~QDataLink(){}
 
     /**
@@ -41,12 +44,6 @@ public:
      */
     Q_INVOKABLE virtual void disConnectLink()=0;
 
-private slots:
-    /**
-     * @brief 线程安全的发送数据槽函数（由子类实现）
-     * @param data 要发送的数据
-     */
-    virtual void onSendDataRequested(const QByteArray &data) = 0;
 
 signals:
     /**
@@ -64,7 +61,25 @@ signals:
      * @brief 链路错误
      */
     void linkError(const QString&);
-};
 
+    /**
+     * @brief 需要断开重连
+     */
+    void needReLink();
+
+protected slots:
+    /**
+     * @brief 线程安全的发送数据槽函数（由子类实现）
+     * @param data 要发送的数据
+     */
+    virtual void onSendDataRequested(const QByteArray &data) = 0;
+
+    /**
+     * @brief 响应needReLink
+     */
+    void onReLink(){disConnectLink();connectLink();}
+};
+Q_DECLARE_METATYPE(QDataLink)
+Q_DECLARE_METATYPE(QDataLink*)
 #endif // QDATALINK_H
 
