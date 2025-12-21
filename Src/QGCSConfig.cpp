@@ -54,7 +54,7 @@ static spdlog::level::level_enum levelFromString(const QString &levelStr) {
     return spdlog::level::debug;
 }
 
-QGCSConfig::QGCSConfig() : m_settings(nullptr) {}
+QGCSConfig::QGCSConfig(QObject *parent) : QObject(parent) {}
 
 QGCSConfig::~QGCSConfig() {
     spdlog::warn(SYS_FMT_STR,"系统正在清理资源","即将退出……");
@@ -203,6 +203,27 @@ void QGCSConfig::dealMavsdkMessage(uint32_t systemID,
             break;
         }
     }
+}
+
+#include <QtSerialPort/QSerialPortInfo>
+QStringList QGCSConfig::refreshPortName() const
+{
+    QStringList portNames;
+    const auto ports = QSerialPortInfo::availablePorts();
+    for (const QSerialPortInfo &port : ports) {
+        portNames.append(port.portName());
+    }
+    return portNames;
+}
+
+QStringList QGCSConfig::standardBaudRates() const
+{
+    QStringList baudRates;
+    const auto standardBaudRates = QSerialPortInfo::standardBaudRates();
+    for (qint32 baudRate : standardBaudRates) {
+        baudRates.append(QString::number(baudRate));
+    }
+    return (baudRates);
 }
 
 QString QGCSConfig::defaultPortName() const {

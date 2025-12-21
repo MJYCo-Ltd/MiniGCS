@@ -1,11 +1,13 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQuickWindow>
+#include <QtQml>
 
 #include "Link/QSerialDataLink.h"
 #include "Plat/QAutopilot.h"
 #include "QGCSConfig.h"
 #include "QGroundControlStation.h"
+#include "Plat/QPlat.h"
 
 int main(int argc, char *argv[]) {
     QQuickWindow::setGraphicsApi(QSGRendererInterface::Direct3D11);
@@ -58,6 +60,10 @@ int main(int argc, char *argv[]) {
 
         QGCSConfig::instance()->release();
     });
+
+    // 注册 QML 类型
+    qmlRegisterType<QGroundControlStation>("MiniGCS", 1, 0, "GroundControlStation");
+    qmlRegisterType<QPlat>("MiniGCS", 1, 0, "Plat");
 
     QQmlApplicationEngine engine;
     QObject::connect(

@@ -16,6 +16,11 @@ class QPlatPrivate;
 class MINIGCS_EXPORT QPlat : public QObject
 {
     Q_OBJECT
+    Q_PROPERTY(QString firmwareVersion READ getFirmwareVersion NOTIFY infoUpdated)
+    Q_PROPERTY(QString softwareVersion READ getSoftwareVersion NOTIFY infoUpdated)
+    Q_PROPERTY(bool connected READ isConnected NOTIFY connectionStatusChanged)
+    Q_PROPERTY(QDateTime lastConnectedTime READ getLastConnectedTime NOTIFY infoUpdated)
+    Q_PROPERTY(QDateTime lastDisconnectedTime READ getLastDisconnectedTime NOTIFY infoUpdated)
 
 public:
     explicit QPlat(QObject *parent = nullptr);

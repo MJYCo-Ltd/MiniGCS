@@ -3,6 +3,7 @@
 #include <QDateTime>
 
 QPlat::QPlat(QObject *parent)
+    : QObject(parent)
 {
 }
 
@@ -18,11 +19,17 @@ QPlat::~QPlat()
 
 QString QPlat::getFirmwareVersion() const
 {
+    if (!d_ptr) {
+        return QString("Unknown");
+    }
     return d_ptr->getFirmwareVersion();
 }
 
 QString QPlat::getSoftwareVersion() const
 {
+    if (!d_ptr) {
+        return QString("Unknown");
+    }
     return d_ptr->getSoftwareVersion();
 }
 
@@ -55,5 +62,8 @@ QDateTime QPlat::getLastDisconnectedTime() const
 
 QString QPlat::toString() const
 {
+    if (!d_ptr) {
+        return QString("QPlat (未初始化)");
+    }
     return d_ptr->toString();
 }

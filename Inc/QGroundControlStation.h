@@ -3,12 +3,13 @@
 
 #include <QObject>
 #include <QMap>
-#include <QThread>
+#include <QQmlListProperty>
 #include "MiniGCSExport.h"
 
 // 前向声明
 class QPlat;
 class QDataLink;
+class QThread;
 
 /**
  * @brief QGroundControlStation类 - 地面控制站类
@@ -16,11 +17,15 @@ class QDataLink;
 class MINIGCS_EXPORT QGroundControlStation : public QObject
 {
     Q_OBJECT
+    Q_PROPERTY(QQmlListProperty<QPlat> plats READ plats NOTIFY platsChanged)
+    Q_PROPERTY(QQmlListProperty<QDataLink> dataLinks READ dataLinks NOTIFY dataLinksChanged)
 
 public:
     explicit QGroundControlStation(QObject *parent = nullptr);
     ~QGroundControlStation();
 
+    QQmlListProperty<QPlat> plats();
+    QQmlListProperty<QDataLink> dataLinks();
     /**
      * @brief 初始化系统
      */
@@ -46,11 +51,6 @@ public:
     void ClearAllDataLink();
 
     /**
-     * @brief 获取飞机数量
-     */
-    int getVehicleCount() const;
-
-    /**
      * @brief 获取所有飞控对象
      * @return 飞控对象列表
      */
@@ -63,6 +63,12 @@ signals:
      */
     void newPlatFind(QPlat* vehicle);
     void mavConnectionError(const QString& error);
+    /**
+     * @brief 飞机数量变化信号
+     */
+    void platsChanged();
+
+    void dataLinksChanged();
 
 private:
     /**

@@ -50,13 +50,6 @@ public:
     mavsdk::System* getSystem(uint8_t systemId) const;
 
     /**
-     * @brief 获取系统数量
-     * @return 系统数量
-     */
-    int getSystemCount() const;
-
-
-    /**
      * @brief 设置连接错误处理
      * @param parent QGroundControlStation实例指针，用于信号发射
      */

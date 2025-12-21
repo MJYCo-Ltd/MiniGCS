@@ -1,6 +1,7 @@
 #ifndef QGCSCONFIG_H
 #define QGCSCONFIG_H
 
+#include <QObject>
 #include <QString>
 #include "MiniGCSExport.h"
 
@@ -24,8 +25,9 @@ namespace spdlog {
  * 提供对串口、波特率、地图等配置项的读写访问
  * GCS系统ID和组件ID只能通过配置文件设置，不支持运行时修改
  */
-class MINIGCS_EXPORT QGCSConfig
+class MINIGCS_EXPORT QGCSConfig:public QObject
 {
+    Q_OBJECT
 public:
     /**
    * @brief 获取配置单例实例
@@ -51,41 +53,44 @@ public:
    */
     void dealMavsdkMessage(uint32_t systemID, const std::string &fields_json);
 
+    Q_INVOKABLE QStringList refreshPortName() const;
+    Q_INVOKABLE QStringList standardBaudRates() const;
+
     /**
    * @brief 获取默认串口名称
    * @return 串口名称（如 "COM1", "/dev/ttyUSB0"）
    */
-    QString defaultPortName() const;
+    Q_INVOKABLE QString defaultPortName() const;
 
     /**
    * @brief 设置默认串口名称
    * @param portName 串口名称
    */
-    void setDefaultPortName(const QString &portName);
+    Q_INVOKABLE void setDefaultPortName(const QString &portName);
 
     /**
    * @brief 获取默认波特率
    * @return 波特率（如 57600, 115200）
    */
-    int defaultBaudRate() const;
+    Q_INVOKABLE int defaultBaudRate() const;
 
     /**
    * @brief 设置默认波特率
    * @param baudRate 波特率
    */
-    void setDefaultBaudRate(int baudRate);
+    Q_INVOKABLE void setDefaultBaudRate(int baudRate);
 
     /**
    * @brief 获取地图名称
    * @return 地图名称
    */
-    QString mapName() const;
+    Q_INVOKABLE QString mapName() const;
 
     /**
    * @brief 设置地图名称
    * @param mapName 地图名称
    */
-    void setMapName(const QString &mapName);
+    Q_INVOKABLE void setMapName(const QString &mapName);
 
     /**
    * @brief 获取日志等级字符串（例如 "debug","info","warn","error"）
@@ -130,7 +135,7 @@ public:
     /**
    * @brief 重新加载配置
    */
-    void reload();
+    Q_INVOKABLE void reload();
 
     /**
    * @brief 获取配置文件路径
@@ -139,7 +144,7 @@ public:
     QString configFilePath() const;
 
 private:
-    QGCSConfig();
+    QGCSConfig(QObject* parent=nullptr);
     ~QGCSConfig();
     Q_DISABLE_COPY(QGCSConfig)
 
@@ -153,7 +158,7 @@ private:
      */
     void init_logging();
 
-    QSettings* m_settings;        ///< QSettings实例，用于读写INI文件
+    QSettings* m_settings{};        ///< QSettings实例，用于读写INI文件
     QString m_configFilePath;     ///< 配置文件路径
 
     std::vector<spdlog::sink_ptr> sinks;

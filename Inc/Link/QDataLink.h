@@ -79,7 +79,5 @@ protected slots:
      */
     void onReLink(){disConnectLink();connectLink();}
 };
-Q_DECLARE_METATYPE(QDataLink)
-Q_DECLARE_METATYPE(QDataLink*)
 #endif // QDATALINK_H
 

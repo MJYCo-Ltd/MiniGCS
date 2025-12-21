@@ -103,7 +103,5 @@ private:
     QList<QGpsPosition> m_waypoints;        ///< 航点列表
 };
 
-Q_DECLARE_METATYPE(QAirLine*)
-
 #endif // _YTY_QAIRLINE_H
 

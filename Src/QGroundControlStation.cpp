@@ -1,5 +1,6 @@
 #include <QCoreApplication>
 #include <QDebug>
+#include <QThread>
 #include "QGroundControlStation.h"
 #include "Plat/QAutopilot.h"
 #include "Link/QDataLink.h"
@@ -19,6 +20,58 @@ QGroundControlStation::~QGroundControlStation()
     if (d_ptr) {
         d_ptr.release();
     }
+}
+
+static qsizetype platsCount(QQmlListProperty<QPlat> *prop) {
+    auto self = static_cast<QMap<uint8_t, QPlat *> *>(prop->data);
+    return self->size();
+}
+
+static QPlat *platAt(QQmlListProperty<QPlat> *prop, qsizetype index) {
+    auto self = static_cast<QMap<uint8_t, QPlat *> *>(prop->data);
+    auto itor = self->begin();
+    while (index--) {
+        if (itor++ == self->end()) {
+            return (nullptr);
+        }
+    }
+
+    if (itor != self->end()) {
+        return (itor.value());
+    } else {
+        return (nullptr);
+    }
+}
+
+QQmlListProperty<QPlat> QGroundControlStation::plats() {
+    return QQmlListProperty<QPlat>(this, &m_mapId2Standalone, &platsCount,
+                                   &platAt);
+}
+
+static qsizetype dataLinkCount(QQmlListProperty<QDataLink> *prop) {
+    auto self = static_cast<QMap<QDataLink *, QThread *> *>(prop->data);
+    return self->size();
+}
+
+static QDataLink *dataLinkAt(QQmlListProperty<QDataLink> *prop, qsizetype index) {
+    auto self = static_cast<QMap<QDataLink *, QThread *> *>(prop->data);
+    auto itor = self->begin();
+    while (index--) {
+        if (itor++ == self->end()) {
+            return (nullptr);
+        }
+    }
+
+    if (itor != self->end()) {
+        return (itor.key());
+    } else {
+        return (nullptr);
+    }
+}
+
+QQmlListProperty<QDataLink> QGroundControlStation::dataLinks() {
+    return QQmlListProperty<QDataLink>(this, &m_mapLink, &dataLinkCount,
+                                       &dataLinkAt);
 }
 
 void QGroundControlStation::Init()
@@ -64,6 +117,8 @@ bool QGroundControlStation::AddDataLink(QDataLink* pDataLink)
     QMetaObject::invokeMethod(pDataLink, "connectLink",
                               Qt::QueuedConnection);
 
+    emit dataLinksChanged();
+
     return true;
 }
 
@@ -77,9 +132,11 @@ void QGroundControlStation::RemoveDatLink(QDataLink* pDataLink)
     if (m_mapLink.end() != itor)
     {
         dealDataLinkThread(itor);
+        // 从集合中移除
+        m_mapLink.erase(itor);
+
+        emit dataLinksChanged();
     }
-    // 从集合中移除
-    m_mapLink.erase(itor);
 }
 
 void QGroundControlStation::ClearAllDataLink()
@@ -91,6 +148,7 @@ void QGroundControlStation::ClearAllDataLink()
 
     // 清空集合
     m_mapLink.clear();
+    emit dataLinksChanged();
 }
 
 void QGroundControlStation::processDataLinkMessage(const QByteArray &data)
@@ -122,6 +180,7 @@ void QGroundControlStation::sendDataToAllLinks(const QByteArray &data)
 QPlat *QGroundControlStation::getOrCreatePlat(uint8_t uId,bool bIsAutopilot)
 {
     QPlat * pPlat = m_mapId2Standalone.value(uId,nullptr);
+    bool bNewPlatCreated = false;
     if (nullptr == pPlat) {
         if (bIsAutopilot) {
             pPlat = new QAutopilot(this);
@@ -129,6 +188,7 @@ QPlat *QGroundControlStation::getOrCreatePlat(uint8_t uId,bool bIsAutopilot)
             pPlat = new QPlat(this);
         }
         m_mapId2Standalone.insert(uId,pPlat);
+        bNewPlatCreated = true;
     }else{
         /// 如果系统与之前保存的类型不一致，删除原来的重新构建
         if (!bIsAutopilot) {
@@ -144,6 +204,11 @@ QPlat *QGroundControlStation::getOrCreatePlat(uint8_t uId,bool bIsAutopilot)
                 m_mapId2Standalone[uId] = pPlat;
             }
         }
+    }
+
+    // 如果创建了新的平台，发出数量变化信号
+    if (bNewPlatCreated) {
+        emit platsChanged();
     }
 
     return(pPlat);
@@ -168,11 +233,6 @@ void QGroundControlStation::dealDataLinkThread(
     }
 
     thread->deleteLater();
-}
-
-int QGroundControlStation::getVehicleCount() const
-{
-    return d_ptr->getSystemCount();
 }
 
 QVector<QPlat *> QGroundControlStation::getAllStandalone() const

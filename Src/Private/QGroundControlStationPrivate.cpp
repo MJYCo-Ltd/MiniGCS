@@ -107,23 +107,6 @@ mavsdk::System* QGroundControlStationPrivate::getSystem(uint8_t systemId) const
     return nullptr;
 }
 
-int QGroundControlStationPrivate::getSystemCount() const
-{
-    if (!m_mavsdk) {
-        return 0;
-    }
-    
-    int count = 0;
-    auto systems = m_mavsdk->systems();
-    for (auto system : systems) {
-        if (system->is_connected()) {
-            count++;
-        }
-    }
-    
-    return count;
-}
-
 void QGroundControlStationPrivate::setupConnectionErrorHandling(QObject* parent)
 {
     if (!m_mavsdk || !parent) {
