@@ -4,13 +4,14 @@
 #include <QObject>
 #include <QMetaType>
 #include <QString>
+#include "MiniGCSExport.h"
 
 /**
  * @brief 自动驾驶仪载具类型枚举
  * 
  * 定义各种载具类型，可在 QML 中使用
  */
-class QAutoVehicleType
+class MINIGCS_EXPORT QAutoVehicleType
 {
     Q_GADGET
 

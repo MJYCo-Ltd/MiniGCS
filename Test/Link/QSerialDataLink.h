@@ -1,7 +1,7 @@
 #ifndef QSERIALDATALINK_H
 #define QSERIALDATALINK_H
 
-#include "QDataLink.h"
+#include "Link/QDataLink.h"
 #include <QString>
 
 // 前向声明
@@ -91,4 +91,5 @@ private:
 };
 
 #endif // QSERIALDATALINK_H
+
 

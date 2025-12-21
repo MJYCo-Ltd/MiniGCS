@@ -12,8 +12,9 @@
 #include <memory>
 #include <mavsdk/mavsdk.h>
 #include <mavsdk/plugins/mavlink_direct/mavlink_direct.h>
+#include "MiniGCSExport.h"
 
-class XmlToMavSDK
+class MINIGCS_EXPORT XmlToMavSDK
 {
 public:
 

@@ -5,13 +5,14 @@
 #include <QList>
 #include <QString>
 #include "QAirLine.h"
+#include "MiniGCSExport.h"
 
 /**
  * @brief 航线管理器类
  * 
  * 该类管理多条航线，提供添加、删除、查找等功能
  */
-class QAirLineManager : public QObject
+class MINIGCS_EXPORT QAirLineManager : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(QList<QObject*> airlines READ airlines NOTIFY airlinesChanged)

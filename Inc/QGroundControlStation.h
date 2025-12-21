@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QMap>
 #include <QThread>
+#include "MiniGCSExport.h"
 
 // 前向声明
 class QPlat;
@@ -12,7 +13,7 @@ class QDataLink;
 /**
  * @brief QGroundControlStation类 - 地面控制站类
  */
-class QGroundControlStation : public QObject
+class MINIGCS_EXPORT QGroundControlStation : public QObject
 {
     Q_OBJECT
 

@@ -3,13 +3,14 @@
 
 #include <QObject>
 #include <QByteArray>
+#include "MiniGCSExport.h"
 
 /**
  * @brief QDataLink类 - 数据链路基类
  * 
  * 该类定义了数据链路的基本接口，包括接收消息的信号和发送数据的方法
  */
-class QDataLink : public QObject
+class MINIGCS_EXPORT QDataLink : public QObject
 {
     Q_OBJECT
 

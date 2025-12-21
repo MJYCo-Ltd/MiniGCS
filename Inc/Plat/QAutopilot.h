@@ -6,13 +6,14 @@
 #include "AirLine/QNEDPosition.h"
 #include "Plat/QAutopilotStatus.h"
 #include "Plat/QAutoVehicleType.h"
+#include "MiniGCSExport.h"
 
 /**
  * @brief QAutopilot类 - 具备自动驾驶功能的系统
  * 
  * 该类封装了自动驾驶功能的所有信息，包括连接状态、硬件信息等
  */
-class QAutopilot : public QPlat
+class MINIGCS_EXPORT QAutopilot : public QPlat
 {
     Q_OBJECT
     Q_PROPERTY(QGpsPosition gpsPosition READ gpsPosition WRITE setGpsPosition NOTIFY gpsPositionChanged)

@@ -4,13 +4,14 @@
 #include <QObject>
 #include <QMetaType>
 #include <QString>
+#include "MiniGCSExport.h"
 
 /**
  * @brief 自动驾驶仪状态信息结构体
  * 
  * 包含GPS信息、电池信息、遥控器连接状态等
  */
-class QAutopilotStatus
+class MINIGCS_EXPORT QAutopilotStatus
 {
     Q_GADGET
     Q_PROPERTY(int gpsCount READ gpsCount WRITE setGpsCount)

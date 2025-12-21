@@ -5,6 +5,7 @@
 #include <QString>
 #include <QVector>
 #include <QDateTime>
+#include "MiniGCSExport.h"
 
 class QPlatPrivate;
 /**
@@ -12,7 +13,7 @@ class QPlatPrivate;
  * 
  * 该类封装了平台的一些版本信息等
  */
-class QPlat : public QObject
+class MINIGCS_EXPORT QPlat : public QObject
 {
     Q_OBJECT
 

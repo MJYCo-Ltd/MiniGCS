@@ -6,13 +6,14 @@
 #include <QList>
 #include <QMetaType>
 #include "QGpsPosition.h"
+#include "MiniGCSExport.h"
 
 /**
  * @brief 航线类
  * 
  * 该类表示一条航线，包含多个航点位置
  */
-class QAirLine : public QObject
+class MINIGCS_EXPORT QAirLine : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(QString name READ name WRITE setName NOTIFY nameChanged)

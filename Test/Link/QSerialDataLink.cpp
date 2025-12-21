@@ -179,3 +179,4 @@ void QSerialDataLink::closeOpenSerialPort()
         emit linkStatusChanged(false);
     }
 }
+

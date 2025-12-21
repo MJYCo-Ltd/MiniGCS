@@ -3,13 +3,14 @@
 
 #include <QObject>
 #include <QMetaType>
+#include "MiniGCSExport.h"
 
 /**
  * @brief NED位置信息结构体
  * 
  * 包含NED坐标系下的位置信息（North-East-Down）
  */
-class QNEDPosition
+class MINIGCS_EXPORT QNEDPosition
 {
     Q_GADGET
     Q_PROPERTY(float north READ north WRITE setNorth)

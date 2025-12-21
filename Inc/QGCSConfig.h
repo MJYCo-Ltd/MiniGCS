@@ -2,6 +2,7 @@
 #define QGCSCONFIG_H
 
 #include <QString>
+#include "MiniGCSExport.h"
 
 class QSettings;
 
@@ -23,7 +24,7 @@ namespace spdlog {
  * 提供对串口、波特率、地图等配置项的读写访问
  * GCS系统ID和组件ID只能通过配置文件设置，不支持运行时修改
  */
-class QGCSConfig
+class MINIGCS_EXPORT QGCSConfig
 {
 public:
     /**
