@@ -108,14 +108,17 @@ void QGCSConfig::init_logging() {
 void QGCSConfig::qtLogHandler(QtMsgType type, const QMessageLogContext &ctx,
                               const QString &msg) {
     std::string logMsg(msg.toUtf8().constData());
-    const char* pFileName = strrchr(ctx.file,'\\');
-    if(nullptr == pFileName){
-        pFileName = strrchr(ctx.file,'/');
+    const char *pFileName = nullptr;
+    if (nullptr != ctx.file) {
+        pFileName = strrchr(ctx.file, '/');
+        if (NULL == pFileName) {
+            pFileName = strrchr(ctx.file, '\\');
+        }
     }
 
     // 拼接上下文信息
     std::string ctxInfo = fmt::format(
-        "[{}:{} {}] {}", nullptr != pFileName ? pFileName+1 : "", ctx.line,
+        "[{}:{} {}] {}", NULL != pFileName ? pFileName+1 : "", ctx.line,
         ctx.function ? ctx.function : "", logMsg);
 
     switch (type) {

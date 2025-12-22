@@ -5,6 +5,7 @@
 #include "AirLine/QGpsPosition.h"
 #include "AirLine/QNEDPosition.h"
 #include "Plat/QAutopilotStatus.h"
+#include "Plat/QAutopilotFixedwing.h"
 #include "Plat/QAutoVehicleType.h"
 #include "MiniGCSExport.h"
 
@@ -16,11 +17,12 @@
 class MINIGCS_EXPORT QAutopilot : public QPlat
 {
     Q_OBJECT
-    Q_PROPERTY(QGpsPosition gpsPosition READ gpsPosition WRITE setGpsPosition NOTIFY gpsPositionChanged)
-    Q_PROPERTY(QNEDPosition nedPosition READ nedPosition WRITE setNedPosition NOTIFY nedPositionChanged)
-    Q_PROPERTY(QGpsPosition homePosition READ homePosition WRITE setHomePosition NOTIFY homePositionChanged)
-    Q_PROPERTY(QAutopilotStatus status READ status WRITE setStatus NOTIFY statusChanged)
-    Q_PROPERTY(double heading READ heading WRITE setHeading NOTIFY headingChanged)
+    Q_PROPERTY(QGpsPosition gpsPosition READ gpsPosition NOTIFY gpsPositionChanged)
+    Q_PROPERTY(QNEDPosition nedPosition READ nedPosition NOTIFY nedPositionChanged)
+    Q_PROPERTY(QGpsPosition homePosition READ homePosition NOTIFY homePositionChanged)
+    Q_PROPERTY(QAutopilotStatus status READ status NOTIFY statusChanged)
+    Q_PROPERTY(QAutopilotFixedwing fixedwing READ fixedwing NOTIFY fixedwingChanged)
+    Q_PROPERTY(double heading READ heading NOTIFY headingChanged)
     Q_PROPERTY(QAutoVehicleType::Vehicle vehicleType READ vehicleType WRITE setVehicleType NOTIFY vehicleTypeChanged)
     Q_PROPERTY(QAutoVehicleType::Autopilot autopilotType READ autopilotType WRITE setAutopilotType NOTIFY autopilotTypeChanged)
 
@@ -40,22 +42,10 @@ public:
     QGpsPosition gpsPosition() const { return m_gpsPosition; }
 
     /**
-     * @brief 设置GPS位置
-     * @param position GPS位置
-     */
-    void setGpsPosition(const QGpsPosition &position);
-
-    /**
      * @brief 获取NED位置
      * @return NED位置
      */
     QNEDPosition nedPosition() const { return m_nedPosition; }
-
-    /**
-     * @brief 设置NED位置
-     * @param position NED位置
-     */
-    void setNedPosition(const QNEDPosition &position);
 
     /**
      * @brief 获取Home位置
@@ -64,22 +54,16 @@ public:
     QGpsPosition homePosition() const { return m_homePosition; }
 
     /**
-     * @brief 设置Home位置
-     * @param position Home位置
-     */
-    void setHomePosition(const QGpsPosition &position);
-
-    /**
      * @brief 获取状态信息
      * @return 状态信息
      */
     QAutopilotStatus status() const { return m_status; }
 
     /**
-     * @brief 设置状态信息
-     * @param status 状态信息
+     * @brief 获取固定翼状态
+     * @return 固定翼状态
      */
-    void setStatus(const QAutopilotStatus &status);
+    QAutopilotFixedwing fixedwing() const { return m_fixedwing; }
 
     /**
      * @brief 获取航向角
@@ -150,6 +134,12 @@ signals:
     void headingChanged(double heading);
 
     /**
+     * @brief 固定翼状态变化信号
+     * @param fixedwing 新的固定翼状态
+     */
+    void fixedwingChanged(const QAutopilotFixedwing &fixedwing);
+
+    /**
      * @brief 载具类型变化信号
      * @param vehicleType 新的载具类型
      */
@@ -172,6 +162,8 @@ protected slots:
                       bool isMagnetometerCalibrationOk, bool isLocalPositionOk,
                       bool isGlobalPositionOk, bool isHomePositionOk, bool isArmable);
     void homeUpdate(double dLon,double dLat,float dH);
+    void fixedwingUpdate(float airspeedMS, float throttlePercentage, float climbRateMS,
+                        float groundspeedMS, float headingDeg, float absoluteAltitudeM);
 
 protected:
 
@@ -187,6 +179,7 @@ protected:
     QNEDPosition m_nedPosition;
     QGpsPosition m_homePosition;
     QAutopilotStatus m_status;
+    QAutopilotFixedwing m_fixedwing;
     double m_heading{0.0};  ///< 航向角（度）
     QAutoVehicleType::Vehicle m_vehicleType{QAutoVehicleType::Vehicle_Unknown};  ///< 载具类型
     QAutoVehicleType::Autopilot m_autopilotType{QAutoVehicleType::Autopilot_Unknown};  ///< 自动驾驶仪类型

@@ -117,6 +117,14 @@ void QAutopilotPrivate::setTelemetryRate() {
             }
         });
 
+    /// 设置空速
+    m_telemetry->set_rate_fixedwing_metrics_async(1,[this](mavsdk::Telemetry::Result result) {
+        if (mavsdk::Telemetry::Result::Success != result) {
+            spdlog::error(PLAT_FMT_STR, m_pSystem->get_system_id(),
+                          "set_rate_fixedwing_metrics", result);
+        }
+    });
+
     /// 设置 遥控器状态 发送频率 Unsupported and System status is usually fixed at
     /// 1 Hz
     // m_telemetry->set_rate_rc_status_async(
@@ -136,6 +144,7 @@ template<>struct fmt::formatter<mavsdk::Telemetry::Imu>:ostream_formatter{};
 template<>struct fmt::formatter<mavsdk::Telemetry::PositionVelocityNed>:ostream_formatter{};
 template<>struct fmt::formatter<mavsdk::Telemetry::DistanceSensor>:ostream_formatter{};
 template<>struct fmt::formatter<mavsdk::Telemetry::RcStatus>:ostream_formatter{};
+template<>struct fmt::formatter<mavsdk::Telemetry::FixedwingMetrics>:ostream_formatter{};
 
 void QAutopilotPrivate::setupMessageHandling() {
     if (!m_telemetry) {
@@ -266,6 +275,20 @@ void QAutopilotPrivate::setupMessageHandling() {
         QMetaObject::invokeMethod(q_ptr, "rcStatusUpdate", Qt::QueuedConnection,
                                   Q_ARG(bool, rcStatus.is_available),
                                   Q_ARG(float, rcStatus.signal_strength_percent));
+    });
+
+    /// 订阅固定翼指标
+    m_telemetry->subscribe_fixedwing_metrics([this](mavsdk::Telemetry::FixedwingMetrics fixMetrics){
+        spdlog::info(PLAT_FMT_STR, m_pSystem->get_system_id(), "fixMetrics",
+                     fixMetrics);
+        // 通过Qt元系统调用parent的fixedwingUpdate方法
+        QMetaObject::invokeMethod(q_ptr, "fixedwingUpdate", Qt::QueuedConnection,
+                                  Q_ARG(float, fixMetrics.airspeed_m_s),
+                                  Q_ARG(float, fixMetrics.throttle_percentage),
+                                  Q_ARG(float, fixMetrics.climb_rate_m_s),
+                                  Q_ARG(float, fixMetrics.groundspeed_m_s),
+                                  Q_ARG(float, fixMetrics.heading_deg),
+                                  Q_ARG(float, fixMetrics.absolute_altitude_m));
     });
 
     /// 开始订阅消息

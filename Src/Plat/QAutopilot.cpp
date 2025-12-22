@@ -26,7 +26,10 @@ static const char* fixTypeToChinese(int fixType) {
     }
 }
 
-QAutopilot::QAutopilot(QObject *parent) {}
+QAutopilot::QAutopilot(QObject *parent)
+    : QPlat(parent)
+{
+}
 
 QAutopilot::~QAutopilot() {}
 
@@ -41,34 +44,6 @@ const QAutopilotPrivate *QAutopilot::d_func() const {
 void QAutopilot::arm()
 {
     d_func()->arm();
-}
-
-void QAutopilot::setGpsPosition(const QGpsPosition &position) {
-    if (m_gpsPosition != position) {
-        m_gpsPosition = position;
-        emit gpsPositionChanged(m_gpsPosition);
-    }
-}
-
-void QAutopilot::setNedPosition(const QNEDPosition &position) {
-    if (m_nedPosition != position) {
-        m_nedPosition = position;
-        emit nedPositionChanged(m_nedPosition);
-    }
-}
-
-void QAutopilot::setHomePosition(const QGpsPosition &position) {
-    if (m_homePosition != position) {
-        m_homePosition = position;
-        emit homePositionChanged(m_homePosition);
-    }
-}
-
-void QAutopilot::setStatus(const QAutopilotStatus &status) {
-    if (m_status != status) {
-        m_status = status;
-        emit statusChanged(m_status);
-    }
 }
 
 void QAutopilot::setHeading(double heading) {
@@ -220,5 +195,51 @@ void QAutopilot::homeUpdate(double dLon, double dLat, float dH)
         m_homePosition.setLatitude(dLat);
         m_homePosition.setAltitude(dH);
         emit homePositionChanged(m_homePosition);
+    }
+}
+
+void QAutopilot::fixedwingUpdate(float airspeedMS, float throttlePercentage, float climbRateMS,
+                                 float groundspeedMS, float headingDeg, float absoluteAltitudeM)
+{
+    bool changed = false;
+    
+    // 检查空速
+    if (!qFuzzyCompare(m_fixedwing.airspeedMS(), airspeedMS)) {
+        m_fixedwing.setAirspeedMS(airspeedMS);
+        changed = true;
+    }
+    
+    // 检查油门
+    if (!qFuzzyCompare(m_fixedwing.throttlePercentage(), throttlePercentage)) {
+        m_fixedwing.setThrottlePercentage(throttlePercentage);
+        changed = true;
+    }
+    
+    // 检查爬升率
+    if (!qFuzzyCompare(m_fixedwing.climbRateMS(), climbRateMS)) {
+        m_fixedwing.setClimbRateMS(climbRateMS);
+        changed = true;
+    }
+    
+    // 检查地速
+    if (!qFuzzyCompare(m_fixedwing.groundspeedMS(), groundspeedMS)) {
+        m_fixedwing.setGroundspeedMS(groundspeedMS);
+        changed = true;
+    }
+    
+    // 检查航向
+    if (!qFuzzyCompare(m_fixedwing.headingDeg(), headingDeg)) {
+        m_fixedwing.setHeadingDeg(headingDeg);
+        changed = true;
+    }
+    
+    // 检查绝对高度
+    if (!qFuzzyCompare(m_fixedwing.absoluteAltitudeM(), absoluteAltitudeM)) {
+        m_fixedwing.setAbsoluteAltitudeM(absoluteAltitudeM);
+        changed = true;
+    }
+    
+    if (changed) {
+        emit fixedwingChanged(m_fixedwing);
     }
 }

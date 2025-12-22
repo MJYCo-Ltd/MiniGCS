@@ -14,19 +14,19 @@
 class MINIGCS_EXPORT QAutopilotStatus
 {
     Q_GADGET
-    Q_PROPERTY(int gpsCount READ gpsCount WRITE setGpsCount)
-    Q_PROPERTY(QString gpsStatus READ gpsStatus WRITE setGpsStatus)
-    Q_PROPERTY(float batteryVoltage READ batteryVoltage WRITE setBatteryVoltage)
-    Q_PROPERTY(float batteryRemaining READ batteryRemaining WRITE setBatteryRemaining)
-    Q_PROPERTY(bool isGyrometerCalibrationOk READ isGyrometerCalibrationOk WRITE setGyrometerCalibrationOk)
-    Q_PROPERTY(bool isAccelerometerCalibrationOk READ isAccelerometerCalibrationOk WRITE setAccelerometerCalibrationOk)
-    Q_PROPERTY(bool isMagnetometerCalibrationOk READ isMagnetometerCalibrationOk WRITE setMagnetometerCalibrationOk)
-    Q_PROPERTY(bool isLocalPositionOk READ isLocalPositionOk WRITE setLocalPositionOk)
-    Q_PROPERTY(bool isGlobalPositionOk READ isGlobalPositionOk WRITE setGlobalPositionOk)
-    Q_PROPERTY(bool isHomePositionOk READ isHomePositionOk WRITE setHomePositionOk)
-    Q_PROPERTY(bool isArmable READ isArmable WRITE setArmable)
-    Q_PROPERTY(bool rcIsAvailable READ rcIsAvailable WRITE setRcIsAvailable)
-    Q_PROPERTY(float rcSignalStrengthPercent READ rcSignalStrengthPercent WRITE setRcSignalStrengthPercent)
+    Q_PROPERTY(int gpsCount READ gpsCount)
+    Q_PROPERTY(QString gpsStatus READ gpsStatus)
+    Q_PROPERTY(float batteryVoltage READ batteryVoltage)
+    Q_PROPERTY(float batteryRemaining READ batteryRemaining)
+    Q_PROPERTY(bool isGyrometerCalibrationOk READ isGyrometerCalibrationOk)
+    Q_PROPERTY(bool isAccelerometerCalibrationOk READ isAccelerometerCalibrationOk)
+    Q_PROPERTY(bool isMagnetometerCalibrationOk READ isMagnetometerCalibrationOk)
+    Q_PROPERTY(bool isLocalPositionOk READ isLocalPositionOk)
+    Q_PROPERTY(bool isGlobalPositionOk READ isGlobalPositionOk)
+    Q_PROPERTY(bool isHomePositionOk READ isHomePositionOk)
+    Q_PROPERTY(bool isArmable READ isArmable)
+    Q_PROPERTY(bool rcIsAvailable READ rcIsAvailable)
+    Q_PROPERTY(float rcSignalStrengthPercent READ rcSignalStrengthPercent)
 
 public:
     QAutopilotStatus();
@@ -34,48 +34,52 @@ public:
                      float batteryRemaining, bool rcConnected);
     
     int gpsCount() const { return m_gpsCount; }
-    void setGpsCount(int gpsCount);
     
     QString gpsStatus() const { return m_gpsStatus; }
-    void setGpsStatus(const QString &gpsStatus);
     
     float batteryVoltage() const { return m_batteryVoltage; }
-    void setBatteryVoltage(float batteryVoltage);
     
     float batteryRemaining() const { return m_batteryRemaining; }
-    void setBatteryRemaining(float batteryRemaining);
     
     bool isGyrometerCalibrationOk() const { return m_isGyrometerCalibrationOk; }
-    void setGyrometerCalibrationOk(bool isOk);
     
     bool isAccelerometerCalibrationOk() const { return m_isAccelerometerCalibrationOk; }
-    void setAccelerometerCalibrationOk(bool isOk);
     
     bool isMagnetometerCalibrationOk() const { return m_isMagnetometerCalibrationOk; }
-    void setMagnetometerCalibrationOk(bool isOk);
     
     bool isLocalPositionOk() const { return m_isLocalPositionOk; }
-    void setLocalPositionOk(bool isOk);
     
     bool isGlobalPositionOk() const { return m_isGlobalPositionOk; }
-    void setGlobalPositionOk(bool isOk);
     
     bool isHomePositionOk() const { return m_isHomePositionOk; }
-    void setHomePositionOk(bool isOk);
     
     bool isArmable() const { return m_isArmable; }
-    void setArmable(bool isArmable);
     
     bool rcIsAvailable() const { return m_rcIsAvailable; }
-    void setRcIsAvailable(bool isAvailable);
     
     float rcSignalStrengthPercent() const { return m_rcSignalStrengthPercent; }
-    void setRcSignalStrengthPercent(float signalStrengthPercent);
     
     bool operator==(const QAutopilotStatus &other) const;
     bool operator!=(const QAutopilotStatus &other) const;
 
 private:
+    // 仅允许 QAutopilot 更新状态
+    friend class QAutopilot;
+
+    void setGpsCount(int gpsCount);
+    void setGpsStatus(const QString &gpsStatus);
+    void setBatteryVoltage(float batteryVoltage);
+    void setBatteryRemaining(float batteryRemaining);
+    void setGyrometerCalibrationOk(bool isOk);
+    void setAccelerometerCalibrationOk(bool isOk);
+    void setMagnetometerCalibrationOk(bool isOk);
+    void setLocalPositionOk(bool isOk);
+    void setGlobalPositionOk(bool isOk);
+    void setHomePositionOk(bool isOk);
+    void setArmable(bool isArmable);
+    void setRcIsAvailable(bool isAvailable);
+    void setRcSignalStrengthPercent(float signalStrengthPercent);
+
     int m_gpsCount{0};              ///< GPS数量
     QString m_gpsStatus;              ///< GPS状态
     float m_batteryVoltage{0.0f};   ///< 电池电压（伏特）

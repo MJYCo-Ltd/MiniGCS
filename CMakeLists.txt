@@ -38,6 +38,7 @@ set(MINIGCS_SOURCES
     Src/AirLine/QGpsPosition.cpp
     Src/AirLine/QNEDPosition.cpp
     Src/Plat/QAutopilotStatus.cpp
+    Src/Plat/QAutopilotFixedwing.cpp
     Src/Extern/XmlToMavSDK.cpp
     Src/Extern/AsyncSendMavLink.cpp
     Src/Plat/QAutopilot.cpp
@@ -58,6 +59,7 @@ set(MINIGCS_HEADERS
     Inc/AirLine/QGpsPosition.h
     Inc/AirLine/QNEDPosition.h
     Inc/Plat/QAutopilotStatus.h
+    Inc/Plat/QAutopilotFixedwing.h
     Inc/Extern/XmlToMavSDK.h
     Inc/Extern/AsyncSendMavLink.h
     Inc/Link/QDataLink.h
