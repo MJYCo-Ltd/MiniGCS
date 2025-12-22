@@ -22,7 +22,6 @@ find_package(MAVSDK REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(Qt6 REQUIRED COMPONENTS
     Core
-    Qml
     SerialPort
 )
 
@@ -98,7 +97,6 @@ target_link_libraries(${PROJECT_NAME}
     PUBLIC
     Qt6::Core
     PRIVATE
-    Qt6::Qml
     Qt6::SerialPort
     MAVSDK::mavsdk
     spdlog::spdlog

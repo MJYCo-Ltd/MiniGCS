@@ -3,7 +3,6 @@
 
 #include <QObject>
 #include <QMap>
-#include <QQmlListProperty>
 #include "MiniGCSExport.h"
 
 // 前向声明
@@ -17,15 +16,11 @@ class QThread;
 class MINIGCS_EXPORT QGroundControlStation : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(QQmlListProperty<QPlat> plats READ plats NOTIFY platsChanged)
-    Q_PROPERTY(QQmlListProperty<QDataLink> dataLinks READ dataLinks NOTIFY dataLinksChanged)
 
 public:
     explicit QGroundControlStation(QObject *parent = nullptr);
     ~QGroundControlStation();
 
-    QQmlListProperty<QPlat> plats();
-    QQmlListProperty<QDataLink> dataLinks();
     /**
      * @brief 初始化系统
      */
@@ -54,7 +49,9 @@ public:
      * @brief 获取所有飞控对象
      * @return 飞控对象列表
      */
-    QVector<QPlat*> getAllStandalone() const;
+    Q_INVOKABLE QList<QObject*> plats() const{return(m_listPlat);}
+
+    Q_INVOKABLE QList<QObject*> dataLinks() const{return(m_listLink);}
 
 signals:
     /**
@@ -100,6 +97,8 @@ private:
     friend class QGroundControlStationPrivate;
     std::unique_ptr<QGroundControlStationPrivate> d_ptr;    ///< 私有实现指针
     QMap<QDataLink*,QThread*> m_mapLink;
+    QList<QObject*> m_listLink;
+    QList<QObject*> m_listPlat;
     // 飞控对象管理
     QMap<uint8_t, QPlat*> m_mapId2Standalone;///< 状态
 };
