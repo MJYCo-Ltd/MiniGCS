@@ -10,9 +10,14 @@ QSerialDataLink::QSerialDataLink(const QString &portName, int baudRate, QObject 
 {
 }
 
-QSerialDataLink::~QSerialDataLink()
+/// 更改信息
+void QSerialDataLink::changeInfo(const QString &portName, int baudRate)
 {
-    disConnectLink();
+    if(m_portName != portName || m_baudRate != baudRate){
+        m_portName = portName;
+        m_baudRate = baudRate;
+        emit needReLink();
+    }
 }
 
 bool QSerialDataLink::connectLink()
@@ -90,16 +95,6 @@ bool QSerialDataLink::sendLinkData(const QByteArray &data)
 bool QSerialDataLink::isLinkConnected() const
 {
     return m_serialPort && m_serialPort->isOpen();
-}
-
-QString QSerialDataLink::portName() const
-{
-    return m_portName;
-}
-
-int QSerialDataLink::baudRate() const
-{
-    return m_baudRate;
 }
 
 void QSerialDataLink::onReadyRead()

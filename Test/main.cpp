@@ -4,10 +4,46 @@
 #include <QtQml>
 
 #include "Link/QSerialDataLink.h"
+#include "Link/QTcpServerDataLink.h"
+#include "Link/QTcpClientDataLink.h"
+#include "Link/QUdpServerDataLink.h"
+#include "Link/QUdpClientDataLink.h"
 #include "Plat/QAutopilot.h"
 #include "QTestGCSConfig.h"
 #include "QGroundControlStation.h"
 #include "Plat/QPlat.h"
+
+static void addDataLinksFromConfig(QGroundControlStation *pGroundStation)
+{
+    auto *config = QTestGCSConfig::instance();
+    for (int i = 0; i < config->linkCount(); ++i) {
+        QVariantMap c = config->linkConfigAt(i);
+        QString type = c.value(LinkConfigKeys::Type).toString();
+        QDataLink *link = nullptr;
+        if (type == LinkType::Serial) {
+            link = new QSerialDataLink(
+                c.value(LinkConfigKeys::PortName).toString(),
+                c.value(LinkConfigKeys::BaudRate).toInt(),
+                pGroundStation);
+        } else if (type == LinkType::TcpServer) {
+            link = new QTcpServerDataLink(c.value(LinkConfigKeys::Port).toUInt(), pGroundStation);
+        } else if (type == LinkType::TcpClient) {
+            link = new QTcpClientDataLink(
+                c.value(LinkConfigKeys::HostName).toString(),
+                c.value(LinkConfigKeys::Port).toUInt(),
+                pGroundStation);
+        } else if (type == LinkType::UdpServer) {
+            link = new QUdpServerDataLink(c.value(LinkConfigKeys::Port).toUInt(), pGroundStation);
+        } else if (type == LinkType::UdpClient) {
+            link = new QUdpClientDataLink(
+                c.value(LinkConfigKeys::HostName).toString(),
+                c.value(LinkConfigKeys::Port).toUInt(),
+                pGroundStation);
+        }
+        if (link)
+            pGroundStation->AddDataLink(link);
+    }
+}
 
 int main(int argc, char *argv[]) {
     QQuickWindow::setGraphicsApi(QSGRendererInterface::Direct3D11);
@@ -20,13 +56,8 @@ int main(int argc, char *argv[]) {
     // 创建QGroundControlStation实例
     QGroundControlStation *pGroundStation = new QGroundControlStation;
 
-    // 尝试连接飞控（串口连接示例）
     pGroundStation->Init();
-    // 创建 QSerialDataLink 时指定 parent，确保在正确的线程中
-    QSerialDataLink *pSerialDataLink = new QSerialDataLink(
-        QTestGCSConfig::instance()->defaultPortName(),
-        QTestGCSConfig::instance()->defaultBaudRate(), pGroundStation);
-    pGroundStation->AddDataLink(pSerialDataLink);
+    addDataLinksFromConfig(pGroundStation);
 
     // 连接新飞控对象创建信号
     QObject::connect(

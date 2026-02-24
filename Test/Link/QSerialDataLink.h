@@ -28,7 +28,14 @@ public:
     /**
      * @brief 析构函数
      */
-    virtual ~QSerialDataLink();
+    virtual ~QSerialDataLink(){}
+
+    /**
+     * @brief 更改信息
+     * @param portName
+     * @param baudRate
+     */
+    Q_INVOKABLE void changeInfo(const QString &portName, int baudRate);
 
     /**
      * @brief 打开串口连接
@@ -58,13 +65,13 @@ public:
      * @brief 获取串口名称
      * @return 串口名称
      */
-    QString portName() const;
+    QString portName() const{return(m_portName);}
 
     /**
      * @brief 获取波特率
      * @return 波特率
      */
-    int baudRate() const;
+    int baudRate() const{return(m_baudRate);}
 
 private slots:
     /**
@@ -91,5 +98,4 @@ private:
 };
 
 #endif // QSERIALDATALINK_H
-
 
