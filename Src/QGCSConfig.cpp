@@ -111,14 +111,14 @@ void QGCSConfig::qtLogHandler(QtMsgType type, const QMessageLogContext &ctx,
     const char *pFileName = nullptr;
     if (nullptr != ctx.file) {
         pFileName = strrchr(ctx.file, '/');
-        if (NULL == pFileName) {
+        if (nullptr == pFileName) {
             pFileName = strrchr(ctx.file, '\\');
         }
     }
 
     // 拼接上下文信息
     std::string ctxInfo = fmt::format(
-        "[{}:{} {}] {}", NULL != pFileName ? pFileName+1 : "", ctx.line,
+        "[{}:{} {}] {}", nullptr != pFileName ? pFileName+1 : "", ctx.line,
         ctx.function ? ctx.function : "", logMsg);
 
     switch (type) {
