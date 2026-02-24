@@ -5,7 +5,7 @@
 
 #include "Link/QSerialDataLink.h"
 #include "Plat/QAutopilot.h"
-#include "QGCSConfig.h"
+#include "QTestGCSConfig.h"
 #include "QGroundControlStation.h"
 #include "Plat/QPlat.h"
 
@@ -14,7 +14,7 @@ int main(int argc, char *argv[]) {
 
     QGuiApplication app(argc, argv);
 
-    QGCSConfig::instance()->init();
+    QTestGCSConfig::instance()->init();
     auto oldHandler = qInstallMessageHandler(&QGCSConfig::qtLogHandler);
 
     // 创建QGroundControlStation实例
@@ -24,8 +24,8 @@ int main(int argc, char *argv[]) {
     pGroundStation->Init();
     // 创建 QSerialDataLink 时指定 parent，确保在正确的线程中
     QSerialDataLink *pSerialDataLink = new QSerialDataLink(
-        QGCSConfig::instance()->defaultPortName(),
-        QGCSConfig::instance()->defaultBaudRate(), pGroundStation);
+        QTestGCSConfig::instance()->defaultPortName(),
+        QTestGCSConfig::instance()->defaultBaudRate(), pGroundStation);
     pGroundStation->AddDataLink(pSerialDataLink);
 
     // 连接新飞控对象创建信号
@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
         delete pGroundStation;
         pGroundStation = nullptr;
 
-        QGCSConfig::instance()->release();
+        QTestGCSConfig::instance()->release();
     });
 
     // 注册 QML 类型

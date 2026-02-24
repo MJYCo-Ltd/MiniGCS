@@ -35,6 +35,8 @@ endif()
 # 创建可执行文件
 qt_add_executable(${PROJECT_NAME}
     main.cpp
+    QTestGCSConfig.cpp
+    QTestGCSConfig.h
     Link/QSerialDataLink.cpp
     Link/QSerialDataLink.h
 )

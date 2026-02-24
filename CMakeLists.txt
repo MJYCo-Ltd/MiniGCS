@@ -99,7 +99,6 @@ target_link_libraries(${PROJECT_NAME}
     PUBLIC
     Qt6::Core
     PRIVATE
-    Qt6::SerialPort
     MAVSDK::mavsdk
     spdlog::spdlog
 )

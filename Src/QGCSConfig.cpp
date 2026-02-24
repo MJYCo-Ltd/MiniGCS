@@ -13,9 +13,6 @@
 QGCSConfig *QGCSConfig::m_pSInsatance = nullptr;
 // 配置项键名常量
 namespace {
-const char *KEY_SERIAL_PORT_NAME = "Serial/PortName";
-const char *KEY_SERIAL_BAUD_RATE = "Serial/BaudRate";
-const char *KEY_MAP_NAME = "Map/Name";
 const char *KEY_GCS_SYSTEM_ID = "GCS/SystemId";
 const char *KEY_GCS_COMPONENT_ID = "GCS/ComponentId";
 const char *KEY_LOG_LEVEL = "Logging/Level";
@@ -23,9 +20,6 @@ const char *KEY_MAV_MESSAGE_EXTENSION = "MavMessage/Extension";
 const char *KEY_TIME_SYNC_ENABLED = "TimeSync/Enabled";
 
 // 默认值
-const char *DEFAULT_PORT_NAME = "COM14";
-const int DEFAULT_BAUD_RATE = 57600;
-const char *DEFAULT_MAP_NAME = "OpenStreetMap";
 const uint8_t DEFAULT_GCS_SYSTEM_ID = 246;
 const uint8_t DEFAULT_GCS_COMPONENT_ID = 191;
 const char *DEFAULT_LOG_LEVEL = "debug";
@@ -72,6 +66,13 @@ QGCSConfig *QGCSConfig::instance() {
     }
 
     return (m_pSInsatance);
+}
+
+void QGCSConfig::setInstance(QGCSConfig *p) {
+    if (m_pSInsatance != nullptr && m_pSInsatance != p) {
+        delete m_pSInsatance;
+    }
+    m_pSInsatance = p;
 }
 
 void QGCSConfig::init_logging() {
@@ -208,51 +209,6 @@ void QGCSConfig::dealMavsdkMessage(uint32_t systemID,
     }
 }
 
-#include <QtSerialPort/QSerialPortInfo>
-QStringList QGCSConfig::refreshPortName() const
-{
-    QStringList portNames;
-    const auto ports = QSerialPortInfo::availablePorts();
-    for (const QSerialPortInfo &port : ports) {
-        portNames.append(port.portName());
-    }
-    return portNames;
-}
-
-QStringList QGCSConfig::standardBaudRates() const
-{
-    QStringList baudRates;
-    const auto standardBaudRates = QSerialPortInfo::standardBaudRates();
-    for (qint32 baudRate : standardBaudRates) {
-        baudRates.append(QString::number(baudRate));
-    }
-    return (baudRates);
-}
-
-QString QGCSConfig::defaultPortName() const {
-    return m_settings->value(KEY_SERIAL_PORT_NAME, DEFAULT_PORT_NAME).toString();
-}
-
-void QGCSConfig::setDefaultPortName(const QString &portName) {
-    m_settings->setValue(KEY_SERIAL_PORT_NAME, portName);
-}
-
-int QGCSConfig::defaultBaudRate() const {
-    return m_settings->value(KEY_SERIAL_BAUD_RATE, DEFAULT_BAUD_RATE).toInt();
-}
-
-void QGCSConfig::setDefaultBaudRate(int baudRate) {
-    m_settings->setValue(KEY_SERIAL_BAUD_RATE, baudRate);
-}
-
-QString QGCSConfig::mapName() const {
-    return m_settings->value(KEY_MAP_NAME, DEFAULT_MAP_NAME).toString();
-}
-
-void QGCSConfig::setMapName(const QString &mapName) {
-    m_settings->setValue(KEY_MAP_NAME, mapName);
-}
-
 QString QGCSConfig::logLevel() const {
     if (!m_settings)
         return QString(DEFAULT_LOG_LEVEL);
@@ -302,15 +258,6 @@ QString QGCSConfig::configFilePath() const { return m_configFilePath; }
 
 void QGCSConfig::initializeDefaults() {
     // 如果配置项不存在，则设置默认值
-    if (!m_settings->contains(KEY_SERIAL_PORT_NAME)) {
-        m_settings->setValue(KEY_SERIAL_PORT_NAME, DEFAULT_PORT_NAME);
-    }
-    if (!m_settings->contains(KEY_SERIAL_BAUD_RATE)) {
-        m_settings->setValue(KEY_SERIAL_BAUD_RATE, DEFAULT_BAUD_RATE);
-    }
-    if (!m_settings->contains(KEY_MAP_NAME)) {
-        m_settings->setValue(KEY_MAP_NAME, DEFAULT_MAP_NAME);
-    }
     if (!m_settings->contains(KEY_GCS_SYSTEM_ID)) {
         m_settings->setValue(KEY_GCS_SYSTEM_ID,
                              static_cast<int>(DEFAULT_GCS_SYSTEM_ID));
