@@ -51,7 +51,7 @@ int main(int argc, char *argv[]) {
     QGuiApplication app(argc, argv);
 
     QTestGCSConfig::instance()->init();
-    auto oldHandler = qInstallMessageHandler(&QGCSConfig::qtLogHandler);
+    // auto oldHandler = qInstallMessageHandler(&QGCSConfig::qtLogHandler);
 
     // 创建QGroundControlStation实例
     QGroundControlStation *pGroundStation = new QGroundControlStation;
@@ -83,7 +83,7 @@ int main(int argc, char *argv[]) {
 
     // aboutToQuit 在主线程同步执行，用于做必要的善后工作（短且快速）
     QObject::connect(&app, &QCoreApplication::aboutToQuit, [&]() {
-        qInstallMessageHandler(oldHandler);
+        // qInstallMessageHandler(oldHandler);
         // 尽量在这里执行快速、确定性的清理，避免耗时阻塞
         // 顺序必须
         delete pGroundStation;

@@ -79,7 +79,7 @@ void QGCSConfig::init_logging() {
     // 先建立 sinks
     // auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
     auto file_sink = std::make_shared<spdlog::sinks::daily_file_sink_mt>(
-        "log/minigcs.log", 0,0,false,7);
+        "data/log/minigcs.log", 0,0,false,7);
 
     // 从配置读取日志级别
     QString configuredLevel = DEFAULT_LOG_LEVEL;
@@ -145,9 +145,8 @@ void QGCSConfig::init() {
     if (appName.isEmpty()) {
         appName = "MiniGCS";
     }
-
     // 使用应用程序目录下的配置文件
-    QString appDir = QCoreApplication::applicationDirPath();
+    QString appDir = QString("%1%2Config").arg(QCoreApplication::applicationDirPath()).arg(QDir::separator());
     m_configFilePath = QDir(appDir).filePath(appName + ".ini");
     init_logging();
 
