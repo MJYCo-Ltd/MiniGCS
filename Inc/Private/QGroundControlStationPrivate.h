@@ -85,6 +85,12 @@ public:
      */
     void unsubscribeRawBytesToBeSent();
 
+    /**
+     * @brief 获取最多的通道数
+     * @return
+     */
+    int getMaxChannel();
+
 private:
     std::shared_ptr<mavsdk::Mavsdk> m_mavsdk;        ///< MAVSDK实例
     bool m_isInitialized;                            ///< 是否已初始化

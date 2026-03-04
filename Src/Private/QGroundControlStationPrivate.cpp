@@ -29,7 +29,7 @@ void QGroundControlStationPrivate::initializeMavsdk()
         return;
     }
     
-    // 创建MAVSDK实例，配置为地面站模式
+    /// 创建MAVSDK实例，配置为地面站模式
     mavsdk::Mavsdk::Configuration config(
         mavsdk::ComponentType::GroundStation);
     config.set_system_id(QGCSConfig::instance()->gcsSystemId());
@@ -153,19 +153,22 @@ void QGroundControlStationPrivate::setupNewSystemDiscoveryCallback(
                         qobject_cast<QGroundControlStation *>(parent);
                     if (nullptr != pQGCS) {
                         QPlat *pPlat = pQGCS->getOrCreatePlat(systemId, bHaveAutopilot);
-                        /// 如果平台的Private 指针没有设置 或者 Private的 system与现在的不一致
-                        if (nullptr == pPlat->d_ptr.get() || pPlat->d_ptr.get()->getSystem() != system) {
+                        /// 如果平台的Private 指针没有设置 或者 Private的
+                        /// system与现在的不一致
+                        if (nullptr == pPlat->d_ptr.get() ||
+                            pPlat->d_ptr.get()->getSystem() != system) {
                             if (bHaveAutopilot) {
-                                QPlatPrivate* localQPlatPrivate = new QAutopilotPrivate(pPlat);
+                                QPlatPrivate *localQPlatPrivate = new QAutopilotPrivate(pPlat);
                                 localQPlatPrivate->setSystem(system);
                                 pPlat->SetPrivate(localQPlatPrivate);
                             } else {
-                                QPlatPrivate* localQPlatPrivate = new QPlatPrivate(pPlat);
+                                QPlatPrivate *localQPlatPrivate = new QPlatPrivate(pPlat);
                                 localQPlatPrivate->setSystem(system);
                                 pPlat->SetPrivate(localQPlatPrivate);
                             }
                             /// 发送信号给qt
-                            QMetaObject::invokeMethod(parent,"newPlatFind",Q_ARG(QPlat *, pPlat));
+                            QMetaObject::invokeMethod(parent, "newPlatFind",
+                                                      Q_ARG(QPlat *, pPlat));
                         }
                     }
                 }
@@ -183,19 +186,20 @@ void QGroundControlStationPrivate::processReceivedRawData(const QByteArray &data
     m_mavsdk->pass_received_raw_bytes(data.constData(), data.size());
 }
 
-void QGroundControlStationPrivate::setupRawBytesToBeSentCallback(std::function<void(const QByteArray&)> callback, QObject* parent)
-{
+void QGroundControlStationPrivate::setupRawBytesToBeSentCallback(
+    std::function<void(const QByteArray &)> callback, QObject *parent) {
     if (!m_mavsdk || !parent) {
         return;
     }
 
-    // 取消之前的订阅（如果存在）
+    /// 取消之前的订阅（如果存在）
     unsubscribeRawBytesToBeSent();
 
     // 订阅需要发送的原始字节
-    // MAVSDK 回调可能在非主线程中执行，需要通过 QMetaObject::invokeMethod 确保在主线程中执行
+    // MAVSDK 回调可能在非主线程中执行，需要通过 QMetaObject::invokeMethod
+    // 确保在主线程中执行
     m_rawBytesHandle = m_mavsdk->subscribe_raw_bytes_to_be_sent(
-        [callback, parent](const char* bytes, size_t length) {
+        [callback, parent](const char *bytes, size_t length) {
             if (bytes && length > 0) {
                 QByteArray data(bytes, static_cast<int>(length));
                 // 通过 QMetaObject::invokeMethod 确保在主线程中执行 callback
@@ -205,14 +209,16 @@ void QGroundControlStationPrivate::setupRawBytesToBeSentCallback(std::function<v
                     }
                 });
             }
-        }
-        );
+        });
 }
 
-void QGroundControlStationPrivate::unsubscribeRawBytesToBeSent()
-{
+void QGroundControlStationPrivate::unsubscribeRawBytesToBeSent() {
     if (m_mavsdk && m_rawBytesHandle.valid()) {
         m_mavsdk->unsubscribe_raw_bytes_to_be_sent(m_rawBytesHandle);
     }
 }
 
+int QGroundControlStationPrivate::getMaxChannel()
+{
+    return(MAVLINK_COMM_NUM_BUFFERS);
+}

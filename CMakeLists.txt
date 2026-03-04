@@ -49,6 +49,8 @@ set(MINIGCS_SOURCES
     Src/Plat/Private/QPlatPrivate.cpp
     Src/Private/QGroundControlStationPrivate.cpp
     Src/QGroundControlStation.cpp
+    Src/Link/QDataLink.cpp
+    Src/Link/Private/QDataLinkPrivate.cpp
     Src/QGCSConfig.cpp
 )
 
@@ -63,6 +65,7 @@ set(MINIGCS_HEADERS
     Inc/Extern/XmlToMavSDK.h
     Inc/Extern/AsyncSendMavLink.h
     Inc/Link/QDataLink.h
+    Inc/Link/Private/QDataLinkPrivate.h
     Inc/Plat/QAutopilot.h
     Inc/Plat/QAutoVehicleType.h
     Inc/Plat/QPlat.h

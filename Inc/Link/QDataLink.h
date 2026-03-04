@@ -3,81 +3,67 @@
 
 #include <QObject>
 #include <QByteArray>
+#include <memory>
 #include "MiniGCSExport.h"
+
+class QDataLinkPrivate;
 
 /**
  * @brief QDataLink类 - 数据链路基类
- * 
- * 该类定义了数据链路的基本接口，包括接收消息的信号和发送数据的方法
+ *
+ * 定义数据链路基本接口；通过 QDataLinkPrivate 统计接收包数、丢包、最后心跳及信号质量。
  */
 class MINIGCS_EXPORT QDataLink : public QObject
 {
     Q_OBJECT
+    Q_PROPERTY(qint64 lastMessageTime READ lastMessageTime NOTIFY lastMessageTimeChanged)
+    Q_PROPERTY(qint64 lastHeartbeatTime READ lastHeartbeatTime NOTIFY lastHeartbeatTimeChanged)
+    Q_PROPERTY(double signalQuality READ signalQuality NOTIFY signalQualityChanged)
 
 public:
-    explicit QDataLink(QObject *parent = nullptr):QObject(parent){
-        connect(this,&QDataLink::needReLink,this,&QDataLink::onReLink);
-    }
+    explicit QDataLink(QObject *parent = nullptr);
+    virtual ~QDataLink();
 
-    virtual ~QDataLink(){}
+    void setIndex(quint8 uIndex) { m_unIndex = uIndex; }
+    quint8 index() const { return m_unIndex; }
 
-    /**
-     * @brief 发送数据
-     * @param data 要发送的数据
-     * @return 是否发送成功
-     */
     virtual bool sendLinkData(const QByteArray &data) = 0;
-
-    /**
-     * @brief 检查是否已连接
-     * @return 是否已连接
-     */
     virtual bool isLinkConnected() const = 0;
+    Q_INVOKABLE virtual bool connectLink() = 0;
+    Q_INVOKABLE virtual void disConnectLink() = 0;
 
-    /**
-     * @brief 开始连接
-     */
-    Q_INVOKABLE virtual bool connectLink()=0;
+    /** 将接收到的原始数据喂入解析器并更新链路状态统计 */
+    void feedReceivedData(const QByteArray &data);
 
-    /**
-     * @brief 断开连接
-     */
-    Q_INVOKABLE virtual void disConnectLink()=0;
-
+    Q_INVOKABLE quint64 packetsReceived() const;
+    Q_INVOKABLE quint32 packetsDropped() const;
+    Q_INVOKABLE qint64 lastMessageTime() const;
+    Q_INVOKABLE qint64 lastHeartbeatTime() const;
+    /** 信号质量 [0.0, 1.0] */
+    Q_INVOKABLE double signalQuality() const;
+    Q_INVOKABLE void resetLinkStatistics();
 
 signals:
-    /**
-     * @brief 连接状态变化信号
-     * @param connected 是否已连接
-     */
     void linkStatusChanged(bool connected);
-    /**
-     * @brief 接收到原始数据信号
-     * @param data 接收到的原始数据
-     */
     void messageReceived(const QByteArray &data);
-
-    /**
-     * @brief 链路错误
-     */
-    void linkError(const QString&);
-
-    /**
-     * @brief 需要断开重连
-     */
+    void linkError(const QString &);
     void needReLink();
+    void lastMessageTimeChanged();
+    void lastHeartbeatTimeChanged();
+    /** 信号质量变化时发出，参数为 [0.0, 1.0] */
+    void signalQualityChanged(double quality);
 
 protected slots:
-    /**
-     * @brief 线程安全的发送数据槽函数（由子类实现）
-     * @param data 要发送的数据
-     */
     virtual void onSendDataRequested(const QByteArray &data) = 0;
+    void onReLink() { disConnectLink(); connectLink(); }
 
-    /**
-     * @brief 响应needReLink
-     */
-    void onReLink(){disConnectLink();connectLink();}
+protected:
+    QDataLinkPrivate *d_func() { return d_ptr.get(); }
+    const QDataLinkPrivate *d_func() const { return d_ptr.get(); }
+    quint8 m_unIndex{};
+
+private:
+    std::unique_ptr<QDataLinkPrivate> d_ptr;
 };
 #endif // QDATALINK_H
 

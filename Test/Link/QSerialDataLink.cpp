@@ -80,12 +80,9 @@ bool QSerialDataLink::sendLinkData(const QByteArray &data)
     }
 
     if (bytesWritten != data.size()) {
-        qWarning() << "QSerialDataLink: Partial write:" << bytesWritten 
-                   << "of" << data.size() << "bytes";
-    }
+        qWarning() << "QSerialDataLink: Partial write:" << bytesWritten << "of"
+                   << data.size() << "bytes";
 
-    // 确保数据被写入
-    if (!m_serialPort->waitForBytesWritten(1000)) {
         return false;
     }
 

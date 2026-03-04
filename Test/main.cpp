@@ -8,6 +8,7 @@
 #include "Link/QTcpClientDataLink.h"
 #include "Link/QUdpServerDataLink.h"
 #include "Link/QUdpClientDataLink.h"
+#include "Link/QDataLink.h"
 #include "Plat/QAutopilot.h"
 #include "QTestGCSConfig.h"
 #include "QGroundControlStation.h"
@@ -40,8 +41,14 @@ static void addDataLinksFromConfig(QGroundControlStation *pGroundStation)
                 c.value(LinkConfigKeys::Port).toUInt(),
                 pGroundStation);
         }
-        if (link)
+        if (link) {
             pGroundStation->AddDataLink(link);
+            QObject::connect(link, &QDataLink::signalQualityChanged,
+                             [link](double quality) {
+                                 qDebug() << "DataLink 信号质量变化: index=" << link->index()
+                                          << "quality=" << quality;
+                             });
+        }
     }
 }
 
