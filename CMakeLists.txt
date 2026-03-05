@@ -22,7 +22,6 @@ find_package(MAVSDK REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(Qt6 REQUIRED COMPONENTS
     Core
-    SerialPort
 )
 
 qt_standard_project_setup(REQUIRES 6.9)
@@ -50,7 +49,8 @@ set(MINIGCS_SOURCES
     Src/Private/QGroundControlStationPrivate.cpp
     Src/QGroundControlStation.cpp
     Src/Link/QDataLink.cpp
-    Src/Link/Private/QDataLinkPrivate.cpp
+    Src/Link/QLinkManager.cpp
+    Src/Link/Private/QLinkManagerPrivate.cpp
     Src/QGCSConfig.cpp
 )
 
@@ -65,7 +65,8 @@ set(MINIGCS_HEADERS
     Inc/Extern/XmlToMavSDK.h
     Inc/Extern/AsyncSendMavLink.h
     Inc/Link/QDataLink.h
-    Inc/Link/Private/QDataLinkPrivate.h
+    Inc/Link/QLinkManager.h
+    Inc/Link/Private/QLinkManagerPrivate.h
     Inc/Plat/QAutopilot.h
     Inc/Plat/QAutoVehicleType.h
     Inc/Plat/QPlat.h

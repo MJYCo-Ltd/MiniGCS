@@ -2,68 +2,74 @@
 #define QDATALINK_H
 
 #include <QObject>
+#include <QString>
 #include <QByteArray>
-#include <memory>
+#include <QtGlobal>
+#include "Link/QLinkManager.h"
 #include "MiniGCSExport.h"
 
-class QDataLinkPrivate;
-
 /**
- * @brief QDataLink类 - 数据链路基类
+ * @brief QDataLink类 - 数据链路
  *
- * 定义数据链路基本接口；通过 QDataLinkPrivate 统计接收包数、丢包、最后心跳及信号质量。
+ * 表示一条链路连接，可设置重连次数和自动重连。
+ * Raw 模式下支持发送和接收原始数据（字符串、长度）。
  */
 class MINIGCS_EXPORT QDataLink : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(qint64 lastMessageTime READ lastMessageTime NOTIFY lastMessageTimeChanged)
-    Q_PROPERTY(qint64 lastHeartbeatTime READ lastHeartbeatTime NOTIFY lastHeartbeatTimeChanged)
-    Q_PROPERTY(double signalQuality READ signalQuality NOTIFY signalQualityChanged)
+    Q_PROPERTY(int reconnectCount READ reconnectCount WRITE setReconnectCount NOTIFY reconnectCountChanged)
+    Q_PROPERTY(bool autoReconnect READ autoReconnect WRITE setAutoReconnect NOTIFY autoReconnectChanged)
+    Q_PROPERTY(LinkKind linkKind READ linkKind CONSTANT)
+    Q_PROPERTY(QString connectionString READ connectionString CONSTANT)
 
 public:
-    explicit QDataLink(QObject *parent = nullptr);
-    virtual ~QDataLink();
+    explicit QDataLink(LinkKind kind, const QString &connStr, QObject *parent = nullptr);
+    ~QDataLink();
 
-    void setIndex(quint8 uIndex) { m_unIndex = uIndex; }
-    quint8 index() const { return m_unIndex; }
+    LinkKind linkKind() const { return m_linkKind; }
+    QString connectionString() const { return m_connectionString; }
 
-    virtual bool sendLinkData(const QByteArray &data) = 0;
-    virtual bool isLinkConnected() const = 0;
-    Q_INVOKABLE virtual bool connectLink() = 0;
-    Q_INVOKABLE virtual void disConnectLink() = 0;
+    /** 重连次数，0 表示不限制 */
+    int reconnectCount() const { return m_reconnectCount; }
+    void setReconnectCount(int count);
 
-    /** 将接收到的原始数据喂入解析器并更新链路状态统计 */
-    void feedReceivedData(const QByteArray &data);
+    /** 是否开启自动重连 */
+    bool autoReconnect() const { return m_autoReconnect; }
+    void setAutoReconnect(bool enable);
 
-    Q_INVOKABLE quint64 packetsReceived() const;
-    Q_INVOKABLE quint32 packetsDropped() const;
-    Q_INVOKABLE qint64 lastMessageTime() const;
-    Q_INVOKABLE qint64 lastHeartbeatTime() const;
-    /** 信号质量 [0.0, 1.0] */
-    Q_INVOKABLE double signalQuality() const;
-    Q_INVOKABLE void resetLinkStatistics();
+    /**
+     * @brief 发送原始数据（仅 Raw 模式有效）
+     * @param data 数据指针
+     * @param length 数据长度
+     * @return 是否发送成功
+     */
+    Q_INVOKABLE bool sendRawData(const char *data, int length);
+
+    /**
+     * @brief 发送原始数据（QByteArray 重载）
+     */
+    Q_INVOKABLE bool sendRawData(const QByteArray &data);
 
 signals:
-    void linkStatusChanged(bool connected);
-    void messageReceived(const QByteArray &data);
-    void linkError(const QString &);
-    void needReLink();
-    void lastMessageTimeChanged();
-    void lastHeartbeatTimeChanged();
-    /** 信号质量变化时发出，参数为 [0.0, 1.0] */
-    void signalQualityChanged(double quality);
+    void reconnectCountChanged();
+    void autoReconnectChanged();
 
-protected slots:
-    virtual void onSendDataRequested(const QByteArray &data) = 0;
-    void onReLink() { disConnectLink(); connectLink(); }
+    /**
+     * @brief 接收到原始数据（仅 Raw 模式）
+     * @param data 数据，可用 data.constData() 和 data.size() 获取指针和长度
+     */
+    void rawDataReceived(const QByteArray &data);
 
-protected:
-    QDataLinkPrivate *d_func() { return d_ptr.get(); }
-    const QDataLinkPrivate *d_func() const { return d_ptr.get(); }
-    quint8 m_unIndex{};
+private slots:
+    /** 内部使用：触发 rawDataReceived 信号 */
+    void emitRawDataReceived(const QByteArray &data);
 
 private:
-    std::unique_ptr<QDataLinkPrivate> d_ptr;
+    friend class QLinkManagerPrivate;
+    LinkKind m_linkKind;
+    QString m_connectionString;
+    int m_reconnectCount{0};
+    bool m_autoReconnect{false};
 };
-#endif // QDATALINK_H
 
+#endif // QDATALINK_H

@@ -38,16 +38,6 @@ qt_add_executable(${PROJECT_NAME}
     main.cpp
     QTestGCSConfig.cpp
     QTestGCSConfig.h
-    Link/QSerialDataLink.cpp
-    Link/QSerialDataLink.h
-    Link/QTcpServerDataLink.cpp
-    Link/QTcpServerDataLink.h
-    Link/QUdpServerDataLink.cpp
-    Link/QUdpServerDataLink.h
-    Link/QTcpClientDataLink.cpp
-    Link/QTcpClientDataLink.h
-    Link/QUdpClientDataLink.cpp
-    Link/QUdpClientDataLink.h
 )
 
 # 设置包含目录，以便访问 MiniGCS 的头文件

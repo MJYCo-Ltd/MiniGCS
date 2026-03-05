@@ -6,6 +6,7 @@
 #include "Plat/Private/QAutopilotPrivate.h"
 #include "Plat/QPlat.h"
 #include "QGroundControlStation.h"
+#include "Link/QDataLink.h"
 
 #include "QGCSConfig.h"
 #include "QGCSLog.h"
@@ -36,22 +37,14 @@ void QGroundControlStationPrivate::initializeMavsdk()
     config.set_component_id(QGCSConfig::instance()->gcsComponentId());
     m_mavsdk = std::make_shared<mavsdk::Mavsdk>(config);
 
-    /// 创建连接
-    auto connectionResult = m_mavsdk->add_any_connection_with_handle("raw://");
+    m_mavsdk->subscribe_incoming_messages_json(
+        [](mavsdk::Mavsdk::MavlinkMessage msg) {
+            QGCSConfig::instance()->dealMavsdkMessage(msg.system_id,
+                                                      msg.fields_json);
+            return (true);
+        });
 
-    if (connectionResult.first == mavsdk::ConnectionResult::Success) {
-        m_connectionHandle = connectionResult.second;
-        m_mavsdk->subscribe_incoming_messages_json(
-            [](mavsdk::Mavsdk::MavlinkMessage msg) {
-                QGCSConfig::instance()->dealMavsdkMessage(msg.system_id,
-                                                          msg.fields_json);
-                return (true);
-            });
-    } else {
-        spdlog::critical(MAV_FMT_STR, "add_raw_connection_with_handle",
-                         connectionResult.first);
-    }
-
+    /// 连接由 QLinkManager 通过 addTcpServer/addSerial 等添加
     m_isInitialized = true;
 }
 
@@ -115,17 +108,18 @@ void QGroundControlStationPrivate::setupConnectionErrorHandling(QObject* parent)
     
     // 订阅连接错误
     m_mavsdk->subscribe_connection_errors([this, parent](mavsdk::Mavsdk::ConnectionError error) {
-
         spdlog::critical(MAV_FMT_STR, "Connection error",
                          error.error_description);
-        
-        // 移除有问题的连接
-        m_mavsdk->remove_connection(error.connection_handle);
-        if (m_connectionHandle == error.connection_handle) {
-            m_connectionHandle = mavsdk::Handle<>();
-        }
 
-        // 发射错误信号
+        // 从映射中移除
+        for (auto it = m_connectionHandles.begin(); it != m_connectionHandles.end(); ++it) {
+            if (it->second == error.connection_handle) {
+                m_connectionHandles.erase(it);
+                break;
+            }
+        }
+        m_mavsdk->remove_connection(error.connection_handle);
+
         QMetaObject::invokeMethod(parent, "mavConnectionError", Qt::QueuedConnection,
                                   Q_ARG(QString, QString::fromStdString(error.error_description)));
     });
@@ -221,4 +215,60 @@ void QGroundControlStationPrivate::unsubscribeRawBytesToBeSent() {
 int QGroundControlStationPrivate::getMaxChannel()
 {
     return(MAVLINK_COMM_NUM_BUFFERS);
+}
+
+bool QGroundControlStationPrivate::addConnection(const QString &connectionUrl)
+{
+    if (!m_mavsdk || connectionUrl.isEmpty()) {
+        return false;
+    }
+    std::string url = connectionUrl.toStdString();
+    auto result = m_mavsdk->add_any_connection_with_handle(url);
+    if (result.first == mavsdk::ConnectionResult::Success) {
+        m_connectionHandles[url] = result.second;
+        return true;
+    }
+    spdlog::warn(MAV_FMT_STR, "addConnection failed", result.first);
+    return false;
+}
+
+bool QGroundControlStationPrivate::addRawConnection(QDataLink *rawDataLink)
+{
+    if (!m_mavsdk || !rawDataLink || m_rawDataLink) return false;
+    auto result = m_mavsdk->add_any_connection_with_handle("raw://");
+    if (result.first != mavsdk::ConnectionResult::Success) {
+        spdlog::warn(MAV_FMT_STR, "addRawConnection failed", result.first);
+        return false;
+    }
+    m_connectionHandles["raw://"] = result.second;
+    m_rawDataLink = rawDataLink;
+
+    unsubscribeRawBytesToBeSent();
+    m_rawBytesHandle = m_mavsdk->subscribe_raw_bytes_to_be_sent(
+        [this](const char *bytes, size_t length) {
+            if (bytes && length > 0 && m_rawDataLink) {
+                QByteArray data(bytes, static_cast<int>(length));
+                QDataLink *link = m_rawDataLink;
+                QMetaObject::invokeMethod(link, "emitRawDataReceived",
+                    Qt::QueuedConnection, Q_ARG(QByteArray, data));
+            }
+        });
+    return true;
+}
+
+void QGroundControlStationPrivate::removeConnection(const QString &connectionUrl)
+{
+    if (!m_mavsdk || connectionUrl.isEmpty()) return;
+    std::string url = connectionUrl.toStdString();
+    if (url == "raw://") {
+        m_rawDataLink = nullptr;
+        unsubscribeRawBytesToBeSent();
+    }
+    auto it = m_connectionHandles.find(url);
+    if (it != m_connectionHandles.end()) {
+        if (it->second.valid()) {
+            m_mavsdk->remove_connection(it->second);
+        }
+        m_connectionHandles.erase(it);
+    }
 }

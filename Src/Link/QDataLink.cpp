@@ -1,48 +1,55 @@
 #include "Link/QDataLink.h"
-#include "Link/Private/QDataLinkPrivate.h"
+#include "QGroundControlStation.h"
+#include <QByteArray>
 
-QDataLink::QDataLink(QObject *parent)
+QDataLink::QDataLink(LinkKind kind, const QString &connStr, QObject *parent)
     : QObject(parent)
-    , d_ptr(new QDataLinkPrivate(this))
+    , m_linkKind(kind)
+    , m_connectionString(connStr)
 {
-    connect(this, &QDataLink::needReLink, this, &QDataLink::onReLink);
 }
 
 QDataLink::~QDataLink() = default;
 
-void QDataLink::feedReceivedData(const QByteArray &data)
+void QDataLink::setReconnectCount(int count)
 {
-    if (d_ptr && !data.isEmpty())
-        d_ptr->feedBytes(reinterpret_cast<const uint8_t *>(data.constData()), data.size());
+    if (m_reconnectCount != count) {
+        m_reconnectCount = count;
+        emit reconnectCountChanged();
+    }
 }
 
-quint64 QDataLink::packetsReceived() const
+void QDataLink::setAutoReconnect(bool enable)
 {
-    return d_ptr ? d_ptr->mavlinkPacketsReceived() : 0;
+    if (m_autoReconnect != enable) {
+        m_autoReconnect = enable;
+        emit autoReconnectChanged();
+    }
 }
 
-quint32 QDataLink::packetsDropped() const
+bool QDataLink::sendRawData(const char *data, int length)
 {
-    return d_ptr ? d_ptr->mavlinkPacketsDropped() : 0;
+    if (m_linkKind != LinkKind::Raw || !data || length <= 0) {
+        return false;
+    }
+    QObject *p = parent();
+    while (p) {
+        auto *station = qobject_cast<QGroundControlStation *>(p);
+        if (station) return station->feedRawData(data, length);
+        p = p->parent();
+    }
+    return false;
 }
 
-qint64 QDataLink::lastMessageTime() const
+bool QDataLink::sendRawData(const QByteArray &data)
 {
-    return d_ptr ? d_ptr->lastMessageTime() : 0;
+    if (data.isEmpty()) return true;
+    return sendRawData(data.constData(), data.size());
 }
 
-qint64 QDataLink::lastHeartbeatTime() const
+void QDataLink::emitRawDataReceived(const QByteArray &data)
 {
-    return d_ptr ? d_ptr->lastHeartbeatTime() : 0;
-}
-
-double QDataLink::signalQuality() const
-{
-    return d_ptr ? d_ptr->mavlinkSignalQuality() : 1.0;
-}
-
-void QDataLink::resetLinkStatistics()
-{
-    if (d_ptr)
-        d_ptr->resetMavlinkStatistics();
+    if (!data.isEmpty()) {
+        emit rawDataReceived(data);
+    }
 }

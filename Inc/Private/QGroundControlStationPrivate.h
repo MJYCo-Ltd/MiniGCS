@@ -5,6 +5,7 @@
 #include <QString>
 #include <QMap>
 #include <QVector>
+#include <map>
 #include <memory>
 #include <mavsdk/mavsdk.h>
 #include <mavsdk/system.h>
@@ -91,15 +92,37 @@ public:
      */
     int getMaxChannel();
 
+    /**
+     * @brief 添加连接（供 QLinkManager 使用）
+     * @param connectionUrl 连接字符串
+     * @return 是否添加成功
+     */
+    bool addConnection(const QString &connectionUrl);
+
+    /**
+     * @brief 添加 Raw 连接（需传入 QDataLink 以接收数据）
+     * @param rawDataLink Raw 链路对象，用于接收 rawDataReceived 信号
+     * @return 是否添加成功
+     */
+    bool addRawConnection(class QDataLink *rawDataLink);
+
+    /**
+     * @brief 移除连接（供 QLinkManager 使用）
+     * @param connectionUrl 连接字符串
+     */
+    void removeConnection(const QString &connectionUrl);
+
+    std::shared_ptr<mavsdk::Mavsdk> mavsdk() const { return m_mavsdk; }
+
 private:
     std::shared_ptr<mavsdk::Mavsdk> m_mavsdk;        ///< MAVSDK实例
     bool m_isInitialized;                            ///< 是否已初始化
-    
-    
-    // 连接管理
-    mavsdk::Mavsdk::ConnectionHandle m_connectionHandle; ///< 连接句柄
-    mavsdk::Mavsdk::NewSystemHandle m_newSystemHandle; ///< 新系统订阅句柄
-    mavsdk::Mavsdk::RawBytesHandle m_rawBytesHandle; ///< 原始字节发送回调句柄
+
+    // 连接管理（connectionUrl -> handle）
+    std::map<std::string, mavsdk::Mavsdk::ConnectionHandle> m_connectionHandles;
+    mavsdk::Mavsdk::NewSystemHandle m_newSystemHandle;
+    mavsdk::Mavsdk::RawBytesHandle m_rawBytesHandle;
+    class QDataLink *m_rawDataLink{nullptr};  ///< Raw 模式下的数据链路，用于接收回调
 };
 
 #endif // QGROUNDCONTROLSTATIONPRIVATE_H

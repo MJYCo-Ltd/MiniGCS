@@ -2,13 +2,15 @@
 #define QGROUNDCONTROLSTATION_H
 
 #include <QObject>
+#include <QString>
 #include <QMap>
+#include <QList>
+#include <cstdint>
 #include "MiniGCSExport.h"
 
 // 前向声明
 class QPlat;
-class QDataLink;
-class QThread;
+class QLinkManager;
 
 /**
  * @brief QGroundControlStation类 - 地面控制站类
@@ -27,23 +29,14 @@ public:
     void Init();
 
     /**
-     * @brief 增加数据链路
-     * @param pDataLink
-     * @return
+     * @brief 获取链路管理器
      */
-    bool AddDataLink(QDataLink *pDataLink);
+    QLinkManager *linkManager() const { return m_linkManager; }
 
     /**
-     * @brief 移除数据链路
-     * @param pDataLink
-     * @return
+     * @brief 清除所有链路连接
      */
-    void RemoveDatLink(QDataLink *pDataLink);
-
-    /**
-     * @brief 清除所有数据链路
-     */
-    void ClearAllDataLink();
+    void ClearAllLinks();
 
     /**
      * @brief 获取所有飞控对象
@@ -51,7 +44,13 @@ public:
      */
     Q_INVOKABLE QList<QObject*> plats() const{return(m_listPlat);}
 
-    Q_INVOKABLE QList<QObject*> dataLinks() const{return(m_listLink);}
+    /**
+     * @brief 向 Raw 链路发送数据（供 QDataLink 使用）
+     * @param data 数据指针
+     * @param length 数据长度
+     * @return 是否成功
+     */
+    bool feedRawData(const char *data, int length);
 
 signals:
     /**
@@ -65,21 +64,7 @@ signals:
      */
     void platsChanged();
 
-    void dataLinksChanged();
-
 private:
-    /**
-     * @brief 处理从DataLink接收到的消息
-     * @param data 接收到的原始数据
-     */
-    void processDataLinkMessage(const QByteArray &data);
-
-    /**
-     * @brief 发送数据到所有DataLink
-     * @param data 要发送的数据
-     */
-    void sendDataToAllLinks(const QByteArray &data);
-
     /**
      * @brief 创建或者获取ID
      * @param uId
@@ -87,17 +72,12 @@ private:
      */
     QPlat* getOrCreatePlat(uint8_t uId, bool bIsAutopilot);
 
-    /**
-     * @brief 处理datalink的线程
-     * @param itor
-     */
-    void dealDataLinkThread(QMap<QDataLink*,QThread*>::Iterator itor);
-
 private:
     friend class QGroundControlStationPrivate;
+    friend class QLinkManagerPrivate;
+    friend class QDataLink;
     std::unique_ptr<QGroundControlStationPrivate> d_ptr;    ///< 私有实现指针
-    QMap<QDataLink*,QThread*> m_mapLink;
-    QList<QObject*> m_listLink;
+    QLinkManager *m_linkManager{nullptr};
     QList<QObject*> m_listPlat;
     // 飞控对象管理
     QMap<uint8_t, QPlat*> m_mapId2Standalone;///< 状态

@@ -3,51 +3,62 @@
 #include <QQuickWindow>
 #include <QtQml>
 
-#include "Link/QSerialDataLink.h"
-#include "Link/QTcpServerDataLink.h"
-#include "Link/QTcpClientDataLink.h"
-#include "Link/QUdpServerDataLink.h"
-#include "Link/QUdpClientDataLink.h"
+#include "Link/QLinkManager.h"
 #include "Link/QDataLink.h"
 #include "Plat/QAutopilot.h"
 #include "QTestGCSConfig.h"
 #include "QGroundControlStation.h"
 #include "Plat/QPlat.h"
 
-static void addDataLinksFromConfig(QGroundControlStation *pGroundStation)
+static LinkKind linkKindFromString(const QString &type)
+{
+    if (type == LinkType::Serial) return LinkKind::Serial;
+    if (type == LinkType::TcpServer) return LinkKind::TcpServer;
+    if (type == LinkType::TcpClient) return LinkKind::TcpClient;
+    if (type == LinkType::UdpServer) return LinkKind::UdpServer;
+    if (type == LinkType::UdpClient) return LinkKind::UdpClient;
+    return LinkKind::Raw;
+}
+
+static LinkParams linkParamsFromConfig(const QVariantMap &c, LinkKind kind)
+{
+    LinkParams p;
+    switch (kind) {
+    case LinkKind::TcpServer:
+    case LinkKind::UdpServer:
+        p.port = c.value(LinkConfigKeys::Port).toUInt();
+        break;
+    case LinkKind::TcpClient:
+    case LinkKind::UdpClient:
+        p.hostName = c.value(LinkConfigKeys::HostName).toString();
+        p.port = c.value(LinkConfigKeys::Port).toUInt();
+        break;
+    case LinkKind::Serial:
+        p.portName = c.value(LinkConfigKeys::PortName).toString();
+        p.baudRate = c.value(LinkConfigKeys::BaudRate).toInt();
+        break;
+    default:
+        break;
+    }
+    return p;
+}
+
+static void addLinksFromConfig(QGroundControlStation *pGroundStation)
 {
     auto *config = QTestGCSConfig::instance();
+    auto *linkManager = pGroundStation->linkManager();
+
     for (int i = 0; i < config->linkCount(); ++i) {
         QVariantMap c = config->linkConfigAt(i);
-        QString type = c.value(LinkConfigKeys::Type).toString();
-        QDataLink *link = nullptr;
-        if (type == LinkType::Serial) {
-            link = new QSerialDataLink(
-                c.value(LinkConfigKeys::PortName).toString(),
-                c.value(LinkConfigKeys::BaudRate).toInt(),
-                pGroundStation);
-        } else if (type == LinkType::TcpServer) {
-            link = new QTcpServerDataLink(c.value(LinkConfigKeys::Port).toUInt(), pGroundStation);
-        } else if (type == LinkType::TcpClient) {
-            link = new QTcpClientDataLink(
-                c.value(LinkConfigKeys::HostName).toString(),
-                c.value(LinkConfigKeys::Port).toUInt(),
-                pGroundStation);
-        } else if (type == LinkType::UdpServer) {
-            link = new QUdpServerDataLink(c.value(LinkConfigKeys::Port).toUInt(), pGroundStation);
-        } else if (type == LinkType::UdpClient) {
-            link = new QUdpClientDataLink(
-                c.value(LinkConfigKeys::HostName).toString(),
-                c.value(LinkConfigKeys::Port).toUInt(),
-                pGroundStation);
-        }
+        QString typeStr = c.value(LinkConfigKeys::Type).toString();
+        LinkKind kind = linkKindFromString(typeStr);
+        if (kind == LinkKind::Raw) continue;
+
+        LinkParams params = linkParamsFromConfig(c, kind);
+        QDataLink *link = linkManager->addLink(kind, params);
         if (link) {
-            pGroundStation->AddDataLink(link);
-            QObject::connect(link, &QDataLink::signalQualityChanged,
-                             [link](double quality) {
-                                 qDebug() << "DataLink 信号质量变化: index=" << link->index()
-                                          << "quality=" << quality;
-                             });
+            qDebug() << "链路添加成功:" << typeStr;
+            // 可设置重连: link->setReconnectCount(5); link->setAutoReconnect(true);
         }
     }
 }
@@ -58,20 +69,16 @@ int main(int argc, char *argv[]) {
     QGuiApplication app(argc, argv);
 
     QTestGCSConfig::instance()->init();
-    // auto oldHandler = qInstallMessageHandler(&QGCSConfig::qtLogHandler);
 
-    // 创建QGroundControlStation实例
     QGroundControlStation *pGroundStation = new QGroundControlStation;
 
     pGroundStation->Init();
-    addDataLinksFromConfig(pGroundStation);
+    addLinksFromConfig(pGroundStation);
 
-    // 连接新飞控对象创建信号
     QObject::connect(
         pGroundStation, &QGroundControlStation::newPlatFind, [](QPlat *vehicle) {
             qDebug() << " 新飞控对象创建:" << vehicle->toString();
 
-            // 连接飞控对象的信号
             QObject::connect(vehicle, &QAutopilot::connectionStatusChanged,
                              [vehicle](bool bIsConnected) {
                                  if (bIsConnected)
@@ -88,18 +95,18 @@ int main(int argc, char *argv[]) {
             });
         });
 
-    // aboutToQuit 在主线程同步执行，用于做必要的善后工作（短且快速）
+    QObject::connect(pGroundStation->linkManager(), &QLinkManager::linkCreateFailed,
+                     [](const QString &reason) {
+                         qWarning() << "链路创建失败:" << reason;
+                     });
+
     QObject::connect(&app, &QCoreApplication::aboutToQuit, [&]() {
-        // qInstallMessageHandler(oldHandler);
-        // 尽量在这里执行快速、确定性的清理，避免耗时阻塞
-        // 顺序必须
         delete pGroundStation;
         pGroundStation = nullptr;
 
         QTestGCSConfig::instance()->release();
     });
 
-    // 注册 QML 类型
     qmlRegisterType<QGroundControlStation>("MiniGCS", 1, 0, "GroundControlStation");
     qmlRegisterType<QPlat>("MiniGCS", 1, 0, "Plat");
 
@@ -111,4 +118,3 @@ int main(int argc, char *argv[]) {
 
     return app.exec();
 }
-
