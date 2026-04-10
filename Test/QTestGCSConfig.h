@@ -25,12 +25,12 @@ const char UdpClient[]  = "UdpClient";
  * port: TcpServer/UdpServer 专用（仅端口）
  */
 namespace LinkConfigKeys {
-const char Type[]      = "type";
-const char Name[]      = "name";
-const char PortName[]  = "portName";
-const char BaudRate[]  = "baudRate";
-const char HostName[]  = "hostName";
-const char Port[]      = "port";
+const char Type[]      = "Type";
+const char Name[]      = "Name";
+const char PortName[]  = "PortName";
+const char BaudRate[]  = "BaudRate";
+const char HostName[]  = "HostName";
+const char Port[]      = "Port";
 }
 
 /**

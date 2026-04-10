@@ -1,3 +1,4 @@
+#include <QDebug>
 #include "Extern/XmlToMavSDK.h"
 #include "QGCSConfig.h"
 

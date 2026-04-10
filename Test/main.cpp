@@ -5,7 +5,6 @@
 
 #include "Link/QLinkManager.h"
 #include "Link/QDataLink.h"
-#include "Plat/QAutopilot.h"
 #include "QTestGCSConfig.h"
 #include "QGroundControlStation.h"
 #include "Plat/QPlat.h"
@@ -79,7 +78,7 @@ int main(int argc, char *argv[]) {
         pGroundStation, &QGroundControlStation::newPlatFind, [](QPlat *vehicle) {
             qDebug() << " 新飞控对象创建:" << vehicle->toString();
 
-            QObject::connect(vehicle, &QAutopilot::connectionStatusChanged,
+            QObject::connect(vehicle, &QPlat::connectionStatusChanged,
                              [vehicle](bool bIsConnected) {
                                  if (bIsConnected)
                                      qDebug() << "飞控已连接:" << vehicle->toString();
@@ -87,10 +86,10 @@ int main(int argc, char *argv[]) {
                                      qDebug() << "飞控失去连接:" << vehicle->toString();
                              });
 
-            QObject::connect(vehicle, &QAutopilot::infoUpdated, [vehicle]() {
+            QObject::connect(vehicle, &QPlat::infoUpdated, [vehicle]() {
                 qDebug() << "飞控信息更新:" << vehicle->toString();
             });
-            QObject::connect(vehicle,&QAutopilot::errorInfo,[](const QString& sErrorInfo){
+            QObject::connect(vehicle,&QPlat::errorInfo,[](const QString& sErrorInfo){
                 qDebug()<< "异常消息："<<sErrorInfo;
             });
         });

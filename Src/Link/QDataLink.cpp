@@ -1,6 +1,5 @@
 #include "Link/QDataLink.h"
 #include "QGroundControlStation.h"
-#include <QByteArray>
 
 QDataLink::QDataLink(LinkKind kind, const QString &connStr, QObject *parent)
     : QObject(parent)

@@ -1,6 +1,5 @@
 #include "Plat/Private/QAutopilotPrivate.h"
 #include "QGCSLog.h"
-#include <spdlog/spdlog.h>
 
 template<>struct fmt::formatter<mavsdk::Mission::Result>:ostream_formatter{};
 template<>struct fmt::formatter<mavsdk::Mission::ProgressData>:ostream_formatter{};

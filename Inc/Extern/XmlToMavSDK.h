@@ -1,6 +1,3 @@
-#ifndef XMLTOMAVSDK_H
-#define XMLTOMAVSDK_H
-
 #pragma once
 
 #include <QString>
@@ -8,7 +5,6 @@
 #include <QXmlStreamReader>
 #include <QVector>
 #include <QMap>
-#include <QDebug>
 #include <memory>
 #include <mavsdk/mavsdk.h>
 #include <mavsdk/plugins/mavlink_direct/mavlink_direct.h>
@@ -54,5 +50,3 @@ private:
     std::shared_ptr<mavsdk::System> m_pSystem;
     bool m_bLoadXml{false};
 };
-
-#endif // XMLTOMAVSDK_H

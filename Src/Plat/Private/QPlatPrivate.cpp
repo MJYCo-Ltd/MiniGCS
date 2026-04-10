@@ -1,5 +1,4 @@
 #include <QFile>
-#include <QDateTime>
 #include <QDebug>
 #include <sstream>
 #include <thread>
