@@ -19,3 +19,42 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+## Third-Party Licenses
+
+This project includes and uses the following third-party libraries:
+
+### MAVSDK
+
+MAVSDK is licensed under the LGPL-3.0 License.
+
+Source: https://github.com/mavlink/MAVSDK
+License: https://github.com/mavlink/MAVSDK/blob/main/LICENSE
+
+LGPL-3.0 License Terms:
+MAVSDK is free software: you can redistribute it and/or modify
+it under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MAVSDK is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public License
+along with MAVSDK. If not, see <http://www.gnu.org/licenses/>.
+
+### spdlog
+
+spdlog is licensed under the MIT License.
+
+Source: https://github.com/gabime/spdlog
+License: https://github.com/gabime/spdlog/blob/v1.x/LICENSE
+
+---
+
+For complete license details of all dependencies, please refer to their respective
+license files in the Depends/ directory.
