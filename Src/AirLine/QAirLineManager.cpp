@@ -8,8 +8,7 @@ QAirLineManager::QAirLineManager(QObject *parent)
 
 QAirLineManager::~QAirLineManager()
 {
-    // 清理所有航线
-    qDeleteAll(m_airlines);
+    // 航线均以本对象为父对象，由 QObject 统一销毁。
     m_airlines.clear();
 }
 
@@ -42,6 +41,11 @@ bool QAirLineManager::addAirLine(QAirLine *airline)
     // 设置父对象，确保生命周期管理
     airline->setParent(this);
     m_airlines.append(airline);
+    connect(airline, &QObject::destroyed, this, [this, airline]() {
+        if (m_airlines.removeOne(airline)) {
+            emit airlinesChanged();
+        }
+    });
     emit airlineAdded(airline);
     emit airlinesChanged();
     return true;
@@ -49,10 +53,8 @@ bool QAirLineManager::addAirLine(QAirLine *airline)
 
 QAirLine* QAirLineManager::createAirLine(const QString &name)
 {
-    QAirLine *airline = new QAirLine(name, this);
-    m_airlines.append(airline);
-    emit airlineAdded(airline);
-    emit airlinesChanged();
+    QAirLine *airline = new QAirLine(name);
+    addAirLine(airline);
     return airline;
 }
 
@@ -72,9 +74,7 @@ bool QAirLineManager::removeAirLine(QAirLine *airline)
     m_airlines.removeAt(index);
     emit airlineRemoved(airline);
     emit airlinesChanged();
-    
-    // 注意：不删除对象，因为可能在其他地方仍在使用
-    // 如果需要立即删除，可以调用 airline->deleteLater()
+    airline->deleteLater();
     return true;
 }
 
@@ -89,6 +89,7 @@ bool QAirLineManager::removeAirLineAt(int index)
     m_airlines.removeAt(index);
     emit airlineRemoved(airline);
     emit airlinesChanged();
+    airline->deleteLater();
     return true;
 }
 
@@ -117,12 +118,14 @@ void QAirLineManager::clearAllAirlines()
         return;
     }
 
-    // 发送移除信号
-    for (QAirLine *airline : m_airlines) {
+    const QList<QAirLine *> airlinesToRemove = m_airlines;
+    m_airlines.clear();
+
+    for (QAirLine *airline : airlinesToRemove) {
         emit airlineRemoved(airline);
+        airline->deleteLater();
     }
 
-    m_airlines.clear();
     emit airlinesChanged();
 }
 

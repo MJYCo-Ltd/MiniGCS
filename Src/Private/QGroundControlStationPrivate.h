@@ -5,6 +5,7 @@
 #include <QString>
 #include <QMap>
 #include <QVector>
+#include <functional>
 #include <map>
 #include <memory>
 #include <mavsdk/mavsdk.h>
@@ -122,6 +123,8 @@ private:
     std::map<std::string, mavsdk::Mavsdk::ConnectionHandle> m_connectionHandles;
     mavsdk::Mavsdk::NewSystemHandle m_newSystemHandle;
     mavsdk::Mavsdk::RawBytesHandle m_rawBytesHandle;
+    mavsdk::Mavsdk::ConnectionErrorHandle m_connectionErrorHandle;
+    mavsdk::Mavsdk::InterceptJsonHandle m_incomingMessagesHandle;
     class QDataLink *m_rawDataLink{nullptr};  ///< Raw 模式下的数据链路，用于接收回调
 };
 

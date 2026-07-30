@@ -3,6 +3,8 @@
 
 #include <QString>
 #include <memory>
+#include <mutex>
+#include <thread>
 #include <mavsdk/system.h>
 #include <mavsdk/plugins/mavlink_direct/mavlink_direct.h>
 #include <mavsdk/plugins/info/info.h>
@@ -21,19 +23,27 @@ class QPlatPrivate
 {
 public:
     QPlatPrivate(QPlat* pPlat);
-    ~QPlatPrivate(){}
+    virtual ~QPlatPrivate();
 
     /**
      * @brief 获取固件版本
      * @return 固件版本
      */
-    QString getFirmwareVersion() const { return m_firmwareVersion; }
+    QString getFirmwareVersion() const
+    {
+        std::scoped_lock lock(m_infoMutex);
+        return m_firmwareVersion;
+    }
 
     /**
      * @brief 获取软件版本
      * @return 软件版本
      */
-    QString getSoftwareVersion() const { return m_softwareVersion; }
+    QString getSoftwareVersion() const
+    {
+        std::scoped_lock lock(m_infoMutex);
+        return m_softwareVersion;
+    }
 
     /**
      * @brief 转换为字符串表示
@@ -60,6 +70,8 @@ public:
     virtual void setupMessageHandling();
 
 private:
+    void stopBackgroundTasks();
+
     /**
      * @brief 更新版本信息（通过 Info 插件）
      */
@@ -67,6 +79,7 @@ private:
 
 protected:
     QPlat*  q_ptr;
+    mutable std::mutex m_infoMutex;
     QString m_firmwareVersion;              ///< 固件版本
     QString m_softwareVersion;              ///< 软件版本
     
@@ -78,6 +91,10 @@ protected:
 
     mavsdk::System::IsConnectedHandle m_hConntecd;
     mavsdk::System::ComponentDiscoveredHandle m_hCommonpentDiscovered;
+
+    std::mutex m_backgroundTasksMutex;
+    std::jthread m_loadCustomXmlThread;
+    std::jthread m_updateVersionThread;
 };
 
 #endif // QPLATPRIVATE_H

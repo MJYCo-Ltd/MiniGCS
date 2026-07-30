@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.16)
 
 if(WIN32)
-    set(MAVSDK_DIR ${CMAKE_SOURCE_DIR}/Depends/mavsdk/lib/cmake/MAVSDK)
+    set(MAVSDK_DIR "${CMAKE_CURRENT_LIST_DIR}/Depends/mavsdk/lib/cmake/MAVSDK")
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        set(spdlog_DIR ${CMAKE_SOURCE_DIR}/Depends/spdlog/x64-Debug/lib/cmake/spdlog)
+        set(spdlog_DIR "${CMAKE_CURRENT_LIST_DIR}/Depends/spdlog/x64-Debug/lib/cmake/spdlog")
     elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
-        set(spdlog_DIR ${CMAKE_SOURCE_DIR}/Depends/spdlog/x64-Release/lib/cmake/spdlog)
+        set(spdlog_DIR "${CMAKE_CURRENT_LIST_DIR}/Depends/spdlog/x64-Release/lib/cmake/spdlog")
     endif()
 endif()
 
@@ -25,10 +25,6 @@ find_package(Qt6 REQUIRED COMPONENTS
 )
 
 qt_standard_project_setup(REQUIRES 6.9)
-
-include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}/Inc
-)
 
 # 设置源文件
 set(MINIGCS_SOURCES

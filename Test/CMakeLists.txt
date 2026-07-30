@@ -40,16 +40,6 @@ qt_add_executable(${PROJECT_NAME}
     QTestGCSConfig.h
 )
 
-# 设置包含目录，以便访问 MiniGCS 的头文件
-# 在同一个构建树中，直接使用父目录的 Inc
-# 如果是从已安装的包中使用，通过链接目标自动获取
-if(TARGET MiniGCS)
-    target_include_directories(${PROJECT_NAME}
-        PRIVATE
-        ${CMAKE_SOURCE_DIR}/Inc
-    )
-endif()
-
 # 添加 QML 模块
 qt_add_qml_module(${PROJECT_NAME}
     URI MiniGCS

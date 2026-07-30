@@ -4,6 +4,7 @@
 #include "Link/QLinkManager.h"
 #include <QString>
 #include <QMap>
+#include <QPointer>
 
 class QGroundControlStation;
 class QDataLink;
@@ -16,10 +17,9 @@ class QDataLink;
 class QLinkManagerPrivate
 {
 public:
-    explicit QLinkManagerPrivate(QGroundControlStation *groundStation);
+    explicit QLinkManagerPrivate(QLinkManager *owner,
+                                 QGroundControlStation *groundStation);
     ~QLinkManagerPrivate();
-
-    QGroundControlStation *groundStation() const { return m_groundStation; }
 
     static QString buildConnectionString(LinkKind type, const LinkParams &params);
 
@@ -28,10 +28,15 @@ public:
     void removeConnection(const QString &connStr);
     void removeLink(QDataLink *link);
     QStringList connectionStrings() const;
+    void handleConnectionError(const QString &connStr, const QString &reason);
 
 private:
-    QGroundControlStation *m_groundStation{nullptr};
-    QMap<QString, QDataLink *> m_connections;  ///< connStr -> QDataLink
+    bool openConnection(QDataLink *link);
+    void scheduleReconnect(const QString &connStr, const QString &lastError);
+
+    QPointer<QLinkManager> m_owner;
+    QPointer<QGroundControlStation> m_groundStation;
+    QMap<QString, QPointer<QDataLink>> m_connections;  ///< connStr -> QDataLink
 };
 
 #endif // QLINKMANAGERPRIVATE_H

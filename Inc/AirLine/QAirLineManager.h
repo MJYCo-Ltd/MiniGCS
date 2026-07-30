@@ -37,6 +37,7 @@ public:
     /**
      * @brief 添加航线
      * @param airline 航线对象
+     * @note 成功后对象所有权转移给 QAirLineManager
      * @return 是否添加成功
      */
     Q_INVOKABLE bool addAirLine(QAirLine *airline);
@@ -51,6 +52,7 @@ public:
     /**
      * @brief 移除航线
      * @param airline 航线对象
+     * @note 移除信号发出后，对象将通过 deleteLater() 销毁
      * @return 是否移除成功
      */
     Q_INVOKABLE bool removeAirLine(QAirLine *airline);

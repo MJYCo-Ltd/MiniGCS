@@ -19,6 +19,8 @@ class MINIGCS_EXPORT QDataLink : public QObject
     Q_OBJECT
     Q_PROPERTY(int reconnectCount READ reconnectCount WRITE setReconnectCount NOTIFY reconnectCountChanged)
     Q_PROPERTY(bool autoReconnect READ autoReconnect WRITE setAutoReconnect NOTIFY autoReconnectChanged)
+    Q_PROPERTY(bool connected READ isConnected NOTIFY connectionStatusChanged)
+    Q_PROPERTY(int reconnectAttempts READ reconnectAttempts NOTIFY reconnectAttemptsChanged)
     Q_PROPERTY(LinkKind linkKind READ linkKind CONSTANT)
     Q_PROPERTY(QString connectionString READ connectionString CONSTANT)
 
@@ -37,6 +39,9 @@ public:
     bool autoReconnect() const { return m_autoReconnect; }
     void setAutoReconnect(bool enable);
 
+    bool isConnected() const { return m_connected; }
+    int reconnectAttempts() const { return m_reconnectAttempts; }
+
     /**
      * @brief 发送原始数据（仅 Raw 模式有效）
      * @param data 数据指针
@@ -53,6 +58,8 @@ public:
 signals:
     void reconnectCountChanged();
     void autoReconnectChanged();
+    void connectionStatusChanged(bool connected);
+    void reconnectAttemptsChanged(int attempts);
 
     /**
      * @brief 接收到原始数据（仅 Raw 模式）
@@ -66,10 +73,15 @@ private slots:
 
 private:
     friend class QLinkManagerPrivate;
+    void setConnected(bool connected);
+    void setReconnectAttempts(int attempts);
+
     LinkKind m_linkKind;
     QString m_connectionString;
     int m_reconnectCount{0};
     bool m_autoReconnect{false};
+    bool m_connected{true};
+    int m_reconnectAttempts{0};
 };
 
 #endif // QDATALINK_H

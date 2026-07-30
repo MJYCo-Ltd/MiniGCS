@@ -11,7 +11,7 @@ QString QLinkManager::buildConnectionString(LinkKind type, const LinkParams &par
 
 QLinkManager::QLinkManager(QGroundControlStation *groundStation, QObject *parent)
     : QObject(parent)
-    , d_ptr(new QLinkManagerPrivate(groundStation))
+    , d_ptr(new QLinkManagerPrivate(this, groundStation))
 {
 }
 
@@ -58,4 +58,10 @@ void QLinkManager::clearAll()
     for (const QString &connStr : connStrs) {
         d->removeConnection(connStr);
     }
+}
+
+void QLinkManager::handleConnectionError(const QString &connectionString,
+                                         const QString &reason)
+{
+    d_func()->handleConnectionError(connectionString, reason);
 }

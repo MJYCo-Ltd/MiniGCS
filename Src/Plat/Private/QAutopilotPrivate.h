@@ -26,7 +26,7 @@ class QAutopilotPrivate:public QPlatPrivate
 {
 public:
     QAutopilotPrivate(QPlat*pPlat);
-    ~QAutopilotPrivate(){}
+    ~QAutopilotPrivate() override = default;
 
     /**
      * @brief 解锁

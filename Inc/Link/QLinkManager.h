@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QString>
 #include <QtGlobal>
+#include <memory>
 #include "MiniGCSExport.h"
 
 class QLinkManagerPrivate;
@@ -86,8 +87,15 @@ public:
 signals:
     /** 创建失败（如重复连接）时发出 */
     void linkCreateFailed(const QString &reason);
+    void linkConnectionError(QDataLink *link, const QString &reason);
+    void linkReconnected(QDataLink *link);
+    void linkReconnectFailed(QDataLink *link, const QString &reason);
 
 private:
+    friend class QGroundControlStationPrivate;
+    void handleConnectionError(const QString &connectionString,
+                               const QString &reason);
+
     QLinkManagerPrivate *d_func() { return d_ptr.get(); }
     const QLinkManagerPrivate *d_func() const { return d_ptr.get(); }
     std::unique_ptr<QLinkManagerPrivate> d_ptr;

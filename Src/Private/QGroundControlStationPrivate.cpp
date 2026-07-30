@@ -1,12 +1,14 @@
 #include <QMetaObject>
 #include <QMetaMethod>
 #include <QByteArray>
+#include <QPointer>
 
 #include "Private/QGroundControlStationPrivate.h"
 #include "Plat/Private/QAutopilotPrivate.h"
 #include "Plat/QPlat.h"
 #include "QGroundControlStation.h"
 #include "Link/QDataLink.h"
+#include "Link/QLinkManager.h"
 
 #include "QGCSConfig.h"
 #include "Private/QGCSLog.h"
@@ -18,8 +20,21 @@ QGroundControlStationPrivate::QGroundControlStationPrivate()
 
 QGroundControlStationPrivate::~QGroundControlStationPrivate()
 {
-    m_mavsdk->unsubscribe_on_new_system(m_newSystemHandle);
+    if (!m_mavsdk) {
+        return;
+    }
+
+    m_rawDataLink = nullptr;
     unsubscribeRawBytesToBeSent();
+    if (m_newSystemHandle.valid()) {
+        m_mavsdk->unsubscribe_on_new_system(m_newSystemHandle);
+    }
+    if (m_connectionErrorHandle.valid()) {
+        m_mavsdk->unsubscribe_connection_errors(m_connectionErrorHandle);
+    }
+    if (m_incomingMessagesHandle.valid()) {
+        m_mavsdk->unsubscribe_incoming_messages_json(m_incomingMessagesHandle);
+    }
 }
 
 template<>struct fmt::formatter<mavsdk::ConnectionResult>:ostream_formatter{};
@@ -37,7 +52,7 @@ void QGroundControlStationPrivate::initializeMavsdk()
     config.set_component_id(QGCSConfig::instance()->gcsComponentId());
     m_mavsdk = std::make_shared<mavsdk::Mavsdk>(config);
 
-    m_mavsdk->subscribe_incoming_messages_json(
+    m_incomingMessagesHandle = m_mavsdk->subscribe_incoming_messages_json(
         [](mavsdk::Mavsdk::MavlinkMessage msg) {
             QGCSConfig::instance()->dealMavsdkMessage(msg.system_id,
                                                       msg.fields_json);
@@ -105,23 +120,47 @@ void QGroundControlStationPrivate::setupConnectionErrorHandling(QObject* parent)
     if (!m_mavsdk || !parent) {
         return;
     }
+
+    if (m_connectionErrorHandle.valid()) {
+        m_mavsdk->unsubscribe_connection_errors(m_connectionErrorHandle);
+    }
     
     // 订阅连接错误
-    m_mavsdk->subscribe_connection_errors([this, parent](mavsdk::Mavsdk::ConnectionError error) {
-        spdlog::critical(MAV_FMT_STR, "Connection error",
-                         error.error_description);
-
-        // 从映射中移除
-        for (auto it = m_connectionHandles.begin(); it != m_connectionHandles.end(); ++it) {
-            if (it->second == error.connection_handle) {
-                m_connectionHandles.erase(it);
-                break;
-            }
+    QPointer<QGroundControlStation> station =
+        qobject_cast<QGroundControlStation *>(parent);
+    m_connectionErrorHandle = m_mavsdk->subscribe_connection_errors(
+        [this, station](mavsdk::Mavsdk::ConnectionError error) {
+        if (!station) {
+            return;
         }
-        m_mavsdk->remove_connection(error.connection_handle);
 
-        QMetaObject::invokeMethod(parent, "mavConnectionError", Qt::QueuedConnection,
-                                  Q_ARG(QString, QString::fromStdString(error.error_description)));
+        QMetaObject::invokeMethod(station, [this, station, error]() {
+            if (!station || !m_mavsdk) {
+                return;
+            }
+
+            const QString description =
+                QString::fromStdString(error.error_description);
+            QString connectionString;
+            for (auto it = m_connectionHandles.begin();
+                 it != m_connectionHandles.end(); ++it) {
+                if (it->second == error.connection_handle) {
+                    connectionString = QString::fromStdString(it->first);
+                    break;
+                }
+            }
+
+            if (!connectionString.isEmpty()) {
+                removeConnection(connectionString);
+            } else {
+                m_mavsdk->remove_connection(error.connection_handle);
+            }
+            if (!connectionString.isEmpty() && station->linkManager()) {
+                station->linkManager()->handleConnectionError(connectionString,
+                                                              description);
+            }
+            emit station->mavConnectionError(description);
+        }, Qt::QueuedConnection);
     });
 }
 
@@ -129,6 +168,10 @@ void QGroundControlStationPrivate::setupNewSystemDiscoveryCallback(
     QObject *parent) {
     if (!m_mavsdk || !parent) {
         return;
+    }
+
+    if (m_newSystemHandle.valid()) {
+        m_mavsdk->unsubscribe_on_new_system(m_newSystemHandle);
     }
 
     // 订阅新系统发现
@@ -209,6 +252,7 @@ void QGroundControlStationPrivate::setupRawBytesToBeSentCallback(
 void QGroundControlStationPrivate::unsubscribeRawBytesToBeSent() {
     if (m_mavsdk && m_rawBytesHandle.valid()) {
         m_mavsdk->unsubscribe_raw_bytes_to_be_sent(m_rawBytesHandle);
+        m_rawBytesHandle = {};
     }
 }
 

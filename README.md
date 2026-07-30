@@ -160,8 +160,15 @@ QLinkManager *lm = gcs.linkManager();
 
 LinkParams params;
 params.port = 14550;
-lm->addLink(LinkKind::UdpServer, params);
+QDataLink *link = lm->addLink(LinkKind::UdpServer, params);
+if (link) {
+    link->setAutoReconnect(true);
+    link->setReconnectCount(5); // 0 表示无限重试
+}
 ```
+
+自动重连采用退避策略（1、2、4、8、15 秒，之后保持 15 秒）。可通过
+`connected` 和 `reconnectAttempts` 属性观察当前连接状态与重试次数。
 
 ### 平台 / 飞控（Plat）
 
@@ -181,6 +188,9 @@ lm->addLink(LinkKind::UdpServer, params);
 | `QAirLine` | 单条航线及航点列表 |
 | `QGpsPosition` | GPS 坐标（经纬度、高度） |
 | `QNEDPosition` | NED 坐标 |
+
+`QAirLineManager::addAirLine()` 成功后接管航线对象所有权；移除或清空航线时，
+对象会在 `airlineRemoved` 信号发出后通过 `deleteLater()` 销毁。
 
 ## 日志与配置
 

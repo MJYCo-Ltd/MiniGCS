@@ -6,6 +6,7 @@
 #include <QMap>
 #include <QList>
 #include <cstdint>
+#include <memory>
 #include "MiniGCSExport.h"
 
 // 前向声明
@@ -42,7 +43,7 @@ public:
      * @brief 获取所有飞控对象
      * @return 飞控对象列表
      */
-    Q_INVOKABLE QList<QObject*> plats() const{return(m_listPlat);}
+    Q_INVOKABLE QList<QObject*> plats() const;
 
     /**
      * @brief 向 Raw 链路发送数据（供 QDataLink 使用）
@@ -78,7 +79,6 @@ private:
     friend class QDataLink;
     std::unique_ptr<QGroundControlStationPrivate> d_ptr;    ///< 私有实现指针
     QLinkManager *m_linkManager{nullptr};
-    QList<QObject*> m_listPlat;
     // 飞控对象管理
     QMap<uint8_t, QPlat*> m_mapId2Standalone;///< 状态
 };

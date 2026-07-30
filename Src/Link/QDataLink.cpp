@@ -12,6 +12,7 @@ QDataLink::~QDataLink() = default;
 
 void QDataLink::setReconnectCount(int count)
 {
+    count = qMax(0, count);
     if (m_reconnectCount != count) {
         m_reconnectCount = count;
         emit reconnectCountChanged();
@@ -24,6 +25,24 @@ void QDataLink::setAutoReconnect(bool enable)
         m_autoReconnect = enable;
         emit autoReconnectChanged();
     }
+}
+
+void QDataLink::setConnected(bool connected)
+{
+    if (m_connected == connected) {
+        return;
+    }
+    m_connected = connected;
+    emit connectionStatusChanged(connected);
+}
+
+void QDataLink::setReconnectAttempts(int attempts)
+{
+    if (m_reconnectAttempts == attempts) {
+        return;
+    }
+    m_reconnectAttempts = attempts;
+    emit reconnectAttemptsChanged(attempts);
 }
 
 bool QDataLink::sendRawData(const char *data, int length)

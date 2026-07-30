@@ -4,6 +4,7 @@
 #include "Private/QGroundControlStationPrivate.h"
 #include <QCoreApplication>
 #include <QDebug>
+#include <QtAlgorithms>
 
 QGroundControlStation::QGroundControlStation(QObject *parent)
     : QObject(parent)
@@ -15,6 +16,12 @@ QGroundControlStation::QGroundControlStation(QObject *parent)
 QGroundControlStation::~QGroundControlStation()
 {
     ClearAllLinks();
+
+    // QPlat 是 QObject 子对象，必须在 MAVSDK 私有实现销毁前停止其订阅和后台任务。
+    const QList<QPlat *> platformChildren =
+        findChildren<QPlat *>(QString(), Qt::FindDirectChildrenOnly);
+    qDeleteAll(platformChildren);
+    m_mapId2Standalone.clear();
 }
 
 void QGroundControlStation::Init()
@@ -38,10 +45,20 @@ bool QGroundControlStation::feedRawData(const char *data, int length)
     return true;
 }
 
+QList<QObject *> QGroundControlStation::plats() const
+{
+    QList<QObject *> result;
+    result.reserve(m_mapId2Standalone.size());
+    for (QPlat *plat : m_mapId2Standalone) {
+        result.append(plat);
+    }
+    return result;
+}
+
 QPlat *QGroundControlStation::getOrCreatePlat(uint8_t uId, bool bIsAutopilot)
 {
     QPlat *pPlat = m_mapId2Standalone.value(uId, nullptr);
-    bool bNewPlatCreated = false;
+    bool registryChanged = false;
     if (nullptr == pPlat) {
         if (bIsAutopilot) {
             pPlat = new QAutopilot(this);
@@ -49,25 +66,26 @@ QPlat *QGroundControlStation::getOrCreatePlat(uint8_t uId, bool bIsAutopilot)
             pPlat = new QPlat(this);
         }
         m_mapId2Standalone.insert(uId, pPlat);
-        m_listPlat.push_back(pPlat);
-        bNewPlatCreated = true;
+        registryChanged = true;
     } else {
         if (!bIsAutopilot) {
             if (nullptr != qobject_cast<QAutopilot *>(pPlat)) {
                 pPlat->deleteLater();
                 pPlat = new QPlat(this);
                 m_mapId2Standalone[uId] = pPlat;
+                registryChanged = true;
             }
         } else {
             if (nullptr == qobject_cast<QAutopilot *>(pPlat)) {
                 pPlat->deleteLater();
                 pPlat = new QAutopilot(this);
                 m_mapId2Standalone[uId] = pPlat;
+                registryChanged = true;
             }
         }
     }
 
-    if (bNewPlatCreated) {
+    if (registryChanged) {
         emit platsChanged();
     }
 
