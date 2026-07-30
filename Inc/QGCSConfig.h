@@ -3,20 +3,11 @@
 
 #include <QObject>
 #include <QString>
+#include <cstdint>
+#include <string>
 #include "MiniGCSExport.h"
 
 class QSettings;
-
-
-/// <summary>
-/// 前置声明 spdlog 命名空间和 sink 类
-/// </summary>
-namespace spdlog {
-    namespace sinks {
-        class sink;
-    }
-    using sink_ptr = std::shared_ptr<sinks::sink>;
-};
 
 /**
  * @brief QGCSConfig类 - 配置文件单例类
@@ -127,7 +118,6 @@ private:
      */
     void init_logging();
 
-    std::vector<spdlog::sink_ptr> sinks;
     static QGCSConfig* m_pSInsatance;
 };
 

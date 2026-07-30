@@ -182,15 +182,6 @@ lm->addLink(LinkKind::UdpServer, params);
 | `QGpsPosition` | GPS 坐标（经纬度、高度） |
 | `QNEDPosition` | NED 坐标 |
 
-### 外部接口（Extern）
-
-| 类 | 说明 |
-|----|------|
-| `XmlToMavSDK` | XML 任务文件 → MAVSDK 任务项 |
-| `AsyncSendMavLink` | 异步 MAVLink 发送队列 |
-
----
-
 ## 日志与配置
 
 - 日志由 **spdlog** 输出，并通过 `QGCSConfig::qtLogHandler` 接管 Qt 的 `qDebug` / `qWarning` 等。
@@ -235,13 +226,11 @@ MiniGCS/
 ├── Inc/                       # 公开头文件
 │   ├── QGroundControlStation.h
 │   ├── QGCSConfig.h
-│   ├── QGCSLog.h
 │   ├── MiniGCSExport.h
 │   ├── AirLine/
 │   ├── Link/
 │   ├── Plat/
-│   └── Extern/
-├── Src/                       # 实现
+├── Src/                       # 实现及 MAVSDK/spdlog 内部适配
 └── Test/                      # QML 演示与 QTestGCSConfig
     ├── CMakeLists.txt
     ├── main.cpp

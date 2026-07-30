@@ -62,19 +62,20 @@ set(MINIGCS_HEADERS
     Inc/AirLine/QNEDPosition.h
     Inc/Plat/QAutopilotStatus.h
     Inc/Plat/QAutopilotFixedwing.h
-    Inc/Extern/XmlToMavSDK.h
-    Inc/Extern/AsyncSendMavLink.h
     Inc/Link/QDataLink.h
     Inc/Link/QLinkManager.h
-    Inc/Link/Private/QLinkManagerPrivate.h
+    Src/Link/Private/QLinkManagerPrivate.h
     Inc/Plat/QAutopilot.h
     Inc/Plat/QAutoVehicleType.h
     Inc/Plat/QPlat.h
-    Inc/Plat/Private/QAutopilotPrivate.h
-    Inc/Plat/Private/QPlatPrivate.h
-    Inc/Private/QGroundControlStationPrivate.h
+    Src/Plat/Private/QAutopilotPrivate.h
+    Src/Plat/Private/QPlatPrivate.h
+    Src/Private/QGroundControlStationPrivate.h
     Inc/QGroundControlStation.h
     Inc/QGCSConfig.h
+    Src/Extern/XmlToMavSDK.h
+    Src/Extern/AsyncSendMavLink.h
+    Src/Private/QGCSLog.h
 )
 
 # 构建 MiniGCS 为动态库
@@ -112,6 +113,8 @@ target_include_directories(${PROJECT_NAME}
     PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Inc>
     $<INSTALL_INTERFACE:include>
+    PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src
 )
 
 # 安装配置
@@ -128,8 +131,6 @@ install(DIRECTORY Inc/
     DESTINATION include
     FILES_MATCHING
     PATTERN "*.h"
-    PATTERN "Private" EXCLUDE
-    PATTERN "Plat/Private" EXCLUDE
 )
 
 # 安装 CMake 配置文件

@@ -32,7 +32,7 @@ void QAutopilotPrivate::setSystem(std::shared_ptr<mavsdk::System> system) {
     // arm();
 }
 
-#include "QGCSLog.h"
+#include "Private/QGCSLog.h"
 
 template<>struct fmt::formatter<mavsdk::Action::Result>:ostream_formatter{};
 

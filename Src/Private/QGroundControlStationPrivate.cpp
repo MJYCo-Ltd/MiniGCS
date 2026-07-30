@@ -9,7 +9,7 @@
 #include "Link/QDataLink.h"
 
 #include "QGCSConfig.h"
-#include "QGCSLog.h"
+#include "Private/QGCSLog.h"
 
 QGroundControlStationPrivate::QGroundControlStationPrivate()
     : m_isInitialized(false)

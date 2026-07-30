@@ -5,7 +5,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 
-#include "QGCSLog.h"
+#include "Private/QGCSLog.h"
 #include "QGCSConfig.h"
 #include "Plat/Private/QPlatPrivate.h"
 #include "Plat/QPlat.h"

@@ -5,10 +5,11 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSettings>
+#include <vector>
 #include "QGCSConfig.h"
 
 #include <spdlog/sinks/daily_file_sink.h>
-#include "QGCSLog.h"
+#include "Private/QGCSLog.h"
 
 QGCSConfig *QGCSConfig::m_pSInsatance = nullptr;
 // 配置项键名常量
@@ -52,7 +53,6 @@ QGCSConfig::QGCSConfig(QObject *parent) : QObject(parent) {}
 
 QGCSConfig::~QGCSConfig() {
     spdlog::warn(SYS_FMT_STR,"系统正在清理资源","即将退出……");
-    sinks.clear();
     if (m_settings) {
         save();
         delete m_settings;
@@ -92,7 +92,7 @@ void QGCSConfig::init_logging() {
     // 将级别应用到 sink（并保留原来的按用途设置可选，这里统一使用配置级别）
     file_sink->set_level(lvl);
 
-    sinks.clear();
+    std::vector<spdlog::sink_ptr> sinks;
     sinks.push_back(file_sink);
 
     auto logger =

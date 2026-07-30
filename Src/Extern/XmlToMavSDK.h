@@ -8,12 +8,10 @@
 #include <memory>
 #include <mavsdk/mavsdk.h>
 #include <mavsdk/plugins/mavlink_direct/mavlink_direct.h>
-#include "MiniGCSExport.h"
 
-class MINIGCS_EXPORT XmlToMavSDK
+class XmlToMavSDK
 {
 public:
-
     struct CommandParam {
         QString label;
         int index;
@@ -28,22 +26,15 @@ public:
 
     explicit XmlToMavSDK(const QString& xmlPath);
 
-    // 查找命令
     const ExternCmd* findCmd(const QString& name) const;
-
-    // 列出所有命令
     QStringList listCmdNames() const;
-
-    /**
-     * @brief 设置要发送给的固件
-     * @param system
-     */
     void setSystem(std::shared_ptr<mavsdk::System> system);
-
-    // 发送命令（参数数量不足时自动补0）
-    mavsdk::MavlinkDirect::Result sendCmd(const QString& name,uint32_t uComponentID,const QVector<float>& params);
-
+    mavsdk::MavlinkDirect::Result sendCmd(
+        const QString& name,
+        uint32_t uComponentID,
+        const QVector<float>& params);
     void loadXml(const QString& xmlPath);
+
 private:
     QMap<QString, ExternCmd> m_mapExternCMDs;
     std::shared_ptr<mavsdk::MavlinkDirect> m_pMavlinkDirect;

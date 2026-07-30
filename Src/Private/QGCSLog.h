@@ -2,7 +2,7 @@
 #define QGCSLOG_H
 
 #include <spdlog/spdlog.h>
-#include <spdlog/fmt/ostr.h> // support for user defined types
+#include <spdlog/fmt/ostr.h>
 
 #ifndef MAV_FMT_STR
 #define MAV_FMT_STR "[mavsdk] {}:{}"
