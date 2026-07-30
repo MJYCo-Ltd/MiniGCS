@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QString>
 #include <QtGlobal>
+#include <QMetaType>
 #include <memory>
 #include "MiniGCSExport.h"
 
@@ -16,26 +17,42 @@ class QDataLink;
  *
  * 用于判断并生成连接字符串
  */
-enum class LinkKind {
-    TcpServer,   ///< TCP 服务器（监听）
-    TcpClient,   ///< TCP 客户端（连接）
-    UdpServer,   ///< UDP 服务器（监听）
-    UdpClient,   ///< UDP 客户端（连接）
-    Serial,      ///< 串口
-    Raw          ///< 原始字节（自定义 I/O）
+class MINIGCS_EXPORT LinkTypes
+{
+    Q_GADGET
+public:
+    enum class Kind {
+        TcpServer,   ///< TCP 服务器（监听）
+        TcpClient,   ///< TCP 客户端（连接）
+        UdpServer,   ///< UDP 服务器（监听）
+        UdpClient,   ///< UDP 客户端（连接）
+        Serial,      ///< 串口
+        Raw          ///< 原始字节（自定义 I/O）
+    };
+    Q_ENUM(Kind)
 };
+using LinkKind = LinkTypes::Kind;
 
 /**
  * @brief 链路参数结构体
  *
  * 根据 LinkKind 使用不同字段：Tcp/Udp Server 用 port；Client 用 hostName+port；Serial 用 portName+baudRate
  */
-struct LinkParams {
+struct MINIGCS_EXPORT LinkParams {
+    Q_GADGET
+    Q_PROPERTY(quint16 port MEMBER port)
+    Q_PROPERTY(QString hostName MEMBER hostName)
+    Q_PROPERTY(QString portName MEMBER portName)
+    Q_PROPERTY(int baudRate MEMBER baudRate)
+public:
     quint16 port{0};
     QString hostName;
     QString portName;   ///< 串口名称（Serial 专用）
     int baudRate{0};    ///< 波特率（Serial 专用）
 };
+
+Q_DECLARE_METATYPE(LinkKind)
+Q_DECLARE_METATYPE(LinkParams)
 
 /**
  * @brief QLinkManager类 - 链路管理器

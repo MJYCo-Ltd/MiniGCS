@@ -65,9 +65,10 @@ cmake --build build --config Release
 
 | CMake 选项 | 默认值 | 说明 |
 |------------|--------|------|
-| `BUILD_TEST` | `ON` | 是否同时构建 `Test/` 下的 QML 演示程序 |
+| `MINIGCS_BUILD_DEMO` | `OFF` | 是否构建 `Test/` 下的 QML 演示程序 |
 
-构建产物默认位于 `build/`（或你指定的 `-B` 目录），例如 `build/MiniGCS.dll`、`build/Test.exe`。
+构建产物默认位于 `build/`（或你指定的 `-B` 目录），例如
+`build/MiniGCS.dll`；启用演示选项后才会生成 `Test`。
 
 ### 安装
 
@@ -168,7 +169,8 @@ if (link) {
 ```
 
 自动重连采用退避策略（1、2、4、8、15 秒，之后保持 15 秒）。可通过
-`connected` 和 `reconnectAttempts` 属性观察当前连接状态与重试次数。
+`opened` 表示底层传输是否已注册成功，`reconnectAttempts` 表示当前重试次数。
+飞控是否在线应观察 `QPlat::connected`，不要用链路的 `opened` 代替设备在线状态。
 
 ### 平台 / 飞控（Plat）
 
@@ -192,6 +194,20 @@ if (link) {
 `QAirLineManager::addAirLine()` 成功后接管航线对象所有权；移除或清空航线时，
 对象会在 `airlineRemoved` 信号发出后通过 `deleteLater()` 销毁。
 
+飞控任务不会在发现设备时自动下载。需要时显式调用：
+
+```cpp
+QObject::connect(autopilot, &QAutopilot::airLineDownloaded,
+                 [](const QList<QGpsPosition> &waypoints) {
+                     // waypoint.altitude() 为相对起飞点高度
+                 });
+autopilot->downloadAirLine();
+```
+
+任务下载只使用 MAVSDK `Mission` 路径，避免与 `MissionRaw` 并行请求。
+可通过 `airLineDownloading` 属性观察下载状态；重复请求会被拒绝。下载结果会
+自动忽略没有有效经纬度或相对高度的非航点任务项。
+
 ## 日志与配置
 
 - 日志由 **spdlog** 输出，并通过 `QGCSConfig::qtLogHandler` 接管 Qt 的 `qDebug` / `qWarning` 等。
@@ -206,7 +222,13 @@ if (link) {
 | `GCS/ComponentId` | `191` | 地面站组件 ID |
 | `Logging/Level` | `debug` | `trace` / `debug` / `info` / `warn` / `error` / `critical` / `off` |
 | `MavMessage/Extension` | `ardupilotmega.xml` | MAV 消息扩展定义 |
+| `Mavsdk/TypeTextFile` | `mavsdk_zh_CN.json` | MAVSDK 类型文本映射文件；相对路径基于配置文件目录 |
 | `TimeSync/Enabled` | `true` | 是否启用时间同步 |
+
+载具类型、飞控类型、GPS 定位状态、固件版本类型和 Mission 返回结果的显示文本均从
+`Config/mavsdk_zh_CN.json` 读取，不在 C++ 中硬编码。可以复制该文件制作其他
+语言版本，再通过 `Mavsdk/TypeTextFile` 指向新文件；程序会在文件更新时间或
+大小变化后重新加载。
 
 可通过继承 `QGCSConfig` 并在首次 `instance()` 前调用 `QGCSConfig::setInstance()` 注入自定义配置（`Test` 工程中的 `QTestGCSConfig` 即如此，并额外支持多链路配置）。
 
@@ -214,9 +236,11 @@ if (link) {
 
 ## Test 演示程序
 
-默认随库一起构建（`BUILD_TEST=ON`）。`Test` 为 **Qt Quick** 示例，依赖 Qt 模块：Core、Quick、SerialPort、Location、Network。
+演示程序默认不构建。配置 `-DMINIGCS_BUILD_DEMO=ON` 后才会加入构建；
+`Test` 为 **Qt Quick** 示例，依赖 Qt 模块：Core、Quick、SerialPort、Location、Network。
 
 ```powershell
+cmake -B build -DMINIGCS_BUILD_DEMO=ON
 cmake --build build --target Test
 # 运行前将 MiniGCS.dll、Qt 运行时与 MAVSDK 依赖置于 PATH 或 exe 同目录
 ./build/Test.exe

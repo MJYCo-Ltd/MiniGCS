@@ -1,30 +1,9 @@
 #include "Plat/QAutopilot.h"
 #include "Plat/Private/QAutopilotPrivate.h"
+#include "Private/QMavsdkTextCatalog.h"
 #include <QDateTime>
 #include <QDebug>
 #include <QtGlobal>
-
-// 将FixType枚举转换为中文字符串
-static const char* fixTypeToChinese(int fixType) {
-    switch (fixType) {
-        case 0: // NoGps
-            return "无GPS连接";
-        case 1: // NoFix
-            return "无定位";
-        case 2: // Fix2D
-            return "2D定位";
-        case 3: // Fix3D
-            return "3D定位";
-        case 4: // FixDgps
-            return "DGPS/SBAS辅助定位";
-        case 5: // RtkFloat
-            return "RTK浮点定位";
-        case 6: // RtkFixed
-            return "RTK固定定位";
-        default:
-            return "未知状态";
-    }
-}
 
 QAutopilot::QAutopilot(QObject *parent)
     : QPlat(parent)
@@ -43,7 +22,58 @@ const QAutopilotPrivate *QAutopilot::d_func() const {
 
 void QAutopilot::arm()
 {
-    d_func()->arm();
+    if (d_func()) {
+        d_func()->arm();
+    }
+}
+
+void QAutopilot::downloadAirLine()
+{
+    if (m_airLineDownloading) {
+        emit airLineDownloadFailed(QStringLiteral("航线正在下载"));
+        return;
+    }
+    if (!d_func()) {
+        emit airLineDownloadFailed(QStringLiteral("飞控尚未初始化"));
+        return;
+    }
+
+    m_airLineDownloading = true;
+    const quint64 requestId = ++m_airLineDownloadRequestId;
+    emit airLineDownloadingChanged(true);
+    d_func()->downloadAirLine(requestId);
+}
+
+void QAutopilot::completeAirLineDownload(
+    quint64 requestId, const QList<QGpsPosition> &waypoints)
+{
+    if (requestId != m_airLineDownloadRequestId) {
+        return;
+    }
+    m_airLineDownloading = false;
+    emit airLineDownloadingChanged(false);
+    emit airLineDownloaded(waypoints);
+}
+
+void QAutopilot::failAirLineDownload(quint64 requestId,
+                                     const QString &reason)
+{
+    if (requestId != m_airLineDownloadRequestId) {
+        return;
+    }
+    m_airLineDownloading = false;
+    emit airLineDownloadingChanged(false);
+    emit airLineDownloadFailed(reason);
+}
+
+void QAutopilot::cancelAirLineDownload()
+{
+    if (!m_airLineDownloading) {
+        return;
+    }
+    ++m_airLineDownloadRequestId;
+    m_airLineDownloading = false;
+    emit airLineDownloadingChanged(false);
 }
 
 void QAutopilot::setHeading(double heading) {
@@ -97,7 +127,8 @@ void QAutopilot::gpsInfoUpdate(int gpsCount, int gpsStatus) {
         changed = true;
     }
     
-    QString chineseStatus = QString::fromUtf8(fixTypeToChinese(gpsStatus));
+    const QString chineseStatus =
+        QMavsdkTextCatalog::text(QStringLiteral("gpsFixType"), gpsStatus);
     if (m_status.gpsStatus() != chineseStatus) {
         m_status.setGpsStatus(chineseStatus);
         changed = true;

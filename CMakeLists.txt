@@ -35,7 +35,6 @@ set(MINIGCS_SOURCES
     Src/Plat/QAutopilotStatus.cpp
     Src/Plat/QAutopilotFixedwing.cpp
     Src/Extern/XmlToMavSDK.cpp
-    Src/Extern/AsyncSendMavLink.cpp
     Src/Plat/QAutopilot.cpp
     Src/Plat/QAutoVehicleType.cpp
     Src/Plat/QPlat.cpp
@@ -43,6 +42,7 @@ set(MINIGCS_SOURCES
     Src/Plat/Private/QAutopilotPrivate_control.cpp
     Src/Plat/Private/QPlatPrivate.cpp
     Src/Private/QGroundControlStationPrivate.cpp
+    Src/Private/QMavsdkTextCatalog.cpp
     Src/QGroundControlStation.cpp
     Src/Link/QDataLink.cpp
     Src/Link/QLinkManager.cpp
@@ -67,10 +67,10 @@ set(MINIGCS_HEADERS
     Src/Plat/Private/QAutopilotPrivate.h
     Src/Plat/Private/QPlatPrivate.h
     Src/Private/QGroundControlStationPrivate.h
+    Src/Private/QMavsdkTextCatalog.h
     Inc/QGroundControlStation.h
     Inc/QGCSConfig.h
     Src/Extern/XmlToMavSDK.h
-    Src/Extern/AsyncSendMavLink.h
     Src/Private/QGCSLog.h
 )
 
@@ -129,6 +129,17 @@ install(DIRECTORY Inc/
     PATTERN "*.h"
 )
 
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/Config")
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/Config/mavsdk_zh_CN.json"
+    "${CMAKE_CURRENT_BINARY_DIR}/Config/mavsdk_zh_CN.json"
+    COPYONLY
+)
+
+install(FILES Config/mavsdk_zh_CN.json
+    DESTINATION bin/Config
+)
+
 # 安装 CMake 配置文件
 include(CMakePackageConfigHelpers)
 write_basic_package_version_file(
@@ -155,8 +166,8 @@ install(EXPORT MiniGCSTargets
     DESTINATION lib/cmake/MiniGCS
 )
 
-# 可选：包含 Test 子项目
-option(BUILD_TEST "Build Test executable" ON)
-if(BUILD_TEST)
+# 可选：构建 QML 演示程序
+option(MINIGCS_BUILD_DEMO "Build the MiniGCS QML demo" OFF)
+if(MINIGCS_BUILD_DEMO)
     add_subdirectory(Test)
 endif()

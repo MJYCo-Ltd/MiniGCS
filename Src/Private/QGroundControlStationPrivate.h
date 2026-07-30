@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QString>
 #include <QMap>
+#include <QPointer>
 #include <QVector>
 #include <functional>
 #include <map>
@@ -14,6 +15,7 @@
 // 前向声明
 struct ConnectionConfig;
 class QPlat;
+class QGroundControlStation;
 
 /**
  * @brief QGroundControlStation的私有实现类
@@ -116,6 +118,10 @@ public:
     std::shared_ptr<mavsdk::Mavsdk> mavsdk() const { return m_mavsdk; }
 
 private:
+    void handleConnectionError(
+        const mavsdk::Mavsdk::ConnectionError &error,
+        QGroundControlStation *station);
+
     std::shared_ptr<mavsdk::Mavsdk> m_mavsdk;        ///< MAVSDK实例
     bool m_isInitialized;                            ///< 是否已初始化
 
@@ -125,7 +131,7 @@ private:
     mavsdk::Mavsdk::RawBytesHandle m_rawBytesHandle;
     mavsdk::Mavsdk::ConnectionErrorHandle m_connectionErrorHandle;
     mavsdk::Mavsdk::InterceptJsonHandle m_incomingMessagesHandle;
-    class QDataLink *m_rawDataLink{nullptr};  ///< Raw 模式下的数据链路，用于接收回调
+    QPointer<class QDataLink> m_rawDataLink;  ///< Raw 模式下的数据链路，用于接收回调
 };
 
 #endif // QGROUNDCONTROLSTATIONPRIVATE_H

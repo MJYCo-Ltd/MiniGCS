@@ -73,6 +73,11 @@ public:
     QString mavMessageExtension() const;
 
     /**
+   * @brief 获取 MAVSDK 类型文本映射文件路径
+   */
+    QString mavsdkTypeTextFile() const;
+
+    /**
    * @brief 获取是否开启时间同步
    * @return 是否开启时间同步（默认 true）
    */

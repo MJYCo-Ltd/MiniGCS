@@ -27,13 +27,13 @@ void QDataLink::setAutoReconnect(bool enable)
     }
 }
 
-void QDataLink::setConnected(bool connected)
+void QDataLink::setOpened(bool opened)
 {
-    if (m_connected == connected) {
+    if (m_opened == opened) {
         return;
     }
-    m_connected = connected;
-    emit connectionStatusChanged(connected);
+    m_opened = opened;
+    emit openStatusChanged(opened);
 }
 
 void QDataLink::setReconnectAttempts(int attempts)
@@ -61,7 +61,12 @@ bool QDataLink::sendRawData(const char *data, int length)
 
 bool QDataLink::sendRawData(const QByteArray &data)
 {
-    if (data.isEmpty()) return true;
+    if (m_linkKind != LinkKind::Raw) {
+        return false;
+    }
+    if (data.isEmpty()) {
+        return true;
+    }
     return sendRawData(data.constData(), data.size());
 }
 

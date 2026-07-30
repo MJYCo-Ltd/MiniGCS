@@ -1,10 +1,11 @@
 #include <QCoreApplication>
 #include <QDebug>
 #include <QDir>
-#include <QStandardPaths>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSettings>
+#include <QFileInfo>
+#include <cstring>
 #include <vector>
 #include "QGCSConfig.h"
 
@@ -18,6 +19,7 @@ const char *KEY_GCS_SYSTEM_ID = "GCS/SystemId";
 const char *KEY_GCS_COMPONENT_ID = "GCS/ComponentId";
 const char *KEY_LOG_LEVEL = "Logging/Level";
 const char *KEY_MAV_MESSAGE_EXTENSION = "MavMessage/Extension";
+const char *KEY_MAVSDK_TYPE_TEXT_FILE = "Mavsdk/TypeTextFile";
 const char *KEY_TIME_SYNC_ENABLED = "TimeSync/Enabled";
 
 // 默认值
@@ -25,6 +27,7 @@ const uint8_t DEFAULT_GCS_SYSTEM_ID = 246;
 const uint8_t DEFAULT_GCS_COMPONENT_ID = 191;
 const char *DEFAULT_LOG_LEVEL = "debug";
 const char *DEFAULT_MAV_MESSAGE_EXTENSION = "ardupilotmega.xml";
+const char *DEFAULT_MAVSDK_TYPE_TEXT_FILE = "mavsdk_zh_CN.json";
 const bool DEFAULT_TIME_SYNC_ENABLED = true;
 } // namespace
 
@@ -76,34 +79,40 @@ void QGCSConfig::setInstance(QGCSConfig *p) {
 }
 
 void QGCSConfig::init_logging() {
-    // 先建立 sinks
-    // auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-    auto file_sink = std::make_shared<spdlog::sinks::daily_file_sink_mt>(
-        "data/log/minigcs.log", 0,0,false,7);
-
-    // 从配置读取日志级别
-    QString configuredLevel = DEFAULT_LOG_LEVEL;
-    if (m_settings) {
-        configuredLevel =
-            m_settings->value(KEY_LOG_LEVEL, DEFAULT_LOG_LEVEL).toString();
+    const QString logDirectory = QStringLiteral("data/log");
+    if (!QDir().mkpath(logDirectory)) {
+        qWarning() << "无法创建日志目录:" << logDirectory;
+        return;
     }
-    spdlog::level::level_enum lvl = levelFromString(configuredLevel);
 
-    // 将级别应用到 sink（并保留原来的按用途设置可选，这里统一使用配置级别）
-    file_sink->set_level(lvl);
+    try {
+        auto file_sink = std::make_shared<spdlog::sinks::daily_file_sink_mt>(
+            "data/log/minigcs.log", 0, 0, false, 7);
 
-    std::vector<spdlog::sink_ptr> sinks;
-    sinks.push_back(file_sink);
+        QString configuredLevel = DEFAULT_LOG_LEVEL;
+        if (m_settings) {
+            configuredLevel =
+                m_settings->value(KEY_LOG_LEVEL, DEFAULT_LOG_LEVEL).toString();
+        }
+        spdlog::level::level_enum lvl = levelFromString(configuredLevel);
 
-    auto logger =
-        std::make_shared<spdlog::logger>("core", sinks.begin(), sinks.end());
-    spdlog::set_default_logger(logger);
+        file_sink->set_level(lvl);
 
-    spdlog::set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%^%l%$] [%t] %v");
-    spdlog::set_level(lvl); // 全局级别
+        std::vector<spdlog::sink_ptr> sinks;
+        sinks.push_back(file_sink);
 
-    spdlog::warn(SYS_FMT_STR,
-                 "系统启动 日志级别",configuredLevel.toStdString());
+        auto logger =
+            std::make_shared<spdlog::logger>("core", sinks.begin(), sinks.end());
+        spdlog::set_default_logger(logger);
+
+        spdlog::set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%^%l%$] [%t] %v");
+        spdlog::set_level(lvl);
+
+        spdlog::warn(SYS_FMT_STR, "系统启动 日志级别",
+                     configuredLevel.toStdString());
+    } catch (const spdlog::spdlog_ex &error) {
+        qWarning() << "日志系统初始化失败:" << error.what();
+    }
 }
 
 void QGCSConfig::qtLogHandler(QtMsgType type, const QMessageLogContext &ctx,
@@ -140,6 +149,10 @@ void QGCSConfig::qtLogHandler(QtMsgType type, const QMessageLogContext &ctx,
 }
 
 void QGCSConfig::init() {
+    if (m_settings) {
+        return;
+    }
+
     // 确定配置文件路径
     QString appName = QCoreApplication::applicationName();
     if (appName.isEmpty()) {
@@ -147,8 +160,11 @@ void QGCSConfig::init() {
     }
     // 使用应用程序目录下的配置文件
     QString appDir = QString("%1%2Config").arg(QCoreApplication::applicationDirPath()).arg(QDir::separator());
+    if (!QDir().mkpath(appDir)) {
+        qWarning() << "无法创建配置目录:" << appDir;
+        return;
+    }
     m_configFilePath = QDir(appDir).filePath(appName + ".ini");
-    init_logging();
 
     // 创建QSettings实例
     m_settings = new QSettings(m_configFilePath, QSettings::IniFormat);
@@ -156,6 +172,13 @@ void QGCSConfig::init() {
 
     // 初始化默认值
     initializeDefaults();
+    if (m_settings->status() != QSettings::NoError) {
+        qWarning() << "配置文件读写异常:" << m_configFilePath
+                   << "status=" << m_settings->status();
+    }
+
+    // 默认值与用户配置加载完成后再初始化日志。
+    init_logging();
 }
 
 void QGCSConfig::release() {
@@ -215,6 +238,9 @@ QString QGCSConfig::logLevel() const {
 }
 
 uint8_t QGCSConfig::gcsSystemId() const {
+    if (!m_settings) {
+        return DEFAULT_GCS_SYSTEM_ID;
+    }
     return static_cast<uint8_t>(
         m_settings
             ->value(KEY_GCS_SYSTEM_ID, static_cast<int>(DEFAULT_GCS_SYSTEM_ID))
@@ -222,6 +248,9 @@ uint8_t QGCSConfig::gcsSystemId() const {
 }
 
 uint8_t QGCSConfig::gcsComponentId() const {
+    if (!m_settings) {
+        return DEFAULT_GCS_COMPONENT_ID;
+    }
     return static_cast<uint8_t>(
         m_settings
             ->value(KEY_GCS_COMPONENT_ID,
@@ -230,15 +259,67 @@ uint8_t QGCSConfig::gcsComponentId() const {
 }
 
 QString QGCSConfig::mavMessageExtension() const {
+    if (!m_settings) {
+        return QString::fromLatin1(DEFAULT_MAV_MESSAGE_EXTENSION);
+    }
     return m_settings->value(KEY_MAV_MESSAGE_EXTENSION, DEFAULT_MAV_MESSAGE_EXTENSION).toString();
 }
 
+QString QGCSConfig::mavsdkTypeTextFile() const {
+    QString configured = QString::fromLatin1(DEFAULT_MAVSDK_TYPE_TEXT_FILE);
+    if (m_settings) {
+        configured =
+            m_settings->value(KEY_MAVSDK_TYPE_TEXT_FILE,
+                              DEFAULT_MAVSDK_TYPE_TEXT_FILE).toString().trimmed();
+    }
+    if (configured.isEmpty()) {
+        configured = QString::fromLatin1(DEFAULT_MAVSDK_TYPE_TEXT_FILE);
+    }
+
+    const QFileInfo configuredFile(configured);
+    if (configuredFile.isAbsolute()) {
+        return configuredFile.absoluteFilePath();
+    }
+
+    QString configDirectory;
+    if (!m_configFilePath.isEmpty()) {
+        configDirectory = QFileInfo(m_configFilePath).absolutePath();
+    } else {
+        configDirectory =
+            QDir(QCoreApplication::applicationDirPath()).filePath("Config");
+    }
+    const QString primaryPath = QDir(configDirectory).filePath(configured);
+    if (QFileInfo::exists(primaryPath) ||
+        configured != QString::fromLatin1(DEFAULT_MAVSDK_TYPE_TEXT_FILE)) {
+        return primaryPath;
+    }
+
+    const QString buildTreePath =
+        QDir(QCoreApplication::applicationDirPath())
+            .filePath(QStringLiteral("../Config/%1").arg(configured));
+    if (QFileInfo::exists(buildTreePath)) {
+        return QFileInfo(buildTreePath).absoluteFilePath();
+    }
+
+    const QString workingDirectoryPath =
+        QDir::current().filePath(QStringLiteral("Config/%1").arg(configured));
+    if (QFileInfo::exists(workingDirectoryPath)) {
+        return QFileInfo(workingDirectoryPath).absoluteFilePath();
+    }
+    return primaryPath;
+}
+
 bool QGCSConfig::timeSyncEnabled() const {
+    if (!m_settings) {
+        return DEFAULT_TIME_SYNC_ENABLED;
+    }
     return m_settings->value(KEY_TIME_SYNC_ENABLED, DEFAULT_TIME_SYNC_ENABLED).toBool();
 }
 
 void QGCSConfig::setTimeSyncEnabled(bool enabled) {
-    m_settings->setValue(KEY_TIME_SYNC_ENABLED, enabled);
+    if (m_settings) {
+        m_settings->setValue(KEY_TIME_SYNC_ENABLED, enabled);
+    }
 }
 
 void QGCSConfig::save() {
@@ -256,6 +337,10 @@ void QGCSConfig::reload() {
 QString QGCSConfig::configFilePath() const { return m_configFilePath; }
 
 void QGCSConfig::initializeDefaults() {
+    if (!m_settings) {
+        return;
+    }
+
     // 如果配置项不存在，则设置默认值
     if (!m_settings->contains(KEY_GCS_SYSTEM_ID)) {
         m_settings->setValue(KEY_GCS_SYSTEM_ID,
@@ -270,6 +355,10 @@ void QGCSConfig::initializeDefaults() {
     }
     if (!m_settings->contains(KEY_MAV_MESSAGE_EXTENSION)) {
         m_settings->setValue(KEY_MAV_MESSAGE_EXTENSION, DEFAULT_MAV_MESSAGE_EXTENSION);
+    }
+    if (!m_settings->contains(KEY_MAVSDK_TYPE_TEXT_FILE)) {
+        m_settings->setValue(KEY_MAVSDK_TYPE_TEXT_FILE,
+                             DEFAULT_MAVSDK_TYPE_TEXT_FILE);
     }
     if (!m_settings->contains(KEY_TIME_SYNC_ENABLED)) {
         m_settings->setValue(KEY_TIME_SYNC_ENABLED, DEFAULT_TIME_SYNC_ENABLED);

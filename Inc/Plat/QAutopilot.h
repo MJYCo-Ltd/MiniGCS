@@ -23,6 +23,7 @@ class MINIGCS_EXPORT QAutopilot : public QPlat
     Q_PROPERTY(QAutopilotStatus status READ status NOTIFY statusChanged)
     Q_PROPERTY(QAutopilotFixedwing fixedwing READ fixedwing NOTIFY fixedwingChanged)
     Q_PROPERTY(double heading READ heading NOTIFY headingChanged)
+    Q_PROPERTY(bool airLineDownloading READ airLineDownloading NOTIFY airLineDownloadingChanged)
     Q_PROPERTY(QAutoVehicleType::Vehicle vehicleType READ vehicleType WRITE setVehicleType NOTIFY vehicleTypeChanged)
     Q_PROPERTY(QAutoVehicleType::Autopilot autopilotType READ autopilotType WRITE setAutopilotType NOTIFY autopilotTypeChanged)
 
@@ -34,6 +35,12 @@ public:
      * @brief 解锁无人机
      */
     void arm();
+
+    /**
+     * @brief 显式下载当前任务航线
+     */
+    Q_INVOKABLE void downloadAirLine();
+    bool airLineDownloading() const { return m_airLineDownloading; }
 
     /**
      * @brief 获取GPS位置
@@ -151,6 +158,18 @@ signals:
      */
     void autopilotTypeChanged(QAutoVehicleType::Autopilot autopilotType);
 
+    /**
+     * @brief 航线下载完成
+     * @note 航点高度为 MAVSDK Mission 提供的相对起飞点高度
+     */
+    void airLineDownloaded(const QList<QGpsPosition> &waypoints);
+
+    /**
+     * @brief 航线下载失败
+     */
+    void airLineDownloadFailed(const QString &reason);
+    void airLineDownloadingChanged(bool downloading);
+
 protected slots:
     void positionUpdate(double dLon, double dLat, float dH);
     void nedUpdate(float dNorth, float dEast, float dDown);
@@ -168,6 +187,10 @@ protected slots:
 protected:
 
     friend class QAutopilotPrivate;
+    void completeAirLineDownload(quint64 requestId,
+                                 const QList<QGpsPosition> &waypoints);
+    void failAirLineDownload(quint64 requestId, const QString &reason);
+    void cancelAirLineDownload();
     /**
      * @brief 获取QAutopilotPrivate指针的辅助方法
      * @return QAutopilotPrivate指针
@@ -183,6 +206,8 @@ protected:
     double m_heading{0.0};  ///< 航向角（度）
     QAutoVehicleType::Vehicle m_vehicleType{QAutoVehicleType::Vehicle_Unknown};  ///< 载具类型
     QAutoVehicleType::Autopilot m_autopilotType{QAutoVehicleType::Autopilot_Unknown};  ///< 自动驾驶仪类型
+    bool m_airLineDownloading{false};
+    quint64 m_airLineDownloadRequestId{0};
 };
 
 #endif // _YTY_QAUTOPILOT_H

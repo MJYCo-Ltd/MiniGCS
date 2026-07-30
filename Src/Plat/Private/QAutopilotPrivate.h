@@ -4,17 +4,7 @@
 #include <mavsdk/plugins/action/action.h>
 #include <mavsdk/plugins/telemetry/telemetry.h>
 #include <mavsdk/plugins/mission/mission.h>
-#include <mavsdk/plugins/mission_raw/mission_raw.h>
 #include "QPlatPrivate.h"
-
-/**
- * @brief 滤波后的位置数据结构
- */
-struct FilteredPosition {
-    double lat;
-    double lon;
-    double P;   // 协方差（简化为标量）
-};
 
 /**
  * @brief QAutopilot的私有实现类
@@ -26,7 +16,7 @@ class QAutopilotPrivate:public QPlatPrivate
 {
 public:
     QAutopilotPrivate(QPlat*pPlat);
-    ~QAutopilotPrivate() override = default;
+    ~QAutopilotPrivate() override;
 
     /**
      * @brief 解锁
@@ -38,29 +28,7 @@ public:
 
     void setTelemetryRate();
 
-    void updateAirLine();
-
-    void downAirLine();
-
-private:
-    /**
-     * @brief 判断是否静止（IMU数值较小时）
-     * @param imu IMU数据
-     * @return 是否静止
-     */
-    bool isStatic(const mavsdk::Telemetry::Imu& imu) const;
-
-    /**
-     * @brief 更新位置滤波器
-     * @param state 滤波状态
-     * @param gps_lat GPS纬度
-     * @param gps_lon GPS经度
-     * @param is_static 是否静止
-     */
-    void updateFilter(FilteredPosition& state,
-                      double gps_lat,
-                      double gps_lon,
-                      bool is_static) const;
+    void downloadAirLine(quint64 requestId);
 
 protected:
     /**
@@ -73,15 +41,6 @@ protected:
     std::unique_ptr<mavsdk::Telemetry> m_telemetry; ///< 遥测插件
     std::unique_ptr<mavsdk::Action>    m_action;
     std::unique_ptr<mavsdk::Mission>   m_mission; /// 任务
-    std::unique_ptr<mavsdk::MissionRaw> m_rawMission;
-    mavsdk::Telemetry::Imu m_lastImu;      ///< 最后一次IMU数据
-    
-    // 位置滤波相关
-    FilteredPosition m_filteredState;       ///< 滤波状态
-    
-    static constexpr double Q_move{0.5};    ///< 运动噪声
-    static constexpr double Q_static{0.01}; ///< 静止噪声
-    static constexpr double R_gps{4.0};     ///< GPS 测量噪声（约 2m²）
 };
 
 #endif // Q_SUTOPILOT_PRIVATE_H

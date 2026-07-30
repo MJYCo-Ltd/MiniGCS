@@ -2,9 +2,9 @@
 #define QPLATPRIVATE_H
 
 #include <QString>
+#include <atomic>
 #include <memory>
 #include <mutex>
-#include <thread>
 #include <mavsdk/system.h>
 #include <mavsdk/plugins/mavlink_direct/mavlink_direct.h>
 #include <mavsdk/plugins/info/info.h>
@@ -31,8 +31,9 @@ public:
      */
     QString getFirmwareVersion() const
     {
-        std::scoped_lock lock(m_infoMutex);
-        return m_firmwareVersion;
+        const auto state = m_infoState;
+        std::scoped_lock lock(state->mutex);
+        return state->firmwareVersion;
     }
 
     /**
@@ -41,8 +42,9 @@ public:
      */
     QString getSoftwareVersion() const
     {
-        std::scoped_lock lock(m_infoMutex);
-        return m_softwareVersion;
+        const auto state = m_infoState;
+        std::scoped_lock lock(state->mutex);
+        return state->softwareVersion;
     }
 
     /**
@@ -70,31 +72,32 @@ public:
     virtual void setupMessageHandling();
 
 private:
-    void stopBackgroundTasks();
-
     /**
      * @brief 更新版本信息（通过 Info 插件）
      */
     void updateVersionInfo();
 
 protected:
+    struct InfoState {
+        mutable std::mutex mutex;
+        QString firmwareVersion{"Unknown"};
+        QString softwareVersion{"Unknown"};
+        std::atomic_bool active{true};
+        std::atomic_bool updateRunning{false};
+    };
+
     QPlat*  q_ptr;
-    mutable std::mutex m_infoMutex;
-    QString m_firmwareVersion;              ///< 固件版本
-    QString m_softwareVersion;              ///< 软件版本
+    std::shared_ptr<InfoState> m_infoState;
     
     // MAVSDK相关
     std::shared_ptr<mavsdk::System> m_pSystem; ///< 系统对象
-    std::unique_ptr<mavsdk::Info> m_pInfo;     ///< 信息插件
+    std::shared_ptr<mavsdk::Info> m_pInfo;     ///< 信息插件
     std::unique_ptr<mavsdk::Param> m_pParam;
-    std::unique_ptr<mavsdk::MavlinkDirect> m_pMavlinkDirect;
+    std::shared_ptr<mavsdk::MavlinkDirect> m_pMavlinkDirect;
 
     mavsdk::System::IsConnectedHandle m_hConntecd;
     mavsdk::System::ComponentDiscoveredHandle m_hCommonpentDiscovered;
-
-    std::mutex m_backgroundTasksMutex;
-    std::jthread m_loadCustomXmlThread;
-    std::jthread m_updateVersionThread;
+    mavsdk::MavlinkDirect::MessageHandle m_statusTextHandle;
 };
 
 #endif // QPLATPRIVATE_H

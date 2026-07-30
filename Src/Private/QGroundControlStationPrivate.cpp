@@ -129,39 +129,49 @@ void QGroundControlStationPrivate::setupConnectionErrorHandling(QObject* parent)
     QPointer<QGroundControlStation> station =
         qobject_cast<QGroundControlStation *>(parent);
     m_connectionErrorHandle = m_mavsdk->subscribe_connection_errors(
-        [this, station](mavsdk::Mavsdk::ConnectionError error) {
+        [station](mavsdk::Mavsdk::ConnectionError error) {
         if (!station) {
             return;
         }
 
-        QMetaObject::invokeMethod(station, [this, station, error]() {
-            if (!station || !m_mavsdk) {
+        QMetaObject::invokeMethod(station, [station, error]() {
+            if (!station || !station->d_ptr) {
                 return;
             }
-
-            const QString description =
-                QString::fromStdString(error.error_description);
-            QString connectionString;
-            for (auto it = m_connectionHandles.begin();
-                 it != m_connectionHandles.end(); ++it) {
-                if (it->second == error.connection_handle) {
-                    connectionString = QString::fromStdString(it->first);
-                    break;
-                }
-            }
-
-            if (!connectionString.isEmpty()) {
-                removeConnection(connectionString);
-            } else {
-                m_mavsdk->remove_connection(error.connection_handle);
-            }
-            if (!connectionString.isEmpty() && station->linkManager()) {
-                station->linkManager()->handleConnectionError(connectionString,
-                                                              description);
-            }
-            emit station->mavConnectionError(description);
+            station->d_ptr->handleConnectionError(error, station);
         }, Qt::QueuedConnection);
     });
+}
+
+void QGroundControlStationPrivate::handleConnectionError(
+    const mavsdk::Mavsdk::ConnectionError &error,
+    QGroundControlStation *station)
+{
+    if (!m_mavsdk || !station) {
+        return;
+    }
+
+    const QString description =
+        QString::fromStdString(error.error_description);
+    QString connectionString;
+    for (auto it = m_connectionHandles.begin();
+         it != m_connectionHandles.end(); ++it) {
+        if (it->second == error.connection_handle) {
+            connectionString = QString::fromStdString(it->first);
+            break;
+        }
+    }
+
+    if (!connectionString.isEmpty()) {
+        removeConnection(connectionString);
+    } else {
+        m_mavsdk->remove_connection(error.connection_handle);
+    }
+    if (!connectionString.isEmpty() && station->linkManager()) {
+        station->linkManager()->handleConnectionError(connectionString,
+                                                      description);
+    }
+    emit station->mavConnectionError(description);
 }
 
 void QGroundControlStationPrivate::setupNewSystemDiscoveryCallback(
@@ -174,11 +184,22 @@ void QGroundControlStationPrivate::setupNewSystemDiscoveryCallback(
         m_mavsdk->unsubscribe_on_new_system(m_newSystemHandle);
     }
 
+    QPointer<QGroundControlStation> station =
+        qobject_cast<QGroundControlStation *>(parent);
+    std::weak_ptr<mavsdk::Mavsdk> weakMavsdk = m_mavsdk;
+
     // 订阅新系统发现
-    m_newSystemHandle = m_mavsdk->subscribe_on_new_system([this, parent]() {
-        QMetaObject::invokeMethod(parent, [this, parent]() {
+    m_newSystemHandle = m_mavsdk->subscribe_on_new_system([station, weakMavsdk]() {
+        if (!station) {
+            return;
+        }
+        QMetaObject::invokeMethod(station, [station, weakMavsdk]() {
+            const auto mavsdk = weakMavsdk.lock();
+            if (!station || !mavsdk) {
+                return;
+            }
             // 获取所有系统
-            auto systems = m_mavsdk->systems();
+            auto systems = mavsdk->systems();
 
             // 检查是否有新系统
             for (auto system : systems) {
@@ -186,10 +207,9 @@ void QGroundControlStationPrivate::setupNewSystemDiscoveryCallback(
                 if (system->is_connected()) {
                     uint8_t systemId = system->get_system_id();
                     bool bHaveAutopilot = system->has_autopilot();
-                    QGroundControlStation *pQGCS =
-                        qobject_cast<QGroundControlStation *>(parent);
-                    if (nullptr != pQGCS) {
-                        QPlat *pPlat = pQGCS->getOrCreatePlat(systemId, bHaveAutopilot);
+                    if (station) {
+                        QPlat *pPlat =
+                            station->getOrCreatePlat(systemId, bHaveAutopilot);
                         /// 如果平台的Private 指针没有设置 或者 Private的
                         /// system与现在的不一致
                         if (nullptr == pPlat->d_ptr.get() ||
@@ -204,8 +224,7 @@ void QGroundControlStationPrivate::setupNewSystemDiscoveryCallback(
                                 pPlat->SetPrivate(localQPlatPrivate);
                             }
                             /// 发送信号给qt
-                            QMetaObject::invokeMethod(parent, "newPlatFind",
-                                                      Q_ARG(QPlat *, pPlat));
+                            emit station->newPlatFind(pPlat);
                         }
                     }
                 }
@@ -235,13 +254,17 @@ void QGroundControlStationPrivate::setupRawBytesToBeSentCallback(
     // 订阅需要发送的原始字节
     // MAVSDK 回调可能在非主线程中执行，需要通过 QMetaObject::invokeMethod
     // 确保在主线程中执行
+    QPointer<QObject> context(parent);
     m_rawBytesHandle = m_mavsdk->subscribe_raw_bytes_to_be_sent(
-        [callback, parent](const char *bytes, size_t length) {
+        [callback, context](const char *bytes, size_t length) {
             if (bytes && length > 0) {
                 QByteArray data(bytes, static_cast<int>(length));
+                if (!context) {
+                    return;
+                }
                 // 通过 QMetaObject::invokeMethod 确保在主线程中执行 callback
-                QMetaObject::invokeMethod(parent, [callback, data]() {
-                    if (callback) {
+                QMetaObject::invokeMethod(context, [callback, context, data]() {
+                    if (context && callback) {
                         callback(data);
                     }
                 });
@@ -286,13 +309,13 @@ bool QGroundControlStationPrivate::addRawConnection(QDataLink *rawDataLink)
     }
     m_connectionHandles["raw://"] = result.second;
     m_rawDataLink = rawDataLink;
+    const QPointer<QDataLink> link = m_rawDataLink;
 
     unsubscribeRawBytesToBeSent();
     m_rawBytesHandle = m_mavsdk->subscribe_raw_bytes_to_be_sent(
-        [this](const char *bytes, size_t length) {
-            if (bytes && length > 0 && m_rawDataLink) {
+        [link](const char *bytes, size_t length) {
+            if (bytes && length > 0 && link) {
                 QByteArray data(bytes, static_cast<int>(length));
-                QDataLink *link = m_rawDataLink;
                 QMetaObject::invokeMethod(link, "emitRawDataReceived",
                     Qt::QueuedConnection, Q_ARG(QByteArray, data));
             }

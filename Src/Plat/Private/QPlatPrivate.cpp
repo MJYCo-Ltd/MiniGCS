@@ -1,22 +1,29 @@
 #include <QFile>
 #include <QDebug>
+#include <QPointer>
+#include <QThreadPool>
 #include <sstream>
-#include <thread>
 #include <utility>
 #include <QJsonDocument>
 #include <QJsonObject>
 
 #include "Private/QGCSLog.h"
+#include "Private/QMavsdkTextCatalog.h"
 #include "QGCSConfig.h"
 #include "Plat/Private/QPlatPrivate.h"
 #include "Plat/QPlat.h"
 
 QPlatPrivate::QPlatPrivate(QPlat *pPlat)
-    : q_ptr(pPlat), m_firmwareVersion("Unknown"), m_softwareVersion("Unknown") {
+    : q_ptr(pPlat), m_infoState(std::make_shared<InfoState>()) {
 }
 
 QPlatPrivate::~QPlatPrivate()
 {
+    m_infoState->active = false;
+    if (m_pMavlinkDirect && m_statusTextHandle.valid()) {
+        m_pMavlinkDirect->unsubscribe_message(m_statusTextHandle);
+        m_statusTextHandle = {};
+    }
     if (m_pSystem) {
         if (m_hConntecd.valid()) {
             m_pSystem->unsubscribe_is_connected(m_hConntecd);
@@ -27,23 +34,13 @@ QPlatPrivate::~QPlatPrivate()
             m_hCommonpentDiscovered = {};
         }
     }
-    stopBackgroundTasks();
-}
-
-void QPlatPrivate::stopBackgroundTasks()
-{
-    std::scoped_lock lock(m_backgroundTasksMutex);
-    if (m_loadCustomXmlThread.joinable()) {
-        m_loadCustomXmlThread.request_stop();
-        m_loadCustomXmlThread.join();
-    }
-    if (m_updateVersionThread.joinable()) {
-        m_updateVersionThread.request_stop();
-        m_updateVersionThread.join();
-    }
 }
 
 QString QPlatPrivate::toString() const {
+    if (!m_pSystem) {
+        return QStringLiteral("QPlatInfo: uninitialized");
+    }
+
     std::ostringstream oss;
     const QString firmwareVersion = getFirmwareVersion();
     const QString softwareVersion = getSoftwareVersion();
@@ -53,7 +50,8 @@ QString QPlatPrivate::toString() const {
         << "\r\nfirmwareVersion=" << firmwareVersion.toStdString()
         << "\r\nsoftwareVersion=" << softwareVersion.toStdString()
         << "\r\nhasCamera=" << (m_pSystem->has_camera() ? "true" : "false")
-        << "\r\nhas" << m_pSystem->has_gimbal() << "\r\ncomponentIds=[";
+        << "\r\nhasGimbal=" << (m_pSystem->has_gimbal() ? "true" : "false")
+        << "\r\ncomponentIds=[";
 
     for (auto one : m_pSystem->component_ids()) {
         oss << one << ',';
@@ -65,10 +63,15 @@ QString QPlatPrivate::toString() const {
 
 template<>struct fmt::formatter<mavsdk::MavlinkDirect::Result>:ostream_formatter{};
 void QPlatPrivate::setSystem(std::shared_ptr<mavsdk::System> system) {
-    stopBackgroundTasks();
+    m_infoState->active = false;
+    m_infoState = std::make_shared<InfoState>();
 
     /// 如果原来的system 不为空，取消订阅
     if (nullptr != m_pSystem) {
+        if (m_pMavlinkDirect && m_statusTextHandle.valid()) {
+            m_pMavlinkDirect->unsubscribe_message(m_statusTextHandle);
+            m_statusTextHandle = {};
+        }
         if (m_hConntecd.valid()) {
             m_pSystem->unsubscribe_is_connected(m_hConntecd);
             m_hConntecd = {};
@@ -79,27 +82,34 @@ void QPlatPrivate::setSystem(std::shared_ptr<mavsdk::System> system) {
         }
     }
     m_pSystem = system;
+    if (!m_pSystem) {
+        m_pInfo.reset();
+        m_pParam.reset();
+        m_pMavlinkDirect.reset();
+        return;
+    }
 
     /// 根据配置文件配置是否开启时间同步
     if(QGCSConfig::instance()->timeSyncEnabled()){
         m_pSystem->enable_timesync();
     }
     // 创建插件实例
-    m_pInfo = std::make_unique<mavsdk::Info>(*system);
+    m_pInfo = std::make_shared<mavsdk::Info>(*system);
     m_pParam = std::make_unique<mavsdk::Param>(*system);
-    m_pMavlinkDirect = std::make_unique<mavsdk::MavlinkDirect>(*system);
+    m_pMavlinkDirect = std::make_shared<mavsdk::MavlinkDirect>(*system);
 
-    m_pMavlinkDirect->subscribe_message(
-        "STATUSTEXT", [this](mavsdk::MavlinkDirect::MavlinkMessage msg) {
+    const QPointer<QPlat> plat(q_ptr);
+    m_statusTextHandle = m_pMavlinkDirect->subscribe_message(
+        "STATUSTEXT", [plat](mavsdk::MavlinkDirect::MavlinkMessage msg) {
             QJsonParseError err;
             QJsonDocument doc =
                 QJsonDocument::fromJson(msg.fields_json.c_str(), &err);
             if (err.error != QJsonParseError::NoError || !doc.isObject())
                 return;
             const QJsonObject obj = doc.object();
-            if (obj.value("severity").toInt() < 5) {
+            if (plat && obj.value("severity").toInt() < 5) {
                 QMetaObject::invokeMethod(
-                    q_ptr, "errorInfo", Qt::QueuedConnection,
+                    plat, "errorInfo", Qt::QueuedConnection,
                     Q_ARG(QString, obj.value("text").toString()));
             }
         });
@@ -110,11 +120,13 @@ void QPlatPrivate::setSystem(std::shared_ptr<mavsdk::System> system) {
     QFile file(QGCSConfig::instance()->mavMessageExtension());
     if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         std::string fileInfo = file.readAll().toStdString();
-        std::scoped_lock lock(m_backgroundTasksMutex);
-        m_loadCustomXmlThread = std::jthread([this, fileInfo]() {
-            auto result = m_pMavlinkDirect->load_custom_xml(fileInfo);
+        const auto mavlinkDirect = m_pMavlinkDirect;
+        const auto currentSystem = m_pSystem;
+        QThreadPool::globalInstance()->start(
+            [mavlinkDirect, currentSystem, fileInfo = std::move(fileInfo)]() {
+            auto result = mavlinkDirect->load_custom_xml(fileInfo);
             if (mavsdk::MavlinkDirect::Result::Success != result) {
-                spdlog::error(PLAT_FMT_STR, m_pSystem->get_system_id(),
+                spdlog::error(PLAT_FMT_STR, currentSystem->get_system_id(),
                               "load_custom_xml", result);
             }
         });
@@ -133,20 +145,19 @@ void QPlatPrivate::setupMessageHandling() {
     }
 
     // 订阅系统连接状态变化
-    m_hConntecd = m_pSystem->subscribe_is_connected([this](bool isConnected) {
+    const QPointer<QPlat> plat(q_ptr);
+    m_hConntecd = m_pSystem->subscribe_is_connected([plat](bool isConnected) {
         // 发射连接状态变化信号
-        QMetaObject::invokeMethod(q_ptr, "connectionStatusChanged",
-                                  Qt::QueuedConnection, Q_ARG(bool, isConnected));
-        
-        // 连接时更新版本信息
-        if (isConnected) {
-            updateVersionInfo();
+        if (plat) {
+            QMetaObject::invokeMethod(plat, "connectionStatusChanged",
+                                      Qt::QueuedConnection,
+                                      Q_ARG(bool, isConnected));
         }
     });
 
     // 订阅组件发现
     m_hCommonpentDiscovered = m_pSystem->subscribe_component_discovered(
-        [this](mavsdk::ComponentType componentType) {
+        [](mavsdk::ComponentType componentType) {
             // 这里可以处理新组件发现
             qDebug() << "QVehiclePrivate: Component discovered:"
                      << static_cast<int>(componentType);
@@ -162,39 +173,31 @@ void QPlatPrivate::updateVersionInfo() {
         return;
     }
     
-    // 后台获取版本信息；任务由本对象持有并在析构前等待结束。
-    std::scoped_lock lock(m_backgroundTasksMutex);
-    if (m_updateVersionThread.joinable()) {
-        m_updateVersionThread.request_stop();
-        m_updateVersionThread.join();
+    const auto state = m_infoState;
+    bool expected = false;
+    if (!state->updateRunning.compare_exchange_strong(expected, true)) {
+        return;
     }
-    m_updateVersionThread = std::jthread([this]() {
+    const auto info = m_pInfo;
+    const auto currentSystem = m_pSystem;
+    const QPointer<QPlat> plat(q_ptr);
+
+    QThreadPool::globalInstance()->start([state, info, currentSystem, plat]() {
         bool bUpdate=false;
         QString softwareVersion = "Unknown";
         QString firmwareVersion = "Unknown";
 
         // 获取版本信息
-        auto version_result = m_pInfo->get_version();
+        auto version_result = info->get_version();
         if (version_result.first == mavsdk::Info::Result::Success) {
             auto version = version_result.second;
 
-            spdlog::info(PLAT_FMT_STR, m_pSystem->get_system_id(),
+            spdlog::info(PLAT_FMT_STR, currentSystem->get_system_id(),
                          "version", version);
             
-            auto typeToString = [version](mavsdk::Info::Version::FlightSoftwareVersionType t) {
-                switch (t) {
-                case mavsdk::Info::Version::FlightSoftwareVersionType::Alpha:   return "Alpha";
-                case mavsdk::Info::Version::FlightSoftwareVersionType::Beta:    return "Beta";
-                case mavsdk::Info::Version::FlightSoftwareVersionType::Release: return "Release";
-                case mavsdk::Info::Version::FlightSoftwareVersionType::Dev:  return "Dev";
-                case mavsdk::Info::Version::FlightSoftwareVersionType::Rc:  return "Rc";
-                default: return "Unknown";
-                }
-            };
-
             softwareVersion =
                 QString("Flight SW: v%1.%2.%3 (Vendor v%4.%5.%6, git %7, %8)"
-                        "OS SW: v%9.%10.%11 (git %12)")
+                        "; OS SW: v%9.%10.%11 (git %12)")
                     .arg(version.flight_sw_major)
                     .arg(version.flight_sw_minor)
                     .arg(version.flight_sw_patch)
@@ -202,23 +205,25 @@ void QPlatPrivate::updateVersionInfo() {
                     .arg(version.flight_sw_vendor_minor)
                     .arg(version.flight_sw_vendor_patch)
                     .arg(QString::fromStdString(version.flight_sw_git_hash))
-                    .arg(typeToString(version.flight_sw_version_type))
+                    .arg(QMavsdkTextCatalog::text(
+                        QStringLiteral("flightSoftwareVersionType"),
+                        static_cast<int>(version.flight_sw_version_type)))
                     .arg(version.os_sw_major)
                     .arg(version.os_sw_minor)
                     .arg(version.os_sw_patch)
                     .arg(QString::fromStdString(version.os_sw_git_hash));
             bUpdate = true;
         } else {
-            spdlog::warn(PLAT_FMT_STR, m_pSystem->get_system_id(),
+            spdlog::warn(PLAT_FMT_STR, currentSystem->get_system_id(),
                         "get_version", version_result.first);
         }
 
         // 获取产品信息
-        auto product_result = m_pInfo->get_product();
+        auto product_result = info->get_product();
         if (product_result.first == mavsdk::Info::Result::Success) {
             auto product = product_result.second;
             
-            spdlog::info(PLAT_FMT_STR, m_pSystem->get_system_id(),
+            spdlog::info(PLAT_FMT_STR, currentSystem->get_system_id(),
                          "product", product);
             
             // 构建产品信息字符串
@@ -241,18 +246,19 @@ void QPlatPrivate::updateVersionInfo() {
             }
             bUpdate = true;
         } else {
-            spdlog::warn(PLAT_FMT_STR, m_pSystem->get_system_id(),
+            spdlog::warn(PLAT_FMT_STR, currentSystem->get_system_id(),
                         "get_product", product_result.first);
         }
 
-        {
-            std::scoped_lock infoLock(m_infoMutex);
-            m_softwareVersion = std::move(softwareVersion);
-            m_firmwareVersion = std::move(firmwareVersion);
+        if (state->active) {
+            std::scoped_lock infoLock(state->mutex);
+            state->softwareVersion = std::move(softwareVersion);
+            state->firmwareVersion = std::move(firmwareVersion);
         }
+        state->updateRunning = false;
 
-        if(bUpdate){
-            QMetaObject::invokeMethod(q_ptr,"infoUpdated",Qt::QueuedConnection);
+        if (bUpdate && state->active && plat) {
+            QMetaObject::invokeMethod(plat, "infoUpdated", Qt::QueuedConnection);
         }
     });
 }

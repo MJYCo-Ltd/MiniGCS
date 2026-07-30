@@ -10,7 +10,8 @@ QPlat::QPlat(QObject *parent)
 
 void QPlat::SetPrivate(QPlatPrivate *pPlatPrivate) {
     d_ptr.reset(pPlatPrivate);
-    connect(this, &QPlat::connectionStatusChanged, this, &QPlat::updateConnection);
+    connect(this, &QPlat::connectionStatusChanged,
+            this, &QPlat::updateConnection, Qt::UniqueConnection);
     d_ptr->setupMessageHandling();
 }
 

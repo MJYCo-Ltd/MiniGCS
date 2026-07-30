@@ -1,9 +1,13 @@
 #include "Plat/QAutopilotStatus.h"
+#include "Private/QMavsdkTextCatalog.h"
 #include <QtGlobal>
 
 // QAutopilotStatus 实现
 QAutopilotStatus::QAutopilotStatus()
-    : m_gpsCount(0), m_gpsStatus("未知"), m_batteryVoltage(0.0f),
+    : m_gpsCount(0),
+      m_gpsStatus(QMavsdkTextCatalog::text(
+          QStringLiteral("gpsFixType"), -1)),
+      m_batteryVoltage(0.0f),
       m_batteryRemaining(0.0f)
 {
 }
@@ -11,7 +15,7 @@ QAutopilotStatus::QAutopilotStatus()
 QAutopilotStatus::QAutopilotStatus(int gpsCount, const QString &gpsStatus, float batteryVoltage,
                                    float batteryRemaining, bool rcConnected)
     : m_gpsCount(gpsCount), m_gpsStatus(gpsStatus), m_batteryVoltage(batteryVoltage),
-      m_batteryRemaining(batteryRemaining)
+      m_batteryRemaining(batteryRemaining), m_rcIsAvailable(rcConnected)
 {
 }
 

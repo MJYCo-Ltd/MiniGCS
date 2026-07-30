@@ -19,7 +19,7 @@ class MINIGCS_EXPORT QDataLink : public QObject
     Q_OBJECT
     Q_PROPERTY(int reconnectCount READ reconnectCount WRITE setReconnectCount NOTIFY reconnectCountChanged)
     Q_PROPERTY(bool autoReconnect READ autoReconnect WRITE setAutoReconnect NOTIFY autoReconnectChanged)
-    Q_PROPERTY(bool connected READ isConnected NOTIFY connectionStatusChanged)
+    Q_PROPERTY(bool opened READ isOpened NOTIFY openStatusChanged)
     Q_PROPERTY(int reconnectAttempts READ reconnectAttempts NOTIFY reconnectAttemptsChanged)
     Q_PROPERTY(LinkKind linkKind READ linkKind CONSTANT)
     Q_PROPERTY(QString connectionString READ connectionString CONSTANT)
@@ -39,7 +39,7 @@ public:
     bool autoReconnect() const { return m_autoReconnect; }
     void setAutoReconnect(bool enable);
 
-    bool isConnected() const { return m_connected; }
+    bool isOpened() const { return m_opened; }
     int reconnectAttempts() const { return m_reconnectAttempts; }
 
     /**
@@ -48,7 +48,7 @@ public:
      * @param length 数据长度
      * @return 是否发送成功
      */
-    Q_INVOKABLE bool sendRawData(const char *data, int length);
+    bool sendRawData(const char *data, int length);
 
     /**
      * @brief 发送原始数据（QByteArray 重载）
@@ -58,7 +58,7 @@ public:
 signals:
     void reconnectCountChanged();
     void autoReconnectChanged();
-    void connectionStatusChanged(bool connected);
+    void openStatusChanged(bool opened);
     void reconnectAttemptsChanged(int attempts);
 
     /**
@@ -73,14 +73,14 @@ private slots:
 
 private:
     friend class QLinkManagerPrivate;
-    void setConnected(bool connected);
+    void setOpened(bool opened);
     void setReconnectAttempts(int attempts);
 
     LinkKind m_linkKind;
     QString m_connectionString;
     int m_reconnectCount{0};
     bool m_autoReconnect{false};
-    bool m_connected{true};
+    bool m_opened{true};
     int m_reconnectAttempts{0};
 };
 

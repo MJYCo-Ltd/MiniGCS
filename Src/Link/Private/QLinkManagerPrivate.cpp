@@ -9,15 +9,20 @@ QString QLinkManagerPrivate::buildConnectionString(LinkKind type, const LinkPara
 {
     switch (type) {
     case LinkKind::TcpServer:
+        if (params.port == 0) return {};
         return QString("tcpin://0.0.0.0:%1").arg(params.port);
     case LinkKind::TcpClient:
-        return QString("tcpout://%1:%2").arg(params.hostName).arg(params.port);
+        if (params.hostName.trimmed().isEmpty() || params.port == 0) return {};
+        return QString("tcpout://%1:%2").arg(params.hostName.trimmed()).arg(params.port);
     case LinkKind::UdpServer:
+        if (params.port == 0) return {};
         return QString("udpin://0.0.0.0:%1").arg(params.port);
     case LinkKind::UdpClient:
-        return QString("udpout://%1:%2").arg(params.hostName).arg(params.port);
+        if (params.hostName.trimmed().isEmpty() || params.port == 0) return {};
+        return QString("udpout://%1:%2").arg(params.hostName.trimmed()).arg(params.port);
     case LinkKind::Serial:
-        return QString("serial://%1:%2").arg(params.portName).arg(params.baudRate);
+        if (params.portName.trimmed().isEmpty() || params.baudRate <= 0) return {};
+        return QString("serial://%1:%2").arg(params.portName.trimmed()).arg(params.baudRate);
     case LinkKind::Raw:
         return QString("raw://");
     default:
@@ -60,6 +65,7 @@ QDataLink *QLinkManagerPrivate::addConnection(LinkKind type, const QString &conn
                          [this, connStr, link]() {
             if (m_connections.value(connStr).data() == link) {
                 m_connections.remove(connStr);
+                invalidateReconnect(connStr);
             }
         });
     }
@@ -79,6 +85,7 @@ bool QLinkManagerPrivate::openConnection(QDataLink *link)
 
 void QLinkManagerPrivate::removeConnection(const QString &connStr)
 {
+    invalidateReconnect(connStr);
     auto it = m_connections.find(connStr);
     if (it != m_connections.end()) {
         QPointer<QDataLink> link = it.value();
@@ -114,28 +121,40 @@ void QLinkManagerPrivate::handleConnectionError(const QString &connStr,
         return;
     }
 
-    link->setConnected(false);
-    link->setReconnectAttempts(0);
+    link->setOpened(false);
     if (m_owner) {
         emit m_owner->linkConnectionError(link, reason);
     }
 
-    if (link->autoReconnect()) {
-        scheduleReconnect(connStr, reason);
+    if (!link->autoReconnect()) {
+        invalidateReconnect(connStr);
+        return;
+    }
+    if (!m_pendingReconnects.contains(connStr)) {
+        link->setReconnectAttempts(0);
+        const quint64 generation = m_reconnectGenerations.value(connStr) + 1;
+        m_reconnectGenerations.insert(connStr, generation);
+        m_pendingReconnects.insert(connStr);
+        scheduleReconnect(connStr, reason, generation);
     }
 }
 
 void QLinkManagerPrivate::scheduleReconnect(const QString &connStr,
-                                            const QString &lastError)
+                                            const QString &lastError,
+                                            quint64 generation)
 {
     QPointer<QDataLink> link = m_connections.value(connStr);
-    if (!link || !link->autoReconnect() || !m_owner) {
+    if (!link || !link->autoReconnect() || !m_owner ||
+        !m_pendingReconnects.contains(connStr) ||
+        m_reconnectGenerations.value(connStr) != generation) {
+        m_pendingReconnects.remove(connStr);
         return;
     }
 
     const int nextAttempt = link->reconnectAttempts() + 1;
     const int maxAttempts = link->reconnectCount();
     if (maxAttempts > 0 && nextAttempt > maxAttempts) {
+        m_pendingReconnects.remove(connStr);
         emit m_owner->linkReconnectFailed(link, lastError);
         return;
     }
@@ -146,23 +165,34 @@ void QLinkManagerPrivate::scheduleReconnect(const QString &connStr,
     QPointer<QLinkManager> owner = m_owner;
 
     QTimer::singleShot(delayMs, owner.data(),
-                       [this, owner, link, connStr, lastError]() {
+                       [this, owner, link, connStr, lastError, generation]() {
         if (!owner || !link ||
-            m_connections.value(connStr).data() != link.data()) {
+            m_connections.value(connStr).data() != link.data() ||
+            !m_pendingReconnects.contains(connStr) ||
+            m_reconnectGenerations.value(connStr) != generation) {
             return;
         }
         if (!link->autoReconnect()) {
             link->setReconnectAttempts(0);
+            m_pendingReconnects.remove(connStr);
             return;
         }
 
         if (openConnection(link)) {
             link->setReconnectAttempts(0);
-            link->setConnected(true);
+            link->setOpened(true);
+            m_pendingReconnects.remove(connStr);
             emit owner->linkReconnected(link);
             return;
         }
 
-        scheduleReconnect(connStr, lastError);
+        scheduleReconnect(connStr, lastError, generation);
     });
+}
+
+void QLinkManagerPrivate::invalidateReconnect(const QString &connStr)
+{
+    m_pendingReconnects.remove(connStr);
+    m_reconnectGenerations.insert(
+        connStr, m_reconnectGenerations.value(connStr) + 1);
 }

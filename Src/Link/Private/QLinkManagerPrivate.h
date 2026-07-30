@@ -5,6 +5,7 @@
 #include <QString>
 #include <QMap>
 #include <QPointer>
+#include <QSet>
 
 class QGroundControlStation;
 class QDataLink;
@@ -32,11 +33,15 @@ public:
 
 private:
     bool openConnection(QDataLink *link);
-    void scheduleReconnect(const QString &connStr, const QString &lastError);
+    void scheduleReconnect(const QString &connStr, const QString &lastError,
+                           quint64 generation);
+    void invalidateReconnect(const QString &connStr);
 
     QPointer<QLinkManager> m_owner;
     QPointer<QGroundControlStation> m_groundStation;
     QMap<QString, QPointer<QDataLink>> m_connections;  ///< connStr -> QDataLink
+    QMap<QString, quint64> m_reconnectGenerations;
+    QSet<QString> m_pendingReconnects;
 };
 
 #endif // QLINKMANAGERPRIVATE_H

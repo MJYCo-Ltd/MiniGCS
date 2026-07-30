@@ -40,7 +40,9 @@ void QGroundControlStation::ClearAllLinks()
 
 bool QGroundControlStation::feedRawData(const char *data, int length)
 {
-    if (!d_ptr || !data || length <= 0) return false;
+    if (!d_ptr || !d_ptr->mavsdk() || !data || length <= 0) {
+        return false;
+    }
     d_ptr->processReceivedRawData(QByteArray(data, length));
     return true;
 }

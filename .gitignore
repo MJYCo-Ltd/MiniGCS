@@ -42,6 +42,7 @@
 .qtcreator
 .vs
 *.json
+!Config/*.json
 Depends
 build
 out

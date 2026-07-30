@@ -7,11 +7,11 @@
 #include <QList>
 #include <cstdint>
 #include <memory>
+#include "Link/QLinkManager.h"
 #include "MiniGCSExport.h"
 
 // 前向声明
 class QPlat;
-class QLinkManager;
 
 /**
  * @brief QGroundControlStation类 - 地面控制站类
@@ -19,6 +19,7 @@ class QLinkManager;
 class MINIGCS_EXPORT QGroundControlStation : public QObject
 {
     Q_OBJECT
+    Q_PROPERTY(QLinkManager *linkManager READ linkManager CONSTANT)
 
 public:
     explicit QGroundControlStation(QObject *parent = nullptr);
