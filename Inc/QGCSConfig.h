@@ -78,10 +78,22 @@ public:
     QString mavsdkTypeTextFile() const;
 
     /**
+     * @brief 从 MAVSDK 文本目录读取字符串键对应的文本
+     */
+    QString mavsdkText(const QString &section, const QString &key) const;
+
+    /**
    * @brief 获取是否开启时间同步
    * @return 是否开启时间同步（默认 true）
    */
     bool timeSyncEnabled() const;
+
+    double motionStartHorizontalSpeedMS() const;
+    double motionStartVerticalSpeedMS() const;
+    double motionStopHorizontalSpeedMS() const;
+    double motionStopVerticalSpeedMS() const;
+    int motionStartSampleCount() const;
+    int motionStopSampleCount() const;
 
     /**
    * @brief 设置是否开启时间同步
@@ -104,6 +116,21 @@ public:
    * @return 配置文件路径
    */
     QString configFilePath() const;
+
+signals:
+    /**
+     * @brief warning 及以上级别的格式化日志
+     * @param level spdlog 级别数值
+     * @param message 已格式化的日志文本
+     */
+    void warningLogMessage(int level, const QString &message);
+
+    /**
+     * @brief MAVLink STATUSTEXT 中 warning 及以上级别的固件日志
+     */
+    void firmwareWarningMessage(
+        quint32 systemId, int severity, const QString &message);
+
 protected:
     QGCSConfig(QObject* parent=nullptr);
     virtual ~QGCSConfig();

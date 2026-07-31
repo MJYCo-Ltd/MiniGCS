@@ -1,19 +1,11 @@
 #include "Plat/QAutopilot.h"
 #include "Plat/Private/QAutopilotPrivate.h"
 #include "Private/QMavsdkTextCatalog.h"
+#include "QGCSConfig.h"
 #include <QDateTime>
 #include <QDebug>
 #include <QtGlobal>
 #include <cmath>
-
-namespace {
-constexpr double MotionStartHorizontalMS = 0.7;
-constexpr double MotionStartVerticalMS = 0.5;
-constexpr double MotionStopHorizontalMS = 0.25;
-constexpr double MotionStopVerticalMS = 0.2;
-constexpr int MotionStartSampleCount = 2;
-constexpr int MotionStopSampleCount = 5;
-}
 
 QAutopilot::QAutopilot(QObject *parent)
     : QPlat(parent)
@@ -67,12 +59,14 @@ void QAutopilot::returnToLaunch()
 
 void QAutopilot::downloadAirLine()
 {
-    if (m_airLineDownloading) {
-        emit airLineDownloadFailed(QStringLiteral("航线正在下载"));
+    if (m_airLineDownloading || m_airLineUploading) {
+        emit airLineDownloadFailed(
+            m_airLineUploading ? tr("航线正在上传")
+                               : tr("航线正在下载"));
         return;
     }
     if (!d_func()) {
-        emit airLineDownloadFailed(QStringLiteral("飞控尚未初始化"));
+        emit airLineDownloadFailed(tr("飞控尚未初始化"));
         return;
     }
 
@@ -80,6 +74,43 @@ void QAutopilot::downloadAirLine()
     const quint64 requestId = ++m_airLineDownloadRequestId;
     emit airLineDownloadingChanged(true);
     d_func()->downloadAirLine(requestId);
+}
+
+void QAutopilot::uploadAirLine(const QList<QGpsPosition> &waypoints)
+{
+    if (m_airLineUploading || m_airLineDownloading) {
+        emit airLineUploadFailed(
+            m_airLineDownloading ? tr("航线正在下载")
+                                 : tr("航线正在上传"));
+        return;
+    }
+    if (waypoints.isEmpty()) {
+        emit airLineUploadFailed(tr("航线没有有效航点"));
+        return;
+    }
+    for (qsizetype index = 0; index < waypoints.size(); ++index) {
+        const QGpsPosition &waypoint = waypoints.at(index);
+        const double latitude = waypoint.latitude();
+        const double longitude = waypoint.longitude();
+        const double altitude = waypoint.altitude();
+        if (!std::isfinite(latitude) || !std::isfinite(longitude) ||
+            !std::isfinite(altitude) || latitude < -90.0 ||
+            latitude > 90.0 || longitude < -180.0 ||
+            longitude > 180.0) {
+            emit airLineUploadFailed(
+                tr("第 %1 个航点坐标或高度无效").arg(index + 1));
+            return;
+        }
+    }
+    if (!d_func()) {
+        emit airLineUploadFailed(tr("飞控尚未初始化"));
+        return;
+    }
+
+    m_airLineUploading = true;
+    const quint64 requestId = ++m_airLineUploadRequestId;
+    emit airLineUploadingChanged(true);
+    d_func()->uploadAirLine(requestId, waypoints);
 }
 
 void QAutopilot::completeAirLineDownload(
@@ -114,6 +145,37 @@ void QAutopilot::cancelAirLineDownload()
     emit airLineDownloadingChanged(false);
 }
 
+void QAutopilot::completeAirLineUpload(quint64 requestId)
+{
+    if (requestId != m_airLineUploadRequestId) {
+        return;
+    }
+    m_airLineUploading = false;
+    emit airLineUploadingChanged(false);
+    emit airLineUploaded();
+}
+
+void QAutopilot::failAirLineUpload(quint64 requestId,
+                                   const QString &reason)
+{
+    if (requestId != m_airLineUploadRequestId) {
+        return;
+    }
+    m_airLineUploading = false;
+    emit airLineUploadingChanged(false);
+    emit airLineUploadFailed(reason);
+}
+
+void QAutopilot::cancelAirLineUpload()
+{
+    if (!m_airLineUploading) {
+        return;
+    }
+    ++m_airLineUploadRequestId;
+    m_airLineUploading = false;
+    emit airLineUploadingChanged(false);
+}
+
 void QAutopilot::setHeading(double heading) {
     if (!qFuzzyCompare(m_heading, heading)) {
         m_heading = heading;
@@ -132,6 +194,7 @@ void QAutopilot::setAutopilotType(QAutoVehicleType::Autopilot autopilotType) {
     if (m_autopilotType != autopilotType) {
         m_autopilotType = autopilotType;
         emit autopilotTypeChanged(m_autopilotType);
+        emit autopilotNameChanged();
     }
 }
 
@@ -150,6 +213,11 @@ void QAutopilot::positionUpdate(double dLon, double dLat, float dH) {
         }
         emit gpsPositionChanged(m_gpsPosition);
     }
+}
+
+QString QAutopilot::autopilotName() const
+{
+    return QAutoVehicleType::getAutopilotName(m_autopilotType);
 }
 
 void QAutopilot::nedUpdate(float dNorth, float dEast, float dDown,
@@ -201,21 +269,22 @@ void QAutopilot::inAirUpdate(bool inAir)
 
 void QAutopilot::updateMovingState()
 {
+    const auto *config = QGCSConfig::instance();
     const bool movementCandidate =
         m_inAir ||
-        m_groundSpeedMS >= MotionStartHorizontalMS ||
-        m_verticalSpeedMS >= MotionStartVerticalMS;
+        m_groundSpeedMS >= config->motionStartHorizontalSpeedMS() ||
+        m_verticalSpeedMS >= config->motionStartVerticalSpeedMS();
     const bool stationaryCandidate =
         !m_inAir &&
-        m_groundSpeedMS <= MotionStopHorizontalMS &&
-        m_verticalSpeedMS <= MotionStopVerticalMS;
+        m_groundSpeedMS <= config->motionStopHorizontalSpeedMS() &&
+        m_verticalSpeedMS <= config->motionStopVerticalSpeedMS();
 
     if (!m_moving) {
         m_motionStopSamples = 0;
         if (movementCandidate) {
             ++m_motionStartSamples;
             const int requiredSamples =
-                m_inAir ? 1 : MotionStartSampleCount;
+                m_inAir ? 1 : config->motionStartSampleCount();
             if (m_motionStartSamples >= requiredSamples) {
                 m_moving = true;
                 m_motionStartSamples = 0;
@@ -229,7 +298,7 @@ void QAutopilot::updateMovingState()
     m_motionStartSamples = 0;
     if (stationaryCandidate) {
         ++m_motionStopSamples;
-        if (m_motionStopSamples >= MotionStopSampleCount) {
+        if (m_motionStopSamples >= config->motionStopSampleCount()) {
             m_moving = false;
             m_motionStopSamples = 0;
         }

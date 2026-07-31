@@ -111,6 +111,8 @@ int main(int argc, char *argv[]) {
         new QDroneControlManager(pGroundStation, &app);
     qmlRegisterSingletonInstance(
         "MiniGCS", 1, 0, "DroneControl", droneControl);
+    qmlRegisterSingletonInstance(
+        "MiniGCS", 1, 0, "AppConfig", QTestGCSConfig::instance());
 
     int exitCode = 0;
     {

@@ -208,10 +208,27 @@ autopilot->downloadAirLine();
 可通过 `airLineDownloading` 属性观察下载状态；重复请求会被拒绝。下载结果会
 自动忽略没有有效经纬度或相对高度的非航点任务项。
 
+任务航线可通过同一 `Mission` 插件异步上传：
+
+```cpp
+QList<QGpsPosition> waypoints{
+    QGpsPosition(114.502461, 38.045474, 30.0),
+    QGpsPosition(114.503461, 38.045474, 30.0)
+};
+QObject::connect(autopilot, &QAutopilot::airLineUploaded,
+                 []() { /* 上传成功 */ });
+autopilot->uploadAirLine(waypoints);
+```
+
+可通过 `airLineUploading` 属性及 `airLineUploadFailed` 信号观察上传状态。
+上传与下载互斥，防止对同一个 Mission 插件并发发起任务请求。
+
 ## 日志与配置
 
 - 日志由 **spdlog** 输出，并通过 `QGCSConfig::qtLogHandler` 接管 Qt 的 `qDebug` / `qWarning` 等。
 - 默认日志文件（相对**当前工作目录**）：`data/log/minigcs.log`（按日滚动，保留 7 天）。
+- `QGCSConfig::warningLogMessage` 转发业务 warning 及以上日志；
+  `firmwareWarningMessage` 单独转发 MAVLink `STATUSTEXT` 中 warning 及以上的固件日志。
 - 配置文件路径：`<可执行文件目录>/Config/<applicationName>.ini`（`applicationName` 为空时使用 `MiniGCS.ini`）。
 
 常用 INI 键（节名以代码为准）：
@@ -224,8 +241,14 @@ autopilot->downloadAirLine();
 | `MavMessage/Extension` | `ardupilotmega.xml` | MAV 消息扩展定义 |
 | `Mavsdk/TypeTextFile` | `mavsdk_zh_CN.json` | MAVSDK 类型文本映射文件；相对路径基于配置文件目录 |
 | `TimeSync/Enabled` | `true` | 是否启用时间同步 |
+| `Motion/StartHorizontalSpeedMS` | `0.7` | 判定开始移动的水平速度阈值（m/s） |
+| `Motion/StartVerticalSpeedMS` | `0.5` | 判定开始移动的垂直速度阈值（m/s） |
+| `Motion/StopHorizontalSpeedMS` | `0.25` | 判定停止移动的水平速度阈值（m/s） |
+| `Motion/StopVerticalSpeedMS` | `0.2` | 判定停止移动的垂直速度阈值（m/s） |
+| `Motion/StartSampleCount` | `2` | 开始移动所需连续采样数 |
+| `Motion/StopSampleCount` | `5` | 停止移动所需连续采样数 |
 
-载具类型、飞控类型、GPS 定位状态、固件版本类型和 Mission 返回结果的显示文本均从
+载具类型、飞控类型、机型图标、控制命令名称、GPS 定位状态、固件版本类型和 Mission 返回结果均从
 `Config/mavsdk_zh_CN.json` 读取，不在 C++ 中硬编码。可以复制该文件制作其他
 语言版本，再通过 `Mavsdk/TypeTextFile` 指向新文件；程序会在文件更新时间或
 大小变化后重新加载。
@@ -250,6 +273,8 @@ cmake --build build --target Test
 界面支持按 MAVLink 系统 ID 配置无人机别名、创建编组并维护成员，也可以向
 单机或编组中的在线成员发送解锁、上锁、起飞、降落、返航和任务下载命令。
 无人机别名与编组配置保存在演示程序的 INI 配置文件中。
+地图插件、初始中心、缩放范围以及航点默认/最小/最大高度也可通过演示程序
+INI 文件中的 `Map/*` 与 `Mission/*` 配置项调整。
 
 ---
 

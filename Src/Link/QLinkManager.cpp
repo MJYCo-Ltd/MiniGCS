@@ -21,17 +21,17 @@ QDataLink *QLinkManager::addLink(LinkKind type, const LinkParams &params)
 {
     QString connStr = buildConnectionString(type, params);
     if (connStr.isEmpty()) {
-        emit linkCreateFailed("无效的链路参数");
+        emit linkCreateFailed(tr("无效的链路参数"));
         return nullptr;
     }
     QLinkManagerPrivate *const d = d_func();
     if (d->hasConnection(connStr)) {
-        emit linkCreateFailed(QString("连接已存在: %1").arg(connStr));
+        emit linkCreateFailed(tr("连接已存在: %1").arg(connStr));
         return nullptr;
     }
     QDataLink *link = d->addConnection(type, connStr);
     if (!link) {
-        emit linkCreateFailed("添加链路失败");
+        emit linkCreateFailed(tr("添加链路失败"));
     }
     return link;
 }

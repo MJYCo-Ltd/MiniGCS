@@ -4,6 +4,7 @@
 #include <mavsdk/plugins/action/action.h>
 #include <mavsdk/plugins/telemetry/telemetry.h>
 #include <mavsdk/plugins/mission/mission.h>
+#include "AirLine/QGpsPosition.h"
 #include "QPlatPrivate.h"
 
 /**
@@ -33,6 +34,8 @@ public:
     void setTelemetryRate();
 
     void downloadAirLine(quint64 requestId);
+    void uploadAirLine(quint64 requestId,
+                       const QList<QGpsPosition> &waypoints);
 
 protected:
     void clearTelemetrySubscriptions();

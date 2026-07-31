@@ -61,13 +61,18 @@ void reloadIfChanged(CatalogCache &cache, const QString &path)
 
 QString QMavsdkTextCatalog::text(QStringView section, int value)
 {
+    return text(section, QString::number(value));
+}
+
+QString QMavsdkTextCatalog::text(QStringView section, QStringView key)
+{
     CatalogCache &cache = catalogCache();
     QMutexLocker locker(&cache.mutex);
     reloadIfChanged(cache, QGCSConfig::instance()->mavsdkTypeTextFile());
 
     const QString sectionName = section.toString();
     const QJsonObject entries = cache.root.value(sectionName).toObject();
-    const QJsonValue exact = entries.value(QString::number(value));
+    const QJsonValue exact = entries.value(key.toString());
     if (exact.isString()) {
         return exact.toString();
     }
@@ -76,5 +81,5 @@ QString QMavsdkTextCatalog::text(QStringView section, int value)
     if (fallback.isString()) {
         return fallback.toString();
     }
-    return QStringLiteral("%1(%2)").arg(sectionName).arg(value);
+    return QStringLiteral("%1(%2)").arg(sectionName, key.toString());
 }

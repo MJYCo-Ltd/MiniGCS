@@ -1,5 +1,7 @@
 #include <cmath>
+#include <QCoreApplication>
 #include <QPointer>
+#include <utility>
 
 #include "Plat/Private/QAutopilotPrivate.h"
 #include "Plat/QAutopilot.h"
@@ -11,7 +13,8 @@ void QAutopilotPrivate::downloadAirLine(quint64 requestId)
     if (!m_mission) {
         if (autopilot) {
             autopilot->failAirLineDownload(
-                requestId, QStringLiteral("Mission 插件尚未初始化"));
+                requestId, QCoreApplication::translate(
+                    "QAutopilot", "Mission 插件尚未初始化"));
         }
         return;
     }
@@ -59,6 +62,62 @@ void QAutopilotPrivate::downloadAirLine(quint64 requestId)
             [autopilot, requestId, waypoints]() {
                 if (autopilot) {
                     autopilot->completeAirLineDownload(requestId, waypoints);
+                }
+            },
+            Qt::QueuedConnection);
+    });
+}
+
+void QAutopilotPrivate::uploadAirLine(
+    quint64 requestId, const QList<QGpsPosition> &waypoints)
+{
+    QPointer<QAutopilot> autopilot = q_func();
+    if (!m_mission) {
+        if (autopilot) {
+            autopilot->failAirLineUpload(
+                requestId, QCoreApplication::translate(
+                    "QAutopilot", "Mission 插件尚未初始化"));
+        }
+        return;
+    }
+
+    mavsdk::Mission::MissionPlan missionPlan;
+    missionPlan.mission_items.reserve(
+        static_cast<std::size_t>(waypoints.size()));
+    for (const QGpsPosition &waypoint : waypoints) {
+        mavsdk::Mission::MissionItem item;
+        item.latitude_deg = waypoint.latitude();
+        item.longitude_deg = waypoint.longitude();
+        item.relative_altitude_m = waypoint.altitude();
+        missionPlan.mission_items.push_back(item);
+    }
+
+    m_mission->upload_mission_async(
+        std::move(missionPlan),
+        [autopilot, requestId](mavsdk::Mission::Result result) {
+        if (!autopilot) {
+            return;
+        }
+
+        if (result != mavsdk::Mission::Result::Success) {
+            const QString reason = QMavsdkTextCatalog::text(
+                QStringLiteral("missionResult"), static_cast<int>(result));
+            QMetaObject::invokeMethod(
+                autopilot,
+                [autopilot, requestId, reason]() {
+                    if (autopilot) {
+                        autopilot->failAirLineUpload(requestId, reason);
+                    }
+                },
+                Qt::QueuedConnection);
+            return;
+        }
+
+        QMetaObject::invokeMethod(
+            autopilot,
+            [autopilot, requestId]() {
+                if (autopilot) {
+                    autopilot->completeAirLineUpload(requestId);
                 }
             },
             Qt::QueuedConnection);

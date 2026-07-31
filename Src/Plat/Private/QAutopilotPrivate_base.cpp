@@ -10,6 +10,7 @@ QAutopilotPrivate::~QAutopilotPrivate()
 {
     if (m_mission) {
         m_mission->cancel_mission_download();
+        m_mission->cancel_mission_upload();
     }
     clearTelemetrySubscriptions();
     m_mission.reset();
@@ -30,7 +31,9 @@ const QAutopilot *QAutopilotPrivate::q_func() const {
 void QAutopilotPrivate::setSystem(std::shared_ptr<mavsdk::System> system) {
     if (m_mission) {
         m_mission->cancel_mission_download();
+        m_mission->cancel_mission_upload();
         q_func()->cancelAirLineDownload();
+        q_func()->cancelAirLineUpload();
     }
     clearTelemetrySubscriptions();
     m_mission.reset();

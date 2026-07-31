@@ -8,6 +8,7 @@ class QMavsdkTextCatalog
 {
 public:
     static QString text(QStringView section, int value);
+    static QString text(QStringView section, QStringView key);
 };
 
 #endif // QMAVSDKTEXTCATALOG_H

@@ -49,6 +49,15 @@ public:
 
     Q_INVOKABLE QString mapName() const;
     Q_INVOKABLE void setMapName(const QString &mapName);
+    Q_INVOKABLE double mapCenterLatitude() const;
+    Q_INVOKABLE double mapCenterLongitude() const;
+    Q_INVOKABLE double mapInitialZoom() const;
+    Q_INVOKABLE double mapVehicleZoom() const;
+    Q_INVOKABLE double mapMinimumZoom() const;
+    Q_INVOKABLE double mapMaximumZoom() const;
+    Q_INVOKABLE double missionDefaultAltitude() const;
+    Q_INVOKABLE double missionMinimumAltitude() const;
+    Q_INVOKABLE double missionMaximumAltitude() const;
 
     // ---------- 多链路配置 ----------
     /** 链路数量 */

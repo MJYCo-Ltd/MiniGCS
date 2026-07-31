@@ -82,6 +82,7 @@ public:
      * @return 中文名称
      */
     static QString getAutopilotName(int type);
+
 };
 
 Q_DECLARE_METATYPE(QAutoVehicleType::Vehicle)

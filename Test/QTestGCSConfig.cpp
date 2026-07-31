@@ -4,12 +4,30 @@
 
 namespace {
 const char *KEY_MAP_NAME = "Map/Name";
+const char *KEY_MAP_CENTER_LATITUDE = "Map/CenterLatitude";
+const char *KEY_MAP_CENTER_LONGITUDE = "Map/CenterLongitude";
+const char *KEY_MAP_INITIAL_ZOOM = "Map/InitialZoom";
+const char *KEY_MAP_VEHICLE_ZOOM = "Map/VehicleZoom";
+const char *KEY_MAP_MINIMUM_ZOOM = "Map/MinimumZoom";
+const char *KEY_MAP_MAXIMUM_ZOOM = "Map/MaximumZoom";
+const char *KEY_MISSION_DEFAULT_ALTITUDE = "Mission/DefaultAltitude";
+const char *KEY_MISSION_MINIMUM_ALTITUDE = "Mission/MinimumAltitude";
+const char *KEY_MISSION_MAXIMUM_ALTITUDE = "Mission/MaximumAltitude";
 const char *KEY_LINKS_COUNT = "Links/Count";
 const char *KEY_LINK_GROUP_PREFIX = "Link";
 const char *KEY_DRONE_GROUPS_COUNT = "DroneGroups/Count";
 const char *KEY_DRONE_GROUP_PREFIX = "DroneGroup";
 
-const char *DEFAULT_MAP_NAME = "OpenStreetMap";
+const char *DEFAULT_MAP_NAME = "QGroundControl";
+constexpr double DEFAULT_MAP_CENTER_LATITUDE = 38.045474;
+constexpr double DEFAULT_MAP_CENTER_LONGITUDE = 114.502461;
+constexpr double DEFAULT_MAP_INITIAL_ZOOM = 10.0;
+constexpr double DEFAULT_MAP_VEHICLE_ZOOM = 16.0;
+constexpr double DEFAULT_MAP_MINIMUM_ZOOM = 3.0;
+constexpr double DEFAULT_MAP_MAXIMUM_ZOOM = 18.0;
+constexpr double DEFAULT_MISSION_ALTITUDE = 30.0;
+constexpr double DEFAULT_MISSION_MINIMUM_ALTITUDE = -1000.0;
+constexpr double DEFAULT_MISSION_MAXIMUM_ALTITUDE = 10000.0;
 } // namespace
 
 QTestGCSConfig *QTestGCSConfig::s_instance = nullptr;
@@ -170,6 +188,78 @@ void QTestGCSConfig::saveLinkConfigs()
         m_settings->sync();
 }
 
+double QTestGCSConfig::mapCenterLatitude() const
+{
+    return m_settings
+        ? m_settings->value(KEY_MAP_CENTER_LATITUDE,
+                            DEFAULT_MAP_CENTER_LATITUDE).toDouble()
+        : DEFAULT_MAP_CENTER_LATITUDE;
+}
+
+double QTestGCSConfig::mapCenterLongitude() const
+{
+    return m_settings
+        ? m_settings->value(KEY_MAP_CENTER_LONGITUDE,
+                            DEFAULT_MAP_CENTER_LONGITUDE).toDouble()
+        : DEFAULT_MAP_CENTER_LONGITUDE;
+}
+
+double QTestGCSConfig::mapInitialZoom() const
+{
+    return m_settings
+        ? m_settings->value(KEY_MAP_INITIAL_ZOOM,
+                            DEFAULT_MAP_INITIAL_ZOOM).toDouble()
+        : DEFAULT_MAP_INITIAL_ZOOM;
+}
+
+double QTestGCSConfig::mapVehicleZoom() const
+{
+    return m_settings
+        ? m_settings->value(KEY_MAP_VEHICLE_ZOOM,
+                            DEFAULT_MAP_VEHICLE_ZOOM).toDouble()
+        : DEFAULT_MAP_VEHICLE_ZOOM;
+}
+
+double QTestGCSConfig::mapMinimumZoom() const
+{
+    return m_settings
+        ? m_settings->value(KEY_MAP_MINIMUM_ZOOM,
+                            DEFAULT_MAP_MINIMUM_ZOOM).toDouble()
+        : DEFAULT_MAP_MINIMUM_ZOOM;
+}
+
+double QTestGCSConfig::mapMaximumZoom() const
+{
+    return m_settings
+        ? m_settings->value(KEY_MAP_MAXIMUM_ZOOM,
+                            DEFAULT_MAP_MAXIMUM_ZOOM).toDouble()
+        : DEFAULT_MAP_MAXIMUM_ZOOM;
+}
+
+double QTestGCSConfig::missionDefaultAltitude() const
+{
+    return m_settings
+        ? m_settings->value(KEY_MISSION_DEFAULT_ALTITUDE,
+                            DEFAULT_MISSION_ALTITUDE).toDouble()
+        : DEFAULT_MISSION_ALTITUDE;
+}
+
+double QTestGCSConfig::missionMinimumAltitude() const
+{
+    return m_settings
+        ? m_settings->value(KEY_MISSION_MINIMUM_ALTITUDE,
+                            DEFAULT_MISSION_MINIMUM_ALTITUDE).toDouble()
+        : DEFAULT_MISSION_MINIMUM_ALTITUDE;
+}
+
+double QTestGCSConfig::missionMaximumAltitude() const
+{
+    return m_settings
+        ? m_settings->value(KEY_MISSION_MAXIMUM_ALTITUDE,
+                            DEFAULT_MISSION_MAXIMUM_ALTITUDE).toDouble()
+        : DEFAULT_MISSION_MAXIMUM_ALTITUDE;
+}
+
 QString QTestGCSConfig::droneName(int systemId) const
 {
     if (!m_settings || systemId < 0 || systemId > 255) {
@@ -177,7 +267,7 @@ QString QTestGCSConfig::droneName(int systemId) const
     }
     return m_settings
         ->value(QString("Drones/%1/Name").arg(systemId),
-                QString("无人机 %1").arg(systemId))
+                tr("无人机 %1").arg(systemId))
         .toString();
 }
 
@@ -189,7 +279,7 @@ void QTestGCSConfig::setDroneName(int systemId, const QString &name)
     const QString normalized = name.trimmed();
     m_settings->setValue(
         QString("Drones/%1/Name").arg(systemId),
-        normalized.isEmpty() ? QString("无人机 %1").arg(systemId) : normalized);
+        normalized.isEmpty() ? tr("无人机 %1").arg(systemId) : normalized);
     m_settings->sync();
 }
 
@@ -318,8 +408,46 @@ void QTestGCSConfig::initializeDefaults()
     QGCSConfig::initializeDefaults();
     if (!m_settings)
         return;
-    if (!m_settings->contains(KEY_MAP_NAME)) {
+    const QString configuredMapName =
+        m_settings->value(KEY_MAP_NAME).toString().trimmed();
+    if (!m_settings->contains(KEY_MAP_NAME) || configuredMapName.isEmpty()) {
         m_settings->setValue(KEY_MAP_NAME, DEFAULT_MAP_NAME);
+    }
+    if (!m_settings->contains(KEY_MAP_CENTER_LATITUDE)) {
+        m_settings->setValue(KEY_MAP_CENTER_LATITUDE,
+                             DEFAULT_MAP_CENTER_LATITUDE);
+    }
+    if (!m_settings->contains(KEY_MAP_CENTER_LONGITUDE)) {
+        m_settings->setValue(KEY_MAP_CENTER_LONGITUDE,
+                             DEFAULT_MAP_CENTER_LONGITUDE);
+    }
+    if (!m_settings->contains(KEY_MAP_INITIAL_ZOOM)) {
+        m_settings->setValue(KEY_MAP_INITIAL_ZOOM,
+                             DEFAULT_MAP_INITIAL_ZOOM);
+    }
+    if (!m_settings->contains(KEY_MAP_VEHICLE_ZOOM)) {
+        m_settings->setValue(KEY_MAP_VEHICLE_ZOOM,
+                             DEFAULT_MAP_VEHICLE_ZOOM);
+    }
+    if (!m_settings->contains(KEY_MAP_MINIMUM_ZOOM)) {
+        m_settings->setValue(KEY_MAP_MINIMUM_ZOOM,
+                             DEFAULT_MAP_MINIMUM_ZOOM);
+    }
+    if (!m_settings->contains(KEY_MAP_MAXIMUM_ZOOM)) {
+        m_settings->setValue(KEY_MAP_MAXIMUM_ZOOM,
+                             DEFAULT_MAP_MAXIMUM_ZOOM);
+    }
+    if (!m_settings->contains(KEY_MISSION_DEFAULT_ALTITUDE)) {
+        m_settings->setValue(KEY_MISSION_DEFAULT_ALTITUDE,
+                             DEFAULT_MISSION_ALTITUDE);
+    }
+    if (!m_settings->contains(KEY_MISSION_MINIMUM_ALTITUDE)) {
+        m_settings->setValue(KEY_MISSION_MINIMUM_ALTITUDE,
+                             DEFAULT_MISSION_MINIMUM_ALTITUDE);
+    }
+    if (!m_settings->contains(KEY_MISSION_MAXIMUM_ALTITUDE)) {
+        m_settings->setValue(KEY_MISSION_MAXIMUM_ALTITUDE,
+                             DEFAULT_MISSION_MAXIMUM_ALTITUDE);
     }
     if (!m_settings->contains(KEY_LINKS_COUNT)) {
         m_settings->setValue(KEY_LINKS_COUNT, 0);

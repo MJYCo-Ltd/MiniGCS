@@ -30,8 +30,10 @@ class MINIGCS_EXPORT QAutopilot : public QPlat
     Q_PROPERTY(bool armed READ armed NOTIFY armedChanged)
     Q_PROPERTY(bool inAir READ inAir NOTIFY inAirChanged)
     Q_PROPERTY(bool airLineDownloading READ airLineDownloading NOTIFY airLineDownloadingChanged)
+    Q_PROPERTY(bool airLineUploading READ airLineUploading NOTIFY airLineUploadingChanged)
     Q_PROPERTY(QAutoVehicleType::Vehicle vehicleType READ vehicleType WRITE setVehicleType NOTIFY vehicleTypeChanged)
     Q_PROPERTY(QAutoVehicleType::Autopilot autopilotType READ autopilotType WRITE setAutopilotType NOTIFY autopilotTypeChanged)
+    Q_PROPERTY(QString autopilotName READ autopilotName NOTIFY autopilotNameChanged)
 
 public:
     explicit QAutopilot(QObject *parent = nullptr);
@@ -51,6 +53,13 @@ public:
      */
     Q_INVOKABLE void downloadAirLine();
     bool airLineDownloading() const { return m_airLineDownloading; }
+
+    /**
+     * @brief 上传任务航线
+     * @param waypoints 航点列表，高度为相对起飞点高度
+     */
+    Q_INVOKABLE void uploadAirLine(const QList<QGpsPosition> &waypoints);
+    bool airLineUploading() const { return m_airLineUploading; }
 
     /**
      * @brief 获取GPS位置
@@ -117,6 +126,7 @@ public:
      * @return 自动驾驶仪类型
      */
     QAutoVehicleType::Autopilot autopilotType() const { return m_autopilotType; }
+    QString autopilotName() const;
 
     /**
      * @brief 设置自动驾驶仪类型
@@ -177,6 +187,7 @@ signals:
      * @param autopilotType 新的自动驾驶仪类型
      */
     void autopilotTypeChanged(QAutoVehicleType::Autopilot autopilotType);
+    void autopilotNameChanged();
 
     /**
      * @brief 航线下载完成
@@ -189,6 +200,10 @@ signals:
      */
     void airLineDownloadFailed(const QString &reason);
     void airLineDownloadingChanged(bool downloading);
+
+    void airLineUploaded();
+    void airLineUploadFailed(const QString &reason);
+    void airLineUploadingChanged(bool uploading);
 
 protected slots:
     void positionUpdate(double dLon, double dLat, float dH);
@@ -215,6 +230,9 @@ protected:
                                  const QList<QGpsPosition> &waypoints);
     void failAirLineDownload(quint64 requestId, const QString &reason);
     void cancelAirLineDownload();
+    void completeAirLineUpload(quint64 requestId);
+    void failAirLineUpload(quint64 requestId, const QString &reason);
+    void cancelAirLineUpload();
     void updateMovingState();
     /**
      * @brief 获取QAutopilotPrivate指针的辅助方法
@@ -241,6 +259,8 @@ protected:
     QAutoVehicleType::Autopilot m_autopilotType{QAutoVehicleType::Autopilot_Unknown};  ///< 自动驾驶仪类型
     bool m_airLineDownloading{false};
     quint64 m_airLineDownloadRequestId{0};
+    bool m_airLineUploading{false};
+    quint64 m_airLineUploadRequestId{0};
 };
 
 #endif // _YTY_QAUTOPILOT_H

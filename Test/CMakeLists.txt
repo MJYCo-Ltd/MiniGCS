@@ -46,7 +46,14 @@ qt_add_executable(${PROJECT_NAME}
 qt_add_qml_module(${PROJECT_NAME}
     URI MiniGCS
     QML_FILES
+        qml/CommandConfirmDialog.qml
+        qml/DroneControlPanel.qml
+        qml/DroneMap.qml
+        qml/GroupDroneControl.qml
+        qml/LogPanel.qml
         qml/Main.qml
+        qml/RouteEditor.qml
+        qml/SingleDroneControl.qml
     RESOURCES
         qml/images/boat.svg
         qml/images/fixed-wing.svg

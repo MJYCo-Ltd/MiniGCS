@@ -1,10 +1,12 @@
 #include "QDroneControlManager.h"
 
 #include "Plat/QAutopilot.h"
+#include "QGCSConfig.h"
 #include "QGroundControlStation.h"
 #include "QTestGCSConfig.h"
 
 #include <algorithm>
+#include <cmath>
 
 QDroneControlManager::QDroneControlManager(
     QGroundControlStation *groundStation, QObject *parent)
@@ -22,6 +24,26 @@ QDroneControlManager::QDroneControlManager(
             this, [this](QPlat *platform) {
                 registerPlatform(platform);
             });
+    connect(QGCSConfig::instance(), &QGCSConfig::warningLogMessage,
+            this, [this](int, const QString &message) {
+                m_businessLogs.append(message);
+                constexpr qsizetype MaximumVisibleLogCount = 500;
+                if (m_businessLogs.size() > MaximumVisibleLogCount) {
+                    m_businessLogs.remove(
+                        0, m_businessLogs.size() - MaximumVisibleLogCount);
+                }
+                emit businessLogsChanged();
+            });
+    connect(QGCSConfig::instance(), &QGCSConfig::firmwareWarningMessage,
+            this, [this](quint32, int, const QString &message) {
+                m_firmwareLogs.append(message);
+                constexpr qsizetype MaximumVisibleLogCount = 500;
+                if (m_firmwareLogs.size() > MaximumVisibleLogCount) {
+                    m_firmwareLogs.remove(
+                        0, m_firmwareLogs.size() - MaximumVisibleLogCount);
+                }
+                emit firmwareLogsChanged();
+            });
 }
 
 void QDroneControlManager::registerPlatform(QObject *platform)
@@ -38,6 +60,30 @@ void QDroneControlManager::registerPlatform(QObject *platform)
     m_autopilots.insert(systemId, autopilot);
     connect(autopilot, &QPlat::connectionStatusChanged,
             this, &QDroneControlManager::dronesChanged);
+    connect(autopilot, &QAutopilot::airLineDownloaded,
+            this, [this, systemId](const QList<QGpsPosition> &waypoints) {
+                QVariantList values;
+                values.reserve(waypoints.size());
+                for (const QGpsPosition &waypoint : waypoints) {
+                    QVariantMap value;
+                    value.insert("latitude", waypoint.latitude());
+                    value.insert("longitude", waypoint.longitude());
+                    value.insert("altitude", waypoint.altitude());
+                    values.append(value);
+                }
+                emit missionDownloaded(systemId, values);
+            });
+    connect(autopilot, &QAutopilot::airLineUploaded,
+            this, [this, systemId]() {
+                emit missionUploadResult(systemId, true, QString());
+            });
+    connect(autopilot, &QAutopilot::airLineUploadFailed,
+            this, [this, systemId](const QString &reason) {
+                qWarning() << tr("无人机") << systemId
+                           << tr("航线上传失败:")
+                           << reason;
+                emit missionUploadResult(systemId, false, reason);
+            });
     connect(autopilot, &QObject::destroyed, this,
             [this, systemId](QObject *destroyedObject) {
         const QPointer<QAutopilot> current = m_autopilots.value(systemId);
@@ -76,10 +122,78 @@ QVariantList QDroneControlManager::groups() const
     return QTestGCSConfig::instance()->droneGroupList();
 }
 
+QStringList QDroneControlManager::businessLogs() const
+{
+    return m_businessLogs;
+}
+
+QStringList QDroneControlManager::firmwareLogs() const
+{
+    return m_firmwareLogs;
+}
+
+QString QDroneControlManager::commandKey(Command command) const
+{
+    switch (command) {
+    case ArmCommand:
+        return QStringLiteral("arm");
+    case DisarmCommand:
+        return QStringLiteral("disarm");
+    case TakeoffCommand:
+        return QStringLiteral("takeoff");
+    case LandCommand:
+        return QStringLiteral("land");
+    case ReturnToLaunchCommand:
+        return QStringLiteral("returnToLaunch");
+    case DownloadMissionCommand:
+        return QStringLiteral("downloadMission");
+    case UploadMissionCommand:
+        return QStringLiteral("uploadMission");
+    case InvalidCommand:
+        break;
+    }
+    return {};
+}
+
+QString QDroneControlManager::commandName(int command) const
+{
+    const QString key = commandKey(static_cast<Command>(command));
+    if (key.isEmpty()) {
+        return QGCSConfig::instance()->mavsdkText(
+            QStringLiteral("command"), QStringLiteral("default"));
+    }
+    return QGCSConfig::instance()->mavsdkText(
+        QStringLiteral("command"), key);
+}
+
+QString QDroneControlManager::vehicleIcon(int vehicleType) const
+{
+    return QGCSConfig::instance()->mavsdkText(
+        QStringLiteral("vehicleIcon"), QString::number(vehicleType));
+}
+
+void QDroneControlManager::clearBusinessLogs()
+{
+    if (m_businessLogs.isEmpty()) {
+        return;
+    }
+    m_businessLogs.clear();
+    emit businessLogsChanged();
+}
+
+void QDroneControlManager::clearFirmwareLogs()
+{
+    if (m_firmwareLogs.isEmpty()) {
+        return;
+    }
+    m_firmwareLogs.clear();
+    emit firmwareLogsChanged();
+}
+
 void QDroneControlManager::renameDrone(int systemId, const QString &name)
 {
     if (!m_autopilots.contains(systemId)) {
-        emit commandRejected(QString("未找到系统 ID %1").arg(systemId));
+        emit commandRejected(tr("未找到系统 ID %1").arg(systemId));
         return;
     }
     QTestGCSConfig::instance()->setDroneName(systemId, name);
@@ -92,7 +206,7 @@ bool QDroneControlManager::addGroup(const QString &name)
     if (added) {
         emit groupsChanged();
     } else {
-        emit commandRejected("编组名称为空或已经存在");
+        emit commandRejected(tr("编组名称为空或已经存在"));
     }
     return added;
 }
@@ -130,48 +244,49 @@ bool QDroneControlManager::setGroupMembers(
 }
 
 bool QDroneControlManager::execute(
-    QAutopilot *autopilot, const QString &command)
+    QAutopilot *autopilot, Command command)
 {
     if (!autopilot || !autopilot->isConnected()) {
         return false;
     }
-    if (command == "arm") {
+    switch (command) {
+    case ArmCommand:
         autopilot->arm();
         return true;
-    }
-    if (command == "disarm") {
+    case DisarmCommand:
         autopilot->disarm();
         return true;
-    }
-    if (command == "takeoff") {
+    case TakeoffCommand:
         autopilot->takeoff();
         return true;
-    }
-    if (command == "land") {
+    case LandCommand:
         autopilot->land();
         return true;
-    }
-    if (command == "returnToLaunch") {
+    case ReturnToLaunchCommand:
         autopilot->returnToLaunch();
         return true;
-    }
-    if (command == "downloadMission") {
-        if (autopilot->airLineDownloading()) {
+    case DownloadMissionCommand:
+        if (autopilot->airLineDownloading() ||
+            autopilot->airLineUploading()) {
             return false;
         }
         autopilot->downloadAirLine();
         return true;
+    case UploadMissionCommand:
+    case InvalidCommand:
+        return false;
     }
     return false;
 }
 
 bool QDroneControlManager::executeSingle(
-    int systemId, const QString &command)
+    int systemId, int commandValue)
 {
+    const Command command = static_cast<Command>(commandValue);
     QAutopilot *autopilot = m_autopilots.value(systemId);
     if (!execute(autopilot, command)) {
         emit commandRejected(
-            QString("无人机 %1 离线或命令不受支持").arg(systemId));
+            tr("无人机 %1 离线或命令不受支持").arg(systemId));
         return false;
     }
     emit commandDispatched(
@@ -180,8 +295,9 @@ bool QDroneControlManager::executeSingle(
 }
 
 bool QDroneControlManager::executeGroup(
-    const QString &groupName, const QString &command)
+    const QString &groupName, int commandValue)
 {
+    const Command command = static_cast<Command>(commandValue);
     const QVariantList members = groupMembers(groupName);
     int dispatched = 0;
     for (const QVariant &member : members) {
@@ -192,9 +308,106 @@ bool QDroneControlManager::executeGroup(
     }
 
     if (dispatched == 0) {
-        emit commandRejected("编组中没有可执行该命令的在线无人机");
+        emit commandRejected(tr("编组中没有可执行该命令的在线无人机"));
         return false;
     }
     emit commandDispatched(command, groupName, dispatched);
+    return true;
+}
+
+bool QDroneControlManager::parseWaypoints(
+    const QVariantList &values, QList<QGpsPosition> &waypoints,
+    QString &reason) const
+{
+    if (values.isEmpty()) {
+        reason = tr("航线至少需要一个航点");
+        return false;
+    }
+
+    waypoints.clear();
+    waypoints.reserve(values.size());
+    const auto *config = QTestGCSConfig::instance();
+    const double minimumAltitude = config->missionMinimumAltitude();
+    const double maximumAltitude = config->missionMaximumAltitude();
+    for (qsizetype index = 0; index < values.size(); ++index) {
+        const QVariantMap value = values.at(index).toMap();
+        bool latitudeOk = false;
+        bool longitudeOk = false;
+        bool altitudeOk = false;
+        const double latitude =
+            value.value("latitude").toDouble(&latitudeOk);
+        const double longitude =
+            value.value("longitude").toDouble(&longitudeOk);
+        const double altitude =
+            value.value("altitude").toDouble(&altitudeOk);
+        if (!latitudeOk || !longitudeOk || !altitudeOk ||
+            !std::isfinite(latitude) || !std::isfinite(longitude) ||
+            !std::isfinite(altitude) ||
+            latitude < -90.0 || latitude > 90.0 ||
+            longitude < -180.0 || longitude > 180.0 ||
+            altitude < minimumAltitude || altitude > maximumAltitude) {
+            reason = tr("第 %1 个航点坐标或高度无效")
+                         .arg(index + 1);
+            return false;
+        }
+        waypoints.append(QGpsPosition(longitude, latitude, altitude));
+    }
+    return true;
+}
+
+bool QDroneControlManager::uploadMissionSingle(
+    int systemId, const QVariantList &values)
+{
+    QList<QGpsPosition> waypoints;
+    QString reason;
+    if (!parseWaypoints(values, waypoints, reason)) {
+        emit commandRejected(reason);
+        return false;
+    }
+
+    QAutopilot *autopilot = m_autopilots.value(systemId);
+    if (!autopilot || !autopilot->isConnected() ||
+        autopilot->airLineUploading() ||
+        autopilot->airLineDownloading()) {
+        emit commandRejected(
+            tr("无人机 %1 离线或正在上传航线").arg(systemId));
+        return false;
+    }
+
+    autopilot->uploadAirLine(waypoints);
+    emit commandDispatched(
+        UploadMissionCommand,
+        QTestGCSConfig::instance()->droneName(systemId), 1);
+    return true;
+}
+
+bool QDroneControlManager::uploadMissionGroup(
+    const QString &groupName, const QVariantList &values)
+{
+    QList<QGpsPosition> waypoints;
+    QString reason;
+    if (!parseWaypoints(values, waypoints, reason)) {
+        emit commandRejected(reason);
+        return false;
+    }
+
+    int dispatched = 0;
+    for (const QVariant &member : groupMembers(groupName)) {
+        QAutopilot *autopilot = m_autopilots.value(member.toInt());
+        if (!autopilot || !autopilot->isConnected() ||
+            autopilot->airLineUploading() ||
+            autopilot->airLineDownloading()) {
+            continue;
+        }
+        autopilot->uploadAirLine(waypoints);
+        ++dispatched;
+    }
+    if (dispatched == 0) {
+        emit commandRejected(
+            tr("编组中没有可上传航线的在线无人机"));
+        return false;
+    }
+    emit commandDispatched(
+        UploadMissionCommand, groupName, dispatched);
     return true;
 }

@@ -22,7 +22,7 @@ QPlat::~QPlat()
 QString QPlat::getFirmwareVersion() const
 {
     if (!d_ptr) {
-        return QString("Unknown");
+        return tr("未知");
     }
     return d_ptr->getFirmwareVersion();
 }
@@ -30,7 +30,7 @@ QString QPlat::getFirmwareVersion() const
 QString QPlat::getSoftwareVersion() const
 {
     if (!d_ptr) {
-        return QString("Unknown");
+        return tr("未知");
     }
     return d_ptr->getSoftwareVersion();
 }
@@ -65,7 +65,7 @@ QDateTime QPlat::getLastDisconnectedTime() const
 QString QPlat::toString() const
 {
     if (!d_ptr) {
-        return QString("QPlat (未初始化)");
+        return tr("QPlat（未初始化）");
     }
     return d_ptr->toString();
 }

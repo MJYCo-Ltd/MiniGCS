@@ -1,15 +1,20 @@
 #include <QCoreApplication>
 #include <QDebug>
+#include <QDateTime>
 #include <QDir>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSettings>
 #include <QFileInfo>
+#include <QPointer>
 #include <cstring>
+#include <mutex>
 #include <vector>
 #include "QGCSConfig.h"
+#include "Private/QMavsdkTextCatalog.h"
 
 #include <spdlog/sinks/daily_file_sink.h>
+#include <spdlog/sinks/base_sink.h>
 #include "Private/QGCSLog.h"
 
 QGCSConfig *QGCSConfig::m_pSInsatance = nullptr;
@@ -21,6 +26,12 @@ const char *KEY_LOG_LEVEL = "Logging/Level";
 const char *KEY_MAV_MESSAGE_EXTENSION = "MavMessage/Extension";
 const char *KEY_MAVSDK_TYPE_TEXT_FILE = "Mavsdk/TypeTextFile";
 const char *KEY_TIME_SYNC_ENABLED = "TimeSync/Enabled";
+const char *KEY_MOTION_START_HORIZONTAL = "Motion/StartHorizontalSpeedMS";
+const char *KEY_MOTION_START_VERTICAL = "Motion/StartVerticalSpeedMS";
+const char *KEY_MOTION_STOP_HORIZONTAL = "Motion/StopHorizontalSpeedMS";
+const char *KEY_MOTION_STOP_VERTICAL = "Motion/StopVerticalSpeedMS";
+const char *KEY_MOTION_START_SAMPLES = "Motion/StartSampleCount";
+const char *KEY_MOTION_STOP_SAMPLES = "Motion/StopSampleCount";
 
 // 默认值
 const uint8_t DEFAULT_GCS_SYSTEM_ID = 246;
@@ -29,6 +40,81 @@ const char *DEFAULT_LOG_LEVEL = "debug";
 const char *DEFAULT_MAV_MESSAGE_EXTENSION = "ardupilotmega.xml";
 const char *DEFAULT_MAVSDK_TYPE_TEXT_FILE = "mavsdk_zh_CN.json";
 const bool DEFAULT_TIME_SYNC_ENABLED = true;
+constexpr double DEFAULT_MOTION_START_HORIZONTAL = 0.7;
+constexpr double DEFAULT_MOTION_START_VERTICAL = 0.5;
+constexpr double DEFAULT_MOTION_STOP_HORIZONTAL = 0.25;
+constexpr double DEFAULT_MOTION_STOP_VERTICAL = 0.2;
+constexpr int DEFAULT_MOTION_START_SAMPLES = 2;
+constexpr int DEFAULT_MOTION_STOP_SAMPLES = 5;
+enum MavSeverity {
+    MavSeverityEmergency = 0,
+    MavSeverityAlert,
+    MavSeverityCritical,
+    MavSeverityError,
+    MavSeverityWarning,
+    MavSeverityNotice,
+    MavSeverityInfo,
+    MavSeverityDebug
+};
+thread_local bool g_emittingFirmwareLog = false;
+QtMessageHandler g_previousQtMessageHandler = nullptr;
+bool g_qtLogHandlerInstalled = false;
+
+class FirmwareLogScope final
+{
+public:
+    FirmwareLogScope()
+        : m_previous(g_emittingFirmwareLog)
+    {
+        g_emittingFirmwareLog = true;
+    }
+
+    ~FirmwareLogScope()
+    {
+        g_emittingFirmwareLog = m_previous;
+    }
+
+private:
+    bool m_previous;
+};
+
+class QtWarningSink final : public spdlog::sinks::base_sink<std::mutex>
+{
+public:
+    explicit QtWarningSink(QGCSConfig *config)
+        : m_config(config)
+    {}
+
+protected:
+    void sink_it_(const spdlog::details::log_msg &message) override
+    {
+        if (message.level < spdlog::level::warn || !m_config ||
+            g_emittingFirmwareLog) {
+            return;
+        }
+
+        spdlog::memory_buf_t buffer;
+        formatter_->format(message, buffer);
+        const QString text =
+            QString::fromUtf8(buffer.data(), static_cast<qsizetype>(buffer.size()))
+                .trimmed();
+        const int level = static_cast<int>(message.level);
+        const QPointer<QGCSConfig> config = m_config;
+        QMetaObject::invokeMethod(
+            m_config,
+            [config, level, text]() {
+                if (config) {
+                    emit config->warningLogMessage(level, text);
+                }
+            },
+            Qt::QueuedConnection);
+    }
+
+    void flush_() override {}
+
+private:
+    QPointer<QGCSConfig> m_config;
+};
 } // namespace
 
 // 将 QString（名称）映射到 spdlog 的 level_enum
@@ -88,6 +174,7 @@ void QGCSConfig::init_logging() {
     try {
         auto file_sink = std::make_shared<spdlog::sinks::daily_file_sink_mt>(
             "data/log/minigcs.log", 0, 0, false, 7);
+        auto warning_sink = std::make_shared<QtWarningSink>(this);
 
         QString configuredLevel = DEFAULT_LOG_LEVEL;
         if (m_settings) {
@@ -97,16 +184,19 @@ void QGCSConfig::init_logging() {
         spdlog::level::level_enum lvl = levelFromString(configuredLevel);
 
         file_sink->set_level(lvl);
+        warning_sink->set_level(spdlog::level::warn);
 
         std::vector<spdlog::sink_ptr> sinks;
         sinks.push_back(file_sink);
+        sinks.push_back(warning_sink);
 
         auto logger =
             std::make_shared<spdlog::logger>("core", sinks.begin(), sinks.end());
         spdlog::set_default_logger(logger);
 
         spdlog::set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%^%l%$] [%t] %v");
-        spdlog::set_level(lvl);
+        logger->set_level(
+            lvl < spdlog::level::warn ? lvl : spdlog::level::warn);
 
         spdlog::warn(SYS_FMT_STR, "系统启动 日志级别",
                      configuredLevel.toStdString());
@@ -179,9 +269,19 @@ void QGCSConfig::init() {
 
     // 默认值与用户配置加载完成后再初始化日志。
     init_logging();
+    if (!g_qtLogHandlerInstalled) {
+        g_previousQtMessageHandler =
+            qInstallMessageHandler(&QGCSConfig::qtLogHandler);
+        g_qtLogHandlerInstalled = true;
+    }
 }
 
 void QGCSConfig::release() {
+    if (g_qtLogHandlerInstalled) {
+        qInstallMessageHandler(g_previousQtMessageHandler);
+        g_previousQtMessageHandler = nullptr;
+        g_qtLogHandlerInstalled = false;
+    }
     delete m_pSInsatance;
     m_pSInsatance = nullptr;
 }
@@ -194,38 +294,53 @@ void QGCSConfig::dealMavsdkMessage(uint32_t systemID,
         return;
     const QJsonObject obj = doc.object();
     if (obj.value("message_name").toString() == "STATUSTEXT") {
-        switch (obj.value("severity").toInt()) {
-        case 0:
+        const int severity = obj.value("severity").toInt();
+        const QString text = obj.value("text").toString();
+        if (severity >= MavSeverityEmergency &&
+            severity <= MavSeverityWarning) {
+            const QString formatted =
+                QStringLiteral("[%1] [MAVLink] [system_id=%2] %3")
+                    .arg(QDateTime::currentDateTime().toString(
+                             QStringLiteral("yyyy-MM-dd HH:mm:ss.zzz")))
+                    .arg(systemID)
+                    .arg(text);
+            emit firmwareWarningMessage(
+                static_cast<quint32>(systemID), severity, formatted);
+        }
+
+        const FirmwareLogScope firmwareLogScope;
+        switch (severity) {
+        case MavSeverityEmergency:
             spdlog::critical(PLAT_FMT_STR, systemID, "text",
-                             obj.value("text").toString().toUtf8().data());
+                             text.toUtf8().data());
             break;
-        case 1:
+        case MavSeverityAlert:
             spdlog::critical(PLAT_FMT_STR, systemID, "text",
-                             obj.value("text").toString().toUtf8().data());
+                             text.toUtf8().data());
             break;
-        case 2:
+        case MavSeverityCritical:
             spdlog::critical(PLAT_FMT_STR, systemID, "text",
-                             obj.value("text").toString().toUtf8().data());
+                             text.toUtf8().data());
             break;
-        case 3:
+        case MavSeverityError:
             spdlog::error(PLAT_FMT_STR, systemID, "text",
-                          obj.value("text").toString().toUtf8().data());
+                          text.toUtf8().data());
             break;
-        case 4:
+        case MavSeverityWarning:
             spdlog::warn(PLAT_FMT_STR, systemID, "text",
-                         obj.value("text").toString().toUtf8().data());
+                         text.toUtf8().data());
             break;
-        case 5:
+        case MavSeverityNotice:
             spdlog::info(PLAT_FMT_STR, systemID, "text",
-                         obj.value("text").toString().toUtf8().data());
+                         text.toUtf8().data());
             break;
-        case 6:
+        case MavSeverityInfo:
             spdlog::info(PLAT_FMT_STR, systemID, "text",
-                         obj.value("text").toString().toUtf8().data());
+                         text.toUtf8().data());
             break;
-        case 7:
+        case MavSeverityDebug:
             spdlog::debug(PLAT_FMT_STR, systemID, "text",
-                          obj.value("text").toString().toUtf8().data());
+                          text.toUtf8().data());
             break;
         }
     }
@@ -309,11 +424,65 @@ QString QGCSConfig::mavsdkTypeTextFile() const {
     return primaryPath;
 }
 
+QString QGCSConfig::mavsdkText(
+    const QString &section, const QString &key) const
+{
+    return QMavsdkTextCatalog::text(section, key);
+}
+
 bool QGCSConfig::timeSyncEnabled() const {
     if (!m_settings) {
         return DEFAULT_TIME_SYNC_ENABLED;
     }
     return m_settings->value(KEY_TIME_SYNC_ENABLED, DEFAULT_TIME_SYNC_ENABLED).toBool();
+}
+
+double QGCSConfig::motionStartHorizontalSpeedMS() const
+{
+    return m_settings
+        ? m_settings->value(KEY_MOTION_START_HORIZONTAL,
+                            DEFAULT_MOTION_START_HORIZONTAL).toDouble()
+        : DEFAULT_MOTION_START_HORIZONTAL;
+}
+
+double QGCSConfig::motionStartVerticalSpeedMS() const
+{
+    return m_settings
+        ? m_settings->value(KEY_MOTION_START_VERTICAL,
+                            DEFAULT_MOTION_START_VERTICAL).toDouble()
+        : DEFAULT_MOTION_START_VERTICAL;
+}
+
+double QGCSConfig::motionStopHorizontalSpeedMS() const
+{
+    return m_settings
+        ? m_settings->value(KEY_MOTION_STOP_HORIZONTAL,
+                            DEFAULT_MOTION_STOP_HORIZONTAL).toDouble()
+        : DEFAULT_MOTION_STOP_HORIZONTAL;
+}
+
+double QGCSConfig::motionStopVerticalSpeedMS() const
+{
+    return m_settings
+        ? m_settings->value(KEY_MOTION_STOP_VERTICAL,
+                            DEFAULT_MOTION_STOP_VERTICAL).toDouble()
+        : DEFAULT_MOTION_STOP_VERTICAL;
+}
+
+int QGCSConfig::motionStartSampleCount() const
+{
+    return m_settings
+        ? m_settings->value(KEY_MOTION_START_SAMPLES,
+                            DEFAULT_MOTION_START_SAMPLES).toInt()
+        : DEFAULT_MOTION_START_SAMPLES;
+}
+
+int QGCSConfig::motionStopSampleCount() const
+{
+    return m_settings
+        ? m_settings->value(KEY_MOTION_STOP_SAMPLES,
+                            DEFAULT_MOTION_STOP_SAMPLES).toInt()
+        : DEFAULT_MOTION_STOP_SAMPLES;
 }
 
 void QGCSConfig::setTimeSyncEnabled(bool enabled) {
@@ -362,6 +531,30 @@ void QGCSConfig::initializeDefaults() {
     }
     if (!m_settings->contains(KEY_TIME_SYNC_ENABLED)) {
         m_settings->setValue(KEY_TIME_SYNC_ENABLED, DEFAULT_TIME_SYNC_ENABLED);
+    }
+    if (!m_settings->contains(KEY_MOTION_START_HORIZONTAL)) {
+        m_settings->setValue(KEY_MOTION_START_HORIZONTAL,
+                             DEFAULT_MOTION_START_HORIZONTAL);
+    }
+    if (!m_settings->contains(KEY_MOTION_START_VERTICAL)) {
+        m_settings->setValue(KEY_MOTION_START_VERTICAL,
+                             DEFAULT_MOTION_START_VERTICAL);
+    }
+    if (!m_settings->contains(KEY_MOTION_STOP_HORIZONTAL)) {
+        m_settings->setValue(KEY_MOTION_STOP_HORIZONTAL,
+                             DEFAULT_MOTION_STOP_HORIZONTAL);
+    }
+    if (!m_settings->contains(KEY_MOTION_STOP_VERTICAL)) {
+        m_settings->setValue(KEY_MOTION_STOP_VERTICAL,
+                             DEFAULT_MOTION_STOP_VERTICAL);
+    }
+    if (!m_settings->contains(KEY_MOTION_START_SAMPLES)) {
+        m_settings->setValue(KEY_MOTION_START_SAMPLES,
+                             DEFAULT_MOTION_START_SAMPLES);
+    }
+    if (!m_settings->contains(KEY_MOTION_STOP_SAMPLES)) {
+        m_settings->setValue(KEY_MOTION_STOP_SAMPLES,
+                             DEFAULT_MOTION_STOP_SAMPLES);
     }
 
     // 立即保存默认值
