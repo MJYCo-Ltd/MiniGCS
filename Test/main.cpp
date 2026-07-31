@@ -27,15 +27,16 @@ static LinkParams linkParamsFromConfig(const QVariantMap &c, LinkKind kind)
     switch (kind) {
     case LinkKind::TcpServer:
     case LinkKind::UdpServer:
-        p.port = c.value(LinkConfigKeys::Port).toUInt();
+        p.hostName = c.value(LinkConfigKeys::HostName).toString().trimmed();
+        p.port = static_cast<quint16>(c.value(LinkConfigKeys::Port).toUInt());
         break;
     case LinkKind::TcpClient:
     case LinkKind::UdpClient:
-        p.hostName = c.value(LinkConfigKeys::HostName).toString();
-        p.port = c.value(LinkConfigKeys::Port).toUInt();
+        p.hostName = c.value(LinkConfigKeys::HostName).toString().trimmed();
+        p.port = static_cast<quint16>(c.value(LinkConfigKeys::Port).toUInt());
         break;
     case LinkKind::Serial:
-        p.portName = c.value(LinkConfigKeys::PortName).toString();
+        p.portName = c.value(LinkConfigKeys::PortName).toString().trimmed();
         p.baudRate = c.value(LinkConfigKeys::BaudRate).toInt();
         break;
     default:

@@ -72,6 +72,7 @@ public:
         const QString &groupName, const QVariantList &waypoints);
     Q_INVOKABLE void clearBusinessLogs();
     Q_INVOKABLE void clearFirmwareLogs();
+    Q_INVOKABLE bool applyConfiguredLinks();
 
 signals:
     void dronesChanged();

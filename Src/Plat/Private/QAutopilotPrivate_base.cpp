@@ -5,6 +5,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QTimer>
+#include <sstream>
 
 #include "Extern/XmlToMavSDK.h"
 #include "QGCSConfig.h"
@@ -147,6 +148,22 @@ void QAutopilotPrivate::clearTelemetrySubscriptions()
     if (m_batteryHandle.valid()) {
         m_telemetry->unsubscribe_battery(m_batteryHandle);
         m_batteryHandle = {};
+    }
+    if (m_rawGpsHandle.valid()) {
+        m_telemetry->unsubscribe_raw_gps(m_rawGpsHandle);
+        m_rawGpsHandle = {};
+    }
+    if (m_attitudeEulerHandle.valid()) {
+        m_telemetry->unsubscribe_attitude_euler(m_attitudeEulerHandle);
+        m_attitudeEulerHandle = {};
+    }
+    if (m_flightModeHandle.valid()) {
+        m_telemetry->unsubscribe_flight_mode(m_flightModeHandle);
+        m_flightModeHandle = {};
+    }
+    if (m_landedStateHandle.valid()) {
+        m_telemetry->unsubscribe_landed_state(m_landedStateHandle);
+        m_landedStateHandle = {};
     }
     if (m_healthHandle.valid()) {
         m_telemetry->unsubscribe_health(m_healthHandle);
@@ -447,6 +464,30 @@ void QAutopilotPrivate::setTelemetryRate() {
             }
         });
 
+    m_telemetry->set_rate_raw_gps_async(
+        1, [systemId](mavsdk::Telemetry::Result result) {
+            if (mavsdk::Telemetry::Result::Success != result) {
+                spdlog::error(PLAT_FMT_STR, systemId,
+                              "set_rate_raw_gps", result);
+            }
+        });
+
+    m_telemetry->set_rate_attitude_euler_async(
+        2, [systemId](mavsdk::Telemetry::Result result) {
+            if (mavsdk::Telemetry::Result::Success != result) {
+                spdlog::error(PLAT_FMT_STR, systemId,
+                              "set_rate_attitude_euler", result);
+            }
+        });
+
+    m_telemetry->set_rate_landed_state_async(
+        1, [systemId](mavsdk::Telemetry::Result result) {
+            if (mavsdk::Telemetry::Result::Success != result) {
+                spdlog::error(PLAT_FMT_STR, systemId,
+                              "set_rate_landed_state", result);
+            }
+        });
+
     /// 设置 健康度 发送频率
     m_telemetry->set_rate_health_async(
         0.5, [systemId](mavsdk::Telemetry::Result result) {
@@ -502,7 +543,8 @@ void QAutopilotPrivate::setupMessageHandling() {
                 autopilot, "positionUpdate", Qt::QueuedConnection,
                 Q_ARG(double, position.longitude_deg),
                 Q_ARG(double, position.latitude_deg),
-                Q_ARG(float, position.absolute_altitude_m));
+                Q_ARG(float, position.absolute_altitude_m),
+                Q_ARG(float, position.relative_altitude_m));
         }
     });
 
@@ -520,10 +562,67 @@ void QAutopilotPrivate::setupMessageHandling() {
         if (autopilot) {
             QMetaObject::invokeMethod(
                 autopilot, "batteryUpdate", Qt::QueuedConnection,
+                Q_ARG(int, static_cast<int>(battery.id)),
+                Q_ARG(float, battery.temperature_degc),
                 Q_ARG(float, battery.voltage_v),
-                Q_ARG(float, battery.remaining_percent));
+                Q_ARG(float, battery.current_battery_a),
+                Q_ARG(float, battery.capacity_consumed_ah),
+                Q_ARG(float, battery.remaining_percent),
+                Q_ARG(float, battery.time_remaining_s),
+                Q_ARG(int, static_cast<int>(battery.battery_function)));
         }
     });
+
+    m_rawGpsHandle = m_telemetry->subscribe_raw_gps(
+        [autopilot](mavsdk::Telemetry::RawGps gps) {
+            if (autopilot) {
+                QMetaObject::invokeMethod(
+                    autopilot, "rawGpsUpdate", Qt::QueuedConnection,
+                    Q_ARG(float, gps.hdop),
+                    Q_ARG(float, gps.vdop),
+                    Q_ARG(float, gps.velocity_m_s),
+                    Q_ARG(float, gps.cog_deg),
+                    Q_ARG(float, gps.horizontal_uncertainty_m),
+                    Q_ARG(float, gps.vertical_uncertainty_m),
+                    Q_ARG(float, gps.velocity_uncertainty_m_s),
+                    Q_ARG(float, gps.heading_uncertainty_deg));
+            }
+        });
+
+    m_attitudeEulerHandle = m_telemetry->subscribe_attitude_euler(
+        [autopilot](mavsdk::Telemetry::EulerAngle attitude) {
+            if (autopilot) {
+                QMetaObject::invokeMethod(
+                    autopilot, "attitudeUpdate", Qt::QueuedConnection,
+                    Q_ARG(float, attitude.roll_deg),
+                    Q_ARG(float, attitude.pitch_deg),
+                    Q_ARG(float, attitude.yaw_deg));
+            }
+        });
+
+    m_flightModeHandle = m_telemetry->subscribe_flight_mode(
+        [autopilot](mavsdk::Telemetry::FlightMode mode) {
+            if (autopilot) {
+                std::ostringstream fallback;
+                fallback << mode;
+                QMetaObject::invokeMethod(
+                    autopilot, "flightModeUpdate", Qt::QueuedConnection,
+                    Q_ARG(int, static_cast<int>(mode)),
+                    Q_ARG(QString, QString::fromStdString(fallback.str())));
+            }
+        });
+
+    m_landedStateHandle = m_telemetry->subscribe_landed_state(
+        [autopilot](mavsdk::Telemetry::LandedState state) {
+            if (autopilot) {
+                std::ostringstream fallback;
+                fallback << state;
+                QMetaObject::invokeMethod(
+                    autopilot, "landedStateUpdate", Qt::QueuedConnection,
+                    Q_ARG(int, static_cast<int>(state)),
+                    Q_ARG(QString, QString::fromStdString(fallback.str())));
+            }
+        });
 
     m_telemetry->set_rate_in_air_async(
         1, [systemId](mavsdk::Telemetry::Result result) {

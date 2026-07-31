@@ -14,9 +14,32 @@ const char *KEY_MISSION_DEFAULT_ALTITUDE = "Mission/DefaultAltitude";
 const char *KEY_MISSION_MINIMUM_ALTITUDE = "Mission/MinimumAltitude";
 const char *KEY_MISSION_MAXIMUM_ALTITUDE = "Mission/MaximumAltitude";
 const char *KEY_LINKS_COUNT = "Links/Count";
-const char *KEY_LINK_GROUP_PREFIX = "Link";
+const char *KEY_LINK_GROUP_PREFIX = "link";
 const char *KEY_DRONE_GROUPS_COUNT = "DroneGroups/Count";
 const char *KEY_DRONE_GROUP_PREFIX = "DroneGroup";
+
+// INI 分组内键名（PascalCase，与 Config/*.ini 保持一致）
+const char *INI_LINK_TYPE = "Type";
+const char *INI_LINK_NAME = "Name";
+const char *INI_LINK_PORT_NAME = "PortName";
+const char *INI_LINK_BAUD_RATE = "BaudRate";
+const char *INI_LINK_HOST_NAME = "HostName";
+const char *INI_LINK_PORT = "Port";
+
+QVariant linkMapValue(const QVariantMap &config,
+                      const char *camelKey, const char *pascalKey)
+{
+    if (config.contains(QLatin1String(camelKey)))
+        return config.value(QLatin1String(camelKey));
+    return config.value(QLatin1String(pascalKey));
+}
+
+bool linkMapContains(const QVariantMap &config,
+                     const char *camelKey, const char *pascalKey)
+{
+    return config.contains(QLatin1String(camelKey))
+        || config.contains(QLatin1String(pascalKey));
+}
 
 const char *DEFAULT_MAP_NAME = "QGroundControl";
 constexpr double DEFAULT_MAP_CENTER_LATITUDE = 38.045474;
@@ -89,6 +112,26 @@ QString QTestGCSConfig::linkGroupKey(int index) const
     return QString("%1%2").arg(KEY_LINK_GROUP_PREFIX).arg(index);
 }
 
+QString QTestGCSConfig::resolveLinkGroup(int index) const
+{
+    const QString primary = linkGroupKey(index);
+    if (!m_settings)
+        return primary;
+
+    m_settings->beginGroup(primary);
+    const bool primaryOk = !m_settings->value(INI_LINK_TYPE).toString().isEmpty();
+    m_settings->endGroup();
+    if (primaryOk)
+        return primary;
+
+    // 兼容旧版大写前缀 Link0（Linux 上 QSettings 区分大小写）
+    const QString legacy = QStringLiteral("Link%1").arg(index);
+    m_settings->beginGroup(legacy);
+    const bool legacyOk = !m_settings->value(INI_LINK_TYPE).toString().isEmpty();
+    m_settings->endGroup();
+    return legacyOk ? legacy : primary;
+}
+
 int QTestGCSConfig::linkCount() const
 {
     if (!m_settings)
@@ -101,14 +144,20 @@ QVariantMap QTestGCSConfig::linkConfigAt(int index) const
     QVariantMap out;
     if (!m_settings || index < 0 || index >= linkCount())
         return out;
-    const QString group = linkGroupKey(index);
+    const QString group = resolveLinkGroup(index);
     m_settings->beginGroup(group);
-    out.insert(LinkConfigKeys::Type, m_settings->value(LinkConfigKeys::Type).toString());
-    out.insert(LinkConfigKeys::Name, m_settings->value(LinkConfigKeys::Name).toString());
-    out.insert(LinkConfigKeys::PortName, m_settings->value(LinkConfigKeys::PortName).toString());
-    out.insert(LinkConfigKeys::BaudRate, m_settings->value(LinkConfigKeys::BaudRate).toInt());
-    out.insert(LinkConfigKeys::HostName, m_settings->value(LinkConfigKeys::HostName).toString());
-    out.insert(LinkConfigKeys::Port, m_settings->value(LinkConfigKeys::Port).toInt());
+    out.insert(LinkConfigKeys::Type,
+               m_settings->value(INI_LINK_TYPE).toString());
+    out.insert(LinkConfigKeys::Name,
+               m_settings->value(INI_LINK_NAME).toString());
+    out.insert(LinkConfigKeys::PortName,
+               m_settings->value(INI_LINK_PORT_NAME).toString());
+    out.insert(LinkConfigKeys::BaudRate,
+               m_settings->value(INI_LINK_BAUD_RATE).toInt());
+    out.insert(LinkConfigKeys::HostName,
+               m_settings->value(INI_LINK_HOST_NAME).toString());
+    out.insert(LinkConfigKeys::Port,
+               m_settings->value(INI_LINK_PORT).toInt());
     m_settings->endGroup();
     return out;
 }
@@ -119,18 +168,30 @@ void QTestGCSConfig::setLinkConfigAt(int index, const QVariantMap &config)
         return;
     const QString group = linkGroupKey(index);
     m_settings->beginGroup(group);
-    if (config.contains(LinkConfigKeys::Type))
-        m_settings->setValue(LinkConfigKeys::Type, config.value(LinkConfigKeys::Type).toString());
-    if (config.contains(LinkConfigKeys::Name))
-        m_settings->setValue(LinkConfigKeys::Name, config.value(LinkConfigKeys::Name).toString());
-    if (config.contains(LinkConfigKeys::PortName))
-        m_settings->setValue(LinkConfigKeys::PortName, config.value(LinkConfigKeys::PortName).toString());
-    if (config.contains(LinkConfigKeys::BaudRate))
-        m_settings->setValue(LinkConfigKeys::BaudRate, config.value(LinkConfigKeys::BaudRate).toInt());
-    if (config.contains(LinkConfigKeys::HostName))
-        m_settings->setValue(LinkConfigKeys::HostName, config.value(LinkConfigKeys::HostName).toString());
-    if (config.contains(LinkConfigKeys::Port))
-        m_settings->setValue(LinkConfigKeys::Port, config.value(LinkConfigKeys::Port).toInt());
+    if (linkMapContains(config, LinkConfigKeys::Type, INI_LINK_TYPE))
+        m_settings->setValue(INI_LINK_TYPE,
+                             linkMapValue(config, LinkConfigKeys::Type,
+                                          INI_LINK_TYPE).toString());
+    if (linkMapContains(config, LinkConfigKeys::Name, INI_LINK_NAME))
+        m_settings->setValue(INI_LINK_NAME,
+                             linkMapValue(config, LinkConfigKeys::Name,
+                                          INI_LINK_NAME).toString());
+    if (linkMapContains(config, LinkConfigKeys::PortName, INI_LINK_PORT_NAME))
+        m_settings->setValue(INI_LINK_PORT_NAME,
+                             linkMapValue(config, LinkConfigKeys::PortName,
+                                          INI_LINK_PORT_NAME).toString());
+    if (linkMapContains(config, LinkConfigKeys::BaudRate, INI_LINK_BAUD_RATE))
+        m_settings->setValue(INI_LINK_BAUD_RATE,
+                             linkMapValue(config, LinkConfigKeys::BaudRate,
+                                          INI_LINK_BAUD_RATE).toInt());
+    if (linkMapContains(config, LinkConfigKeys::HostName, INI_LINK_HOST_NAME))
+        m_settings->setValue(INI_LINK_HOST_NAME,
+                             linkMapValue(config, LinkConfigKeys::HostName,
+                                          INI_LINK_HOST_NAME).toString());
+    if (linkMapContains(config, LinkConfigKeys::Port, INI_LINK_PORT))
+        m_settings->setValue(INI_LINK_PORT,
+                             linkMapValue(config, LinkConfigKeys::Port,
+                                          INI_LINK_PORT).toInt());
     m_settings->endGroup();
     m_settings->sync();
 }
@@ -143,12 +204,24 @@ void QTestGCSConfig::appendLinkConfig(const QVariantMap &config)
     const QString group = linkGroupKey(count);
     m_settings->setValue(KEY_LINKS_COUNT, count + 1);
     m_settings->beginGroup(group);
-    m_settings->setValue(LinkConfigKeys::Type, config.value(LinkConfigKeys::Type).toString());
-    m_settings->setValue(LinkConfigKeys::Name, config.value(LinkConfigKeys::Name).toString());
-    m_settings->setValue(LinkConfigKeys::PortName, config.value(LinkConfigKeys::PortName).toString());
-    m_settings->setValue(LinkConfigKeys::BaudRate, config.value(LinkConfigKeys::BaudRate).toInt());
-    m_settings->setValue(LinkConfigKeys::HostName, config.value(LinkConfigKeys::HostName).toString());
-    m_settings->setValue(LinkConfigKeys::Port, config.value(LinkConfigKeys::Port).toInt());
+    m_settings->setValue(INI_LINK_TYPE,
+                         linkMapValue(config, LinkConfigKeys::Type,
+                                      INI_LINK_TYPE).toString());
+    m_settings->setValue(INI_LINK_NAME,
+                         linkMapValue(config, LinkConfigKeys::Name,
+                                      INI_LINK_NAME).toString());
+    m_settings->setValue(INI_LINK_PORT_NAME,
+                         linkMapValue(config, LinkConfigKeys::PortName,
+                                      INI_LINK_PORT_NAME).toString());
+    m_settings->setValue(INI_LINK_BAUD_RATE,
+                         linkMapValue(config, LinkConfigKeys::BaudRate,
+                                      INI_LINK_BAUD_RATE).toInt());
+    m_settings->setValue(INI_LINK_HOST_NAME,
+                         linkMapValue(config, LinkConfigKeys::HostName,
+                                      INI_LINK_HOST_NAME).toString());
+    m_settings->setValue(INI_LINK_PORT,
+                         linkMapValue(config, LinkConfigKeys::Port,
+                                      INI_LINK_PORT).toInt());
     m_settings->endGroup();
     m_settings->sync();
 }
@@ -164,11 +237,9 @@ void QTestGCSConfig::removeLinkConfigAt(int index)
         QVariantMap next = linkConfigAt(i + 1);
         setLinkConfigAt(i, next);
     }
-    const QString lastGroup = linkGroupKey(count - 1);
-    m_settings->beginGroup(lastGroup);
-    for (const QString &key : m_settings->childKeys())
-        m_settings->remove(key);
-    m_settings->endGroup();
+    const int last = count - 1;
+    m_settings->remove(linkGroupKey(last));
+    m_settings->remove(QStringLiteral("Link%1").arg(last));
     m_settings->setValue(KEY_LINKS_COUNT, count - 1);
     m_settings->sync();
 }
@@ -258,6 +329,71 @@ double QTestGCSConfig::missionMaximumAltitude() const
         ? m_settings->value(KEY_MISSION_MAXIMUM_ALTITUDE,
                             DEFAULT_MISSION_MAXIMUM_ALTITUDE).toDouble()
         : DEFAULT_MISSION_MAXIMUM_ALTITUDE;
+}
+
+bool QTestGCSConfig::setMapConfiguration(const QVariantMap &config)
+{
+    if (!m_settings) {
+        return false;
+    }
+
+    const QString mapName = config.value(QStringLiteral("mapName"))
+                                .toString().trimmed();
+    bool latitudeOk = false;
+    bool longitudeOk = false;
+    bool initialZoomOk = false;
+    bool vehicleZoomOk = false;
+    bool minimumZoomOk = false;
+    bool maximumZoomOk = false;
+    bool defaultAltitudeOk = false;
+    bool minimumAltitudeOk = false;
+    bool maximumAltitudeOk = false;
+    const double latitude = config.value(QStringLiteral("centerLatitude"))
+                                .toDouble(&latitudeOk);
+    const double longitude = config.value(QStringLiteral("centerLongitude"))
+                                 .toDouble(&longitudeOk);
+    const double initialZoom = config.value(QStringLiteral("initialZoom"))
+                                   .toDouble(&initialZoomOk);
+    const double vehicleZoom = config.value(QStringLiteral("vehicleZoom"))
+                                   .toDouble(&vehicleZoomOk);
+    const double minimumZoom = config.value(QStringLiteral("minimumZoom"))
+                                   .toDouble(&minimumZoomOk);
+    const double maximumZoom = config.value(QStringLiteral("maximumZoom"))
+                                   .toDouble(&maximumZoomOk);
+    const double defaultAltitude = config.value(
+        QStringLiteral("defaultAltitude")).toDouble(&defaultAltitudeOk);
+    const double minimumAltitude = config.value(
+        QStringLiteral("minimumAltitude")).toDouble(&minimumAltitudeOk);
+    const double maximumAltitude = config.value(
+        QStringLiteral("maximumAltitude")).toDouble(&maximumAltitudeOk);
+
+    const bool valid = !mapName.isEmpty() && latitudeOk && longitudeOk &&
+        initialZoomOk && vehicleZoomOk && minimumZoomOk && maximumZoomOk &&
+        defaultAltitudeOk && minimumAltitudeOk && maximumAltitudeOk &&
+        latitude >= -90.0 && latitude <= 90.0 &&
+        longitude >= -180.0 && longitude <= 180.0 &&
+        minimumZoom >= 0.0 && maximumZoom <= 30.0 &&
+        minimumZoom <= initialZoom && initialZoom <= maximumZoom &&
+        minimumZoom <= vehicleZoom && vehicleZoom <= maximumZoom &&
+        minimumAltitude <= defaultAltitude &&
+        defaultAltitude <= maximumAltitude;
+    if (!valid) {
+        return false;
+    }
+
+    m_settings->setValue(KEY_MAP_NAME, mapName);
+    m_settings->setValue(KEY_MAP_CENTER_LATITUDE, latitude);
+    m_settings->setValue(KEY_MAP_CENTER_LONGITUDE, longitude);
+    m_settings->setValue(KEY_MAP_INITIAL_ZOOM, initialZoom);
+    m_settings->setValue(KEY_MAP_VEHICLE_ZOOM, vehicleZoom);
+    m_settings->setValue(KEY_MAP_MINIMUM_ZOOM, minimumZoom);
+    m_settings->setValue(KEY_MAP_MAXIMUM_ZOOM, maximumZoom);
+    m_settings->setValue(KEY_MISSION_DEFAULT_ALTITUDE, defaultAltitude);
+    m_settings->setValue(KEY_MISSION_MINIMUM_ALTITUDE, minimumAltitude);
+    m_settings->setValue(KEY_MISSION_MAXIMUM_ALTITUDE, maximumAltitude);
+    m_settings->sync();
+    emit mapConfigurationChanged();
+    return true;
 }
 
 QString QTestGCSConfig::droneName(int systemId) const

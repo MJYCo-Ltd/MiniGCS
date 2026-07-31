@@ -17,20 +17,22 @@ const char UdpClient[]  = "UdpClient";
 }
 
 /**
- * @brief 单条链路配置的 QVariantMap 键名
+ * @brief 单条链路配置的 QVariantMap / QML 键名（camelCase）
  * type: Serial|TcpServer|TcpClient|UdpServer|UdpClient
  * name: 可选显示名称
  * portName, baudRate: Serial 专用
- * hostName, port: TcpClient/UdpClient 专用
- * port: TcpServer/UdpServer 专用（仅端口）
+ * hostName, port: TcpClient/UdpClient 为远端；TcpServer/UdpServer 中
+ * hostName 为绑定地址（可空，空则底层使用 0.0.0.0）
+ *
+ * INI 文件内仍使用 PascalCase（Type/Name/...），由 QTestGCSConfig 做映射。
  */
 namespace LinkConfigKeys {
-const char Type[]      = "Type";
-const char Name[]      = "Name";
-const char PortName[]  = "PortName";
-const char BaudRate[]  = "BaudRate";
-const char HostName[]  = "HostName";
-const char Port[]      = "Port";
+const char Type[]      = "type";
+const char Name[]      = "name";
+const char PortName[]  = "portName";
+const char BaudRate[]  = "baudRate";
+const char HostName[]  = "hostName";
+const char Port[]      = "port";
 }
 
 /**
@@ -58,6 +60,7 @@ public:
     Q_INVOKABLE double missionDefaultAltitude() const;
     Q_INVOKABLE double missionMinimumAltitude() const;
     Q_INVOKABLE double missionMaximumAltitude() const;
+    Q_INVOKABLE bool setMapConfiguration(const QVariantMap &config);
 
     // ---------- 多链路配置 ----------
     /** 链路数量 */
@@ -86,6 +89,9 @@ public:
 
     void release() override;
 
+signals:
+    void mapConfigurationChanged();
+
 protected:
     void initializeDefaults() override;
 
@@ -95,6 +101,7 @@ private:
     Q_DISABLE_COPY(QTestGCSConfig)
 
     QString linkGroupKey(int index) const;
+    QString resolveLinkGroup(int index) const;
     QString droneGroupKey(int index) const;
     int findDroneGroup(const QString &name) const;
 

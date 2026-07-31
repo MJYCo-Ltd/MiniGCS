@@ -12,7 +12,7 @@ Rectangle {
     signal clearBusinessRequested()
     signal clearFirmwareRequested()
 
-    height: expanded ? 230 : 38
+    implicitHeight: expanded ? 230 : 38
     radius: 7
     color: "#ee111827"
     border.color: "#475467"

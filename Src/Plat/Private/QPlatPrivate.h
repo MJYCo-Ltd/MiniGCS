@@ -85,6 +85,11 @@ public:
      */
     virtual void setupMessageHandling();
 
+    /**
+     * @brief Synchronize the current MAVSDK connection state to QPlat.
+     */
+    void syncConnectionStatus() const;
+
 private:
     /**
      * @brief 更新版本信息（通过 Info 插件）

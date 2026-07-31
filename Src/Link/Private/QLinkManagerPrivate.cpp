@@ -8,23 +8,36 @@
 QString QLinkManagerPrivate::buildConnectionString(LinkKind type, const LinkParams &params)
 {
     switch (type) {
-    case LinkKind::TcpServer:
+    case LinkKind::TcpServer: {
         if (params.port == 0) return {};
-        return QString("tcpin://0.0.0.0:%1").arg(params.port);
+        // MAVSDK: tcpin://bind_ip:port；未指定时绑定全部网卡
+        const QString host = params.hostName.trimmed().isEmpty()
+            ? QStringLiteral("0.0.0.0")
+            : params.hostName.trimmed();
+        return QStringLiteral("tcpin://%1:%2").arg(host).arg(params.port);
+    }
     case LinkKind::TcpClient:
         if (params.hostName.trimmed().isEmpty() || params.port == 0) return {};
-        return QString("tcpout://%1:%2").arg(params.hostName.trimmed()).arg(params.port);
-    case LinkKind::UdpServer:
+        return QStringLiteral("tcpout://%1:%2")
+            .arg(params.hostName.trimmed()).arg(params.port);
+    case LinkKind::UdpServer: {
         if (params.port == 0) return {};
-        return QString("udpin://0.0.0.0:%1").arg(params.port);
+        // MAVSDK: udpin://bind_ip:port；未指定时绑定全部网卡
+        const QString host = params.hostName.trimmed().isEmpty()
+            ? QStringLiteral("0.0.0.0")
+            : params.hostName.trimmed();
+        return QStringLiteral("udpin://%1:%2").arg(host).arg(params.port);
+    }
     case LinkKind::UdpClient:
         if (params.hostName.trimmed().isEmpty() || params.port == 0) return {};
-        return QString("udpout://%1:%2").arg(params.hostName.trimmed()).arg(params.port);
+        return QStringLiteral("udpout://%1:%2")
+            .arg(params.hostName.trimmed()).arg(params.port);
     case LinkKind::Serial:
         if (params.portName.trimmed().isEmpty() || params.baudRate <= 0) return {};
-        return QString("serial://%1:%2").arg(params.portName.trimmed()).arg(params.baudRate);
+        return QStringLiteral("serial://%1:%2")
+            .arg(params.portName.trimmed()).arg(params.baudRate);
     case LinkKind::Raw:
-        return QString("raw://");
+        return QStringLiteral("raw://");
     default:
         return QString();
     }

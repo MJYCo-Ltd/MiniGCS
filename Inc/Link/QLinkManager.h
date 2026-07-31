@@ -36,7 +36,9 @@ using LinkKind = LinkTypes::Kind;
 /**
  * @brief 链路参数结构体
  *
- * 根据 LinkKind 使用不同字段：Tcp/Udp Server 用 port；Client 用 hostName+port；Serial 用 portName+baudRate
+ * 根据 LinkKind 使用不同字段：
+ * Server 用 hostName（绑定地址，空则 0.0.0.0）+ port；
+ * Client 用 hostName+port；Serial 用 portName+baudRate
  */
 struct MINIGCS_EXPORT LinkParams {
     Q_GADGET
@@ -46,7 +48,7 @@ struct MINIGCS_EXPORT LinkParams {
     Q_PROPERTY(int baudRate MEMBER baudRate)
 public:
     quint16 port{0};
-    QString hostName;
+    QString hostName;   ///< Server 为绑定地址；Client 为远端主机
     QString portName;   ///< 串口名称（Serial 专用）
     int baudRate{0};    ///< 波特率（Serial 专用）
 };

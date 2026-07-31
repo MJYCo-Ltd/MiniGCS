@@ -169,6 +169,25 @@ void QPlatPrivate::setupMessageHandling() {
                     }, Qt::QueuedConnection);
             }
         });
+
+    // subscribe_is_connected() only reports future transitions. Synchronize
+    // the current value so an already-online system cannot remain offline in UI.
+    syncConnectionStatus();
+}
+
+void QPlatPrivate::syncConnectionStatus() const
+{
+    if (!m_pSystem) {
+        return;
+    }
+
+    const QPointer<QPlat> plat(q_ptr);
+    const bool isConnected = m_pSystem->is_connected();
+    if (plat) {
+        QMetaObject::invokeMethod(plat, "connectionStatusChanged",
+                                  Qt::QueuedConnection,
+                                  Q_ARG(bool, isConnected));
+    }
 }
 
 template<>struct fmt::formatter<mavsdk::Info::Result>:ostream_formatter{};

@@ -1,12 +1,57 @@
 #include "QDroneControlManager.h"
 
 #include "Plat/QAutopilot.h"
+#include "Link/QDataLink.h"
+#include "Link/QLinkManager.h"
 #include "QGCSConfig.h"
 #include "QGroundControlStation.h"
 #include "QTestGCSConfig.h"
 
 #include <algorithm>
 #include <cmath>
+#include <QSet>
+
+namespace {
+bool parseLinkConfiguration(const QVariantMap &config,
+                            LinkKind &kind, LinkParams &params)
+{
+    const QString type = config.value(LinkConfigKeys::Type).toString();
+    if (type == LinkType::Serial) {
+        kind = LinkKind::Serial;
+        params.portName = config.value(LinkConfigKeys::PortName).toString();
+        params.baudRate = config.value(LinkConfigKeys::BaudRate).toInt();
+        return !params.portName.isEmpty() && params.baudRate > 0;
+    }
+    if (type == LinkType::TcpServer || type == LinkType::UdpServer) {
+        kind = type == LinkType::TcpServer
+            ? LinkKind::TcpServer : LinkKind::UdpServer;
+        params.hostName = config.value(LinkConfigKeys::HostName)
+                              .toString().trimmed();
+        bool portOk = false;
+        const uint port = config.value(LinkConfigKeys::Port).toUInt(&portOk);
+        if (!portOk || port == 0 || port > 65535) {
+            return false;
+        }
+        params.port = static_cast<quint16>(port);
+        return true;
+    }
+    if (type == LinkType::TcpClient || type == LinkType::UdpClient) {
+        kind = type == LinkType::TcpClient
+            ? LinkKind::TcpClient : LinkKind::UdpClient;
+        params.hostName = config.value(LinkConfigKeys::HostName)
+                              .toString().trimmed();
+        bool portOk = false;
+        const uint port = config.value(LinkConfigKeys::Port).toUInt(&portOk);
+        if (!portOk || port == 0 || port > 65535 ||
+            params.hostName.isEmpty()) {
+            return false;
+        }
+        params.port = static_cast<quint16>(port);
+        return true;
+    }
+    return false;
+}
+} // namespace
 
 QDroneControlManager::QDroneControlManager(
     QGroundControlStation *groundStation, QObject *parent)
@@ -212,6 +257,53 @@ void QDroneControlManager::clearFirmwareLogs()
     }
     m_firmwareLogs.clear();
     emit firmwareLogsChanged();
+}
+
+bool QDroneControlManager::applyConfiguredLinks()
+{
+    if (!m_groundStation || !m_groundStation->linkManager()) {
+        emit commandRejected(tr("链路管理器尚未就绪"));
+        return false;
+    }
+
+    QList<QPair<LinkKind, LinkParams>> parsedLinks;
+    QSet<QString> connectionStrings;
+    const QVariantList configurations =
+        QTestGCSConfig::instance()->linkConfigList();
+    for (qsizetype index = 0; index < configurations.size(); ++index) {
+        LinkKind kind = LinkKind::Raw;
+        LinkParams params;
+        if (!parseLinkConfiguration(configurations.at(index).toMap(),
+                                    kind, params)) {
+            emit commandRejected(
+                tr("第 %1 条链路配置无效").arg(index + 1));
+            return false;
+        }
+        const QString connectionString =
+            QLinkManager::buildConnectionString(kind, params);
+        if (connectionString.isEmpty() ||
+            connectionStrings.contains(connectionString)) {
+            emit commandRejected(
+                tr("第 %1 条链路为空或与其他链路重复").arg(index + 1));
+            return false;
+        }
+        connectionStrings.insert(connectionString);
+        parsedLinks.append(qMakePair(kind, params));
+    }
+
+    QLinkManager *const manager = m_groundStation->linkManager();
+    manager->clearAll();
+    for (const auto &entry : parsedLinks) {
+        if (!manager->addLink(entry.first, entry.second)) {
+            emit commandRejected(tr("应用链路配置失败，请检查日志"));
+            return false;
+        }
+    }
+
+    m_businessLogs.append(
+        tr("已应用 %1 条链路配置并重新连接").arg(parsedLinks.size()));
+    emit businessLogsChanged();
+    return true;
 }
 
 void QDroneControlManager::renameDrone(int systemId, const QString &name)

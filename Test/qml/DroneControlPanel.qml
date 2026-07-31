@@ -11,8 +11,9 @@ Rectangle {
     property string statusText: qsTr("控制命令执行前会进行确认")
 
     signal commandRequested(int command, bool groupCommand)
+    signal statusRequested()
 
-    width: 410
+    implicitWidth: 410
     color: "#f5f7fa"
     border.color: "#d9dee7"
 
@@ -52,6 +53,7 @@ Rectangle {
                 onCommandRequested: function(command) {
                     root.commandRequested(command, false)
                 }
+                onStatusRequested: root.statusRequested()
             }
 
             GroupDroneControl {

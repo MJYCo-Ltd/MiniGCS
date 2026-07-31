@@ -26,14 +26,34 @@ class MINIGCS_EXPORT QAutopilot : public QPlat
     Q_PROPERTY(QAutopilotStatus status READ status NOTIFY statusChanged)
     Q_PROPERTY(QAutopilotFixedwing fixedwing READ fixedwing NOTIFY fixedwingChanged)
     Q_PROPERTY(double heading READ heading NOTIFY headingChanged)
+    Q_PROPERTY(double relativeAltitudeM READ relativeAltitudeM NOTIFY positionDetailsChanged)
+    Q_PROPERTY(double rollDeg READ rollDeg NOTIFY attitudeChanged)
+    Q_PROPERTY(double pitchDeg READ pitchDeg NOTIFY attitudeChanged)
+    Q_PROPERTY(double yawDeg READ yawDeg NOTIFY attitudeChanged)
     Q_PROPERTY(double groundSpeedMS READ groundSpeedMS NOTIFY motionChanged)
     Q_PROPERTY(double verticalSpeedMS READ verticalSpeedMS NOTIFY motionChanged)
+    Q_PROPERTY(double velocityNorthMS READ velocityNorthMS NOTIFY motionChanged)
+    Q_PROPERTY(double velocityEastMS READ velocityEastMS NOTIFY motionChanged)
+    Q_PROPERTY(double velocityDownMS READ velocityDownMS NOTIFY motionChanged)
     Q_PROPERTY(bool moving READ moving NOTIFY motionChanged)
     Q_PROPERTY(bool armed READ armed NOTIFY armedChanged)
     Q_PROPERTY(bool inAir READ inAir NOTIFY inAirChanged)
+    Q_PROPERTY(int flightMode READ flightMode NOTIFY flightModeChanged)
+    Q_PROPERTY(QString flightModeName READ flightModeName NOTIFY flightModeChanged)
+    Q_PROPERTY(int landedState READ landedState NOTIFY landedStateChanged)
+    Q_PROPERTY(QString landedStateName READ landedStateName NOTIFY landedStateChanged)
+    Q_PROPERTY(double gpsHdop READ gpsHdop NOTIFY rawGpsChanged)
+    Q_PROPERTY(double gpsVdop READ gpsVdop NOTIFY rawGpsChanged)
+    Q_PROPERTY(double gpsVelocityMS READ gpsVelocityMS NOTIFY rawGpsChanged)
+    Q_PROPERTY(double gpsCourseDeg READ gpsCourseDeg NOTIFY rawGpsChanged)
+    Q_PROPERTY(double gpsHorizontalUncertaintyM READ gpsHorizontalUncertaintyM NOTIFY rawGpsChanged)
+    Q_PROPERTY(double gpsVerticalUncertaintyM READ gpsVerticalUncertaintyM NOTIFY rawGpsChanged)
+    Q_PROPERTY(double gpsVelocityUncertaintyMS READ gpsVelocityUncertaintyMS NOTIFY rawGpsChanged)
+    Q_PROPERTY(double gpsHeadingUncertaintyDeg READ gpsHeadingUncertaintyDeg NOTIFY rawGpsChanged)
     Q_PROPERTY(bool airLineDownloading READ airLineDownloading NOTIFY airLineDownloadingChanged)
     Q_PROPERTY(bool airLineUploading READ airLineUploading NOTIFY airLineUploadingChanged)
     Q_PROPERTY(QAutoVehicleType::Vehicle vehicleType READ vehicleType WRITE setVehicleType NOTIFY vehicleTypeChanged)
+    Q_PROPERTY(QString vehicleName READ vehicleName NOTIFY vehicleNameChanged)
     Q_PROPERTY(QAutoVehicleType::Autopilot autopilotType READ autopilotType WRITE setAutopilotType NOTIFY autopilotTypeChanged)
     Q_PROPERTY(QString autopilotName READ autopilotName NOTIFY autopilotNameChanged)
 
@@ -119,11 +139,30 @@ public:
      * @return 航向角（度）
      */
     double heading() const { return m_heading; }
+    double relativeAltitudeM() const { return m_relativeAltitudeM; }
+    double rollDeg() const { return m_rollDeg; }
+    double pitchDeg() const { return m_pitchDeg; }
+    double yawDeg() const { return m_yawDeg; }
     double groundSpeedMS() const { return m_groundSpeedMS; }
     double verticalSpeedMS() const { return m_verticalSpeedMS; }
+    double velocityNorthMS() const { return m_velocityNorthMS; }
+    double velocityEastMS() const { return m_velocityEastMS; }
+    double velocityDownMS() const { return m_velocityDownMS; }
     bool moving() const { return m_moving; }
     bool armed() const { return m_armed; }
     bool inAir() const { return m_inAir; }
+    int flightMode() const { return m_flightMode; }
+    QString flightModeName() const;
+    int landedState() const { return m_landedState; }
+    QString landedStateName() const;
+    double gpsHdop() const { return m_gpsHdop; }
+    double gpsVdop() const { return m_gpsVdop; }
+    double gpsVelocityMS() const { return m_gpsVelocityMS; }
+    double gpsCourseDeg() const { return m_gpsCourseDeg; }
+    double gpsHorizontalUncertaintyM() const { return m_gpsHorizontalUncertaintyM; }
+    double gpsVerticalUncertaintyM() const { return m_gpsVerticalUncertaintyM; }
+    double gpsVelocityUncertaintyMS() const { return m_gpsVelocityUncertaintyMS; }
+    double gpsHeadingUncertaintyDeg() const { return m_gpsHeadingUncertaintyDeg; }
 
     /**
      * @brief 设置航向角
@@ -136,6 +175,7 @@ public:
      * @return 载具类型
      */
     QAutoVehicleType::Vehicle vehicleType() const { return m_vehicleType; }
+    QString vehicleName() const;
 
     /**
      * @brief 设置载具类型
@@ -202,9 +242,14 @@ signals:
      * @param heading 新的航向角（度）
      */
     void headingChanged(double heading);
+    void positionDetailsChanged();
+    void attitudeChanged();
     void motionChanged();
     void armedChanged(bool armed);
     void inAirChanged(bool inAir);
+    void flightModeChanged();
+    void landedStateChanged();
+    void rawGpsChanged();
 
     /**
      * @brief 固定翼状态变化信号
@@ -217,6 +262,7 @@ signals:
      * @param vehicleType 新的载具类型
      */
     void vehicleTypeChanged(QAutoVehicleType::Vehicle vehicleType);
+    void vehicleNameChanged();
 
     /**
      * @brief 自动驾驶仪类型变化信号
@@ -242,16 +288,28 @@ signals:
     void airLineUploadingChanged(bool uploading);
 
 protected slots:
-    void positionUpdate(double dLon, double dLat, float dH);
+    void positionUpdate(double dLon, double dLat, float dH,
+                        float relativeAltitudeM);
     void nedUpdate(float dNorth, float dEast, float dDown,
                    float velocityNorth, float velocityEast,
                    float velocityDown);
     void armedUpdate(bool armed);
     void inAirUpdate(bool inAir);
     void gpsInfoUpdate(int gpsCount, int gpsStatus);
-    void batteryUpdate(float batteryVoltage, float batteryRemaining);
+    void batteryUpdate(int batteryId, float temperatureC,
+                       float batteryVoltage, float batteryCurrentA,
+                       float consumedAh, float batteryRemaining,
+                       float timeRemainingS, int batteryFunction);
     void rcStatusUpdate(bool isAvailable, float signalStrengthPercent);
     void headingUpdate(double heading);
+    void attitudeUpdate(float rollDeg, float pitchDeg, float yawDeg);
+    void flightModeUpdate(int flightMode, const QString &fallbackName);
+    void landedStateUpdate(int landedState, const QString &fallbackName);
+    void rawGpsUpdate(float hdop, float vdop, float velocityMS,
+                      float courseDeg, float horizontalUncertaintyM,
+                      float verticalUncertaintyM,
+                      float velocityUncertaintyMS,
+                      float headingUncertaintyDeg);
     void healthUpdate(bool isGyrometerCalibrationOk, bool isAccelerometerCalibrationOk,
                       bool isMagnetometerCalibrationOk, bool isLocalPositionOk,
                       bool isGlobalPositionOk, bool isHomePositionOk, bool isArmable);
@@ -284,11 +342,30 @@ protected:
     QAutopilotStatus m_status;
     QAutopilotFixedwing m_fixedwing;
     double m_heading{0.0};  ///< 航向角（度）
+    double m_relativeAltitudeM{0.0};
+    double m_rollDeg{0.0};
+    double m_pitchDeg{0.0};
+    double m_yawDeg{0.0};
     double m_groundSpeedMS{0.0};
     double m_verticalSpeedMS{0.0};
+    double m_velocityNorthMS{0.0};
+    double m_velocityEastMS{0.0};
+    double m_velocityDownMS{0.0};
     bool m_moving{false};
     bool m_armed{false};
     bool m_inAir{false};
+    int m_flightMode{0};
+    int m_landedState{0};
+    QString m_flightModeFallbackName;
+    QString m_landedStateFallbackName;
+    double m_gpsHdop{0.0};
+    double m_gpsVdop{0.0};
+    double m_gpsVelocityMS{0.0};
+    double m_gpsCourseDeg{0.0};
+    double m_gpsHorizontalUncertaintyM{0.0};
+    double m_gpsVerticalUncertaintyM{0.0};
+    double m_gpsVelocityUncertaintyMS{0.0};
+    double m_gpsHeadingUncertaintyDeg{0.0};
     int m_motionStartSamples{0};
     int m_motionStopSamples{0};
     QAutoVehicleType::Vehicle m_vehicleType{QAutoVehicleType::Vehicle_Unknown};  ///< 载具类型

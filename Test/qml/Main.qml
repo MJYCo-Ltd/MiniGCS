@@ -1,20 +1,33 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Layouts
 import MiniGCS
 
 ApplicationWindow {
     id: root
 
-    width: 1180
-    height: 720
-    minimumWidth: 900
-    minimumHeight: 600
+    width: 1440
+    height: 900
+    minimumWidth: 1024
+    minimumHeight: 700
     visible: true
     title: qsTr("MiniGCS 无人机控制")
 
     property int pendingCommand: -1
     property bool pendingGroupCommand: false
     property var pendingWaypoints: []
+
+    function selectedDroneEntry() {
+        const drones = DroneControl.drones
+        for (let index = 0; index < drones.length; ++index) {
+            if (Number(drones[index].systemId) ===
+                    Number(controlPanel.selectedDroneId))
+                return drones[index]
+        }
+        return null
+    }
 
     function requestCommand(command, groupCommand, waypoints) {
         pendingCommand = command
@@ -45,6 +58,14 @@ ApplicationWindow {
                 checkable: true
                 checked: true
             }
+            MenuItem {
+                text: qsTr("无人机详细状态")
+                enabled: controlPanel.selectedDroneId >= 0
+                onTriggered: {
+                    controlPanelMenuItem.checked = true
+                    rightPanelTabs.currentIndex = 1
+                }
+            }
             MenuSeparator {}
             MenuItem {
                 text: qsTr("显示全部")
@@ -63,68 +84,211 @@ ApplicationWindow {
                 }
             }
         }
+        Menu {
+            title: qsTr("配置")
+
+            MenuItem {
+                text: qsTr("链路配置")
+                onTriggered: {
+                    settingsTabs.currentIndex = 0
+                    settingsDialog.open()
+                }
+            }
+            MenuItem {
+                text: qsTr("地图配置")
+                onTriggered: {
+                    settingsTabs.currentIndex = 1
+                    settingsDialog.open()
+                }
+            }
+        }
     }
 
-    DroneMap {
+    SplitView {
+        id: horizontalSplit
         anchors.fill: parent
-        anchors.rightMargin: controlPanel.visible ? controlPanel.width : 0
-        drones: DroneControl.drones
-        selectedDroneId: controlPanel.selectedDroneId
-        waypointModel: routeEditor.waypointModel
-        routeCoordinates: routeEditor.routeCoordinates
-        routeEditing: routeEditor.editing
+        orientation: Qt.Horizontal
 
-        onDroneSelected: function(systemId) {
-            controlPanel.selectedDroneId = systemId
+        handle: Rectangle {
+            implicitWidth: 5
+            implicitHeight: 5
+            color: SplitHandle.pressed ? "#3b82f6"
+                  : SplitHandle.hovered ? "#93c5fd" : "#d0d5dd"
         }
-        onRouteCoordinateRequested: function(coordinate) {
-            routeEditor.addCoordinate(coordinate)
+
+        Rectangle {
+            id: routeDock
+            visible: routeEditorMenuItem.checked
+            SplitView.preferredWidth: 360
+            SplitView.minimumWidth: 240
+            SplitView.maximumWidth: 520
+            color: "#f5f7fa"
+            border.color: "#d0d5dd"
+
+            RouteEditor {
+                id: routeEditor
+                anchors.fill: parent
+                radius: 0
+                color: "#f8fafc"
+                selectedDroneId: controlPanel.selectedDroneId
+                selectedGroupName: controlPanel.selectedGroupName
+
+                onUploadRequested: function(groupCommand, waypoints) {
+                    root.requestCommand(DroneControl.uploadMissionCommand,
+                                        groupCommand, waypoints)
+                }
+            }
+        }
+
+        SplitView {
+            id: centerSplit
+            SplitView.fillWidth: true
+            SplitView.minimumWidth: 350
+            orientation: Qt.Vertical
+
+            handle: Rectangle {
+                implicitWidth: 5
+                implicitHeight: 5
+                color: SplitHandle.pressed ? "#3b82f6"
+                      : SplitHandle.hovered ? "#93c5fd" : "#d0d5dd"
+            }
+
+            Rectangle {
+                SplitView.fillHeight: true
+                SplitView.minimumHeight: 260
+                color: "#e9eef5"
+
+                Loader {
+                    id: mapLoader
+                    anchors.fill: parent
+                    sourceComponent: mapComponent
+                }
+
+                Component {
+                    id: mapComponent
+                    DroneMap {
+                        drones: DroneControl.drones
+                        selectedDroneId: controlPanel.selectedDroneId
+                        waypointModel: routeEditor.waypointModel
+                        routeCoordinates: routeEditor.routeCoordinates
+                        routeEditing: routeEditor.editing
+
+                        onDroneSelected: function(systemId) {
+                            controlPanel.selectedDroneId = systemId
+                        }
+                        onRouteCoordinateRequested: function(coordinate) {
+                            routeEditor.addCoordinate(coordinate)
+                        }
+                    }
+                }
+
+                Connections {
+                    target: AppConfig
+                    function onMapConfigurationChanged() {
+                        mapLoader.active = false
+                        Qt.callLater(function() {
+                            mapLoader.active = true
+                        })
+                    }
+                }
+            }
+
+            LogPanel {
+                id: logPanel
+                visible: logPanelMenuItem.checked
+                SplitView.preferredHeight: expanded ? 230 : 38
+                SplitView.minimumHeight: expanded ? 120 : 38
+                SplitView.maximumHeight: expanded ? 520 : 38
+                radius: 0
+                businessLogs: DroneControl.businessLogs
+                firmwareLogs: DroneControl.firmwareLogs
+
+                onClearBusinessRequested: DroneControl.clearBusinessLogs()
+                onClearFirmwareRequested: DroneControl.clearFirmwareLogs()
+            }
+        }
+
+        Rectangle {
+            id: rightDock
+            visible: controlPanelMenuItem.checked
+            SplitView.preferredWidth: 460
+            SplitView.minimumWidth: 320
+            SplitView.maximumWidth: 720
+            color: "#f5f7fa"
+            border.color: "#d0d5dd"
+
+            ColumnLayout {
+                anchors.fill: parent
+                spacing: 0
+
+                TabBar {
+                    id: rightPanelTabs
+                    Layout.fillWidth: true
+                    TabButton { text: qsTr("控制") }
+                    TabButton { text: qsTr("状态") }
+                }
+
+                StackLayout {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    currentIndex: rightPanelTabs.currentIndex
+
+                    DroneControlPanel {
+                        id: controlPanel
+
+                        onCommandRequested: function(command, groupCommand) {
+                            root.requestCommand(command, groupCommand, [])
+                        }
+                        onStatusRequested: rightPanelTabs.currentIndex = 1
+                    }
+
+                    DroneStatusPage {
+                        vehicle: {
+                            const entry = root.selectedDroneEntry()
+                            return entry ? entry.vehicle : null
+                        }
+                        droneName: {
+                            const entry = root.selectedDroneEntry()
+                            return entry ? entry.name : ""
+                        }
+                        waypointModel: routeEditor.waypointModel
+                        onCloseRequested: rightPanelTabs.currentIndex = 0
+                    }
+                }
+            }
         }
     }
 
-    RouteEditor {
-        id: routeEditor
-        visible: routeEditorMenuItem.checked
-        anchors.left: parent.left
-        anchors.top: parent.top
-        anchors.margins: 12
-        z: 10
-        selectedDroneId: controlPanel.selectedDroneId
-        selectedGroupName: controlPanel.selectedGroupName
+    Dialog {
+        id: settingsDialog
+        modal: true
+        width: Math.min(root.width - 80, 1050)
+        height: Math.min(root.height - 80, 720)
+        x: Math.round((root.width - width) / 2)
+        y: Math.round((root.height - height) / 2)
+        padding: 0
+        title: settingsTabs.currentIndex === 0
+               ? qsTr("链路配置") : qsTr("地图配置")
+        standardButtons: Dialog.Close
 
-        onUploadRequested: function(groupCommand, waypoints) {
-            root.requestCommand(DroneControl.uploadMissionCommand,
-                                groupCommand, waypoints)
-        }
-    }
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 0
 
-    LogPanel {
-        id: logPanel
-        visible: logPanelMenuItem.checked
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        anchors.leftMargin: 12
-        anchors.rightMargin: controlPanel.visible
-                             ? controlPanel.width + 12 : 12
-        anchors.bottomMargin: 12
-        z: 9
-        businessLogs: DroneControl.businessLogs
-        firmwareLogs: DroneControl.firmwareLogs
+            TabBar {
+                id: settingsTabs
+                Layout.fillWidth: true
+                TabButton { text: qsTr("链路配置") }
+                TabButton { text: qsTr("地图配置") }
+            }
 
-        onClearBusinessRequested: DroneControl.clearBusinessLogs()
-        onClearFirmwareRequested: DroneControl.clearFirmwareLogs()
-    }
-
-    DroneControlPanel {
-        id: controlPanel
-        visible: controlPanelMenuItem.checked
-        anchors.top: parent.top
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-
-        onCommandRequested: function(command, groupCommand) {
-            root.requestCommand(command, groupCommand, [])
+            StackLayout {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                currentIndex: settingsTabs.currentIndex
+                LinkConfigPage {}
+                MapConfigPage {}
+            }
         }
     }
 

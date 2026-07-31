@@ -289,6 +289,7 @@ void QGroundControlStationPrivate::bindConnectedSystem(
     const bool hasAutopilot = system->has_autopilot();
     QPlat *platform = station->getOrCreatePlat(systemId, hasAutopilot);
     if (platform->d_ptr && platform->d_ptr->getSystem() == system) {
+        platform->d_ptr->syncConnectionStatus();
         return;
     }
 

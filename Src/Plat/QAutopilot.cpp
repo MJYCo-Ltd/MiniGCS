@@ -197,6 +197,7 @@ void QAutopilot::setVehicleType(QAutoVehicleType::Vehicle vehicleType) {
     if (m_vehicleType != vehicleType) {
         m_vehicleType = vehicleType;
         emit vehicleTypeChanged(m_vehicleType);
+        emit vehicleNameChanged();
     }
 }
 
@@ -208,7 +209,8 @@ void QAutopilot::setAutopilotType(QAutoVehicleType::Autopilot autopilotType) {
     }
 }
 
-void QAutopilot::positionUpdate(double dLon, double dLat, float dH) {
+void QAutopilot::positionUpdate(double dLon, double dLat, float dH,
+                                float relativeAltitudeM) {
     const bool firstPosition = !m_hasGpsPosition;
     if (firstPosition ||
         !qFuzzyCompare(m_gpsPosition.longitude(), dLon) ||
@@ -223,11 +225,39 @@ void QAutopilot::positionUpdate(double dLon, double dLat, float dH) {
         }
         emit gpsPositionChanged(m_gpsPosition);
     }
+    if (!qFuzzyCompare(m_relativeAltitudeM,
+                       static_cast<double>(relativeAltitudeM))) {
+        m_relativeAltitudeM = relativeAltitudeM;
+        emit positionDetailsChanged();
+    }
 }
 
 QString QAutopilot::autopilotName() const
 {
     return QAutoVehicleType::getAutopilotName(m_autopilotType);
+}
+
+QString QAutopilot::vehicleName() const
+{
+    return QAutoVehicleType::getVehicleName(m_vehicleType);
+}
+
+QString QAutopilot::flightModeName() const
+{
+    const QString localized = QMavsdkTextCatalog::text(
+        QStringLiteral("flightMode"), m_flightMode);
+    const QString missing = QStringLiteral("flightMode(%1)").arg(m_flightMode);
+    return localized == missing && !m_flightModeFallbackName.isEmpty()
+        ? m_flightModeFallbackName : localized;
+}
+
+QString QAutopilot::landedStateName() const
+{
+    const QString localized = QMavsdkTextCatalog::text(
+        QStringLiteral("landedState"), m_landedState);
+    const QString missing = QStringLiteral("landedState(%1)").arg(m_landedState);
+    return localized == missing && !m_landedStateFallbackName.isEmpty()
+        ? m_landedStateFallbackName : localized;
 }
 
 void QAutopilot::nedUpdate(float dNorth, float dEast, float dDown,
@@ -253,6 +283,9 @@ void QAutopilot::nedUpdate(float dNorth, float dEast, float dDown,
 
     m_groundSpeedMS = std::hypot(northSpeed, eastSpeed);
     m_verticalSpeedMS = std::abs(downSpeed);
+    m_velocityNorthMS = northSpeed;
+    m_velocityEastMS = eastSpeed;
+    m_velocityDownMS = downSpeed;
     updateMovingState();
     emit motionChanged();
 }
@@ -337,7 +370,10 @@ void QAutopilot::gpsInfoUpdate(int gpsCount, int gpsStatus) {
     }
 }
 
-void QAutopilot::batteryUpdate(float batteryVoltage, float batteryRemaining) {
+void QAutopilot::batteryUpdate(int batteryId, float temperatureC,
+                               float batteryVoltage, float batteryCurrentA,
+                               float consumedAh, float batteryRemaining,
+                               float timeRemainingS, int batteryFunction) {
     bool changed = false;
 
     if (!qFuzzyCompare(m_status.batteryVoltage(), batteryVoltage)) {
@@ -348,10 +384,89 @@ void QAutopilot::batteryUpdate(float batteryVoltage, float batteryRemaining) {
         m_status.setBatteryRemaining(batteryRemaining);
         changed = true;
     }
+    if (m_status.batteryId() != batteryId) {
+        m_status.setBatteryId(batteryId);
+        changed = true;
+    }
+    if (!qFuzzyCompare(m_status.batteryTemperatureC(), temperatureC)) {
+        m_status.setBatteryTemperatureC(temperatureC);
+        changed = true;
+    }
+    if (!qFuzzyCompare(m_status.batteryCurrentA(), batteryCurrentA)) {
+        m_status.setBatteryCurrentA(batteryCurrentA);
+        changed = true;
+    }
+    if (!qFuzzyCompare(m_status.batteryConsumedAh(), consumedAh)) {
+        m_status.setBatteryConsumedAh(consumedAh);
+        changed = true;
+    }
+    if (!qFuzzyCompare(m_status.batteryTimeRemainingS(), timeRemainingS)) {
+        m_status.setBatteryTimeRemainingS(timeRemainingS);
+        changed = true;
+    }
+    const QString function = QMavsdkTextCatalog::text(
+        QStringLiteral("batteryFunction"), batteryFunction);
+    if (m_status.batteryFunction() != function) {
+        m_status.setBatteryFunction(function);
+        changed = true;
+    }
 
     if (changed) {
         emit statusChanged(m_status);
     }
+}
+
+void QAutopilot::attitudeUpdate(float rollDeg, float pitchDeg, float yawDeg)
+{
+    if (qFuzzyCompare(m_rollDeg, static_cast<double>(rollDeg)) &&
+        qFuzzyCompare(m_pitchDeg, static_cast<double>(pitchDeg)) &&
+        qFuzzyCompare(m_yawDeg, static_cast<double>(yawDeg))) {
+        return;
+    }
+    m_rollDeg = rollDeg;
+    m_pitchDeg = pitchDeg;
+    m_yawDeg = yawDeg;
+    emit attitudeChanged();
+}
+
+void QAutopilot::flightModeUpdate(int flightMode, const QString &fallbackName)
+{
+    if (m_flightMode == flightMode &&
+        m_flightModeFallbackName == fallbackName) {
+        return;
+    }
+    m_flightMode = flightMode;
+    m_flightModeFallbackName = fallbackName;
+    emit flightModeChanged();
+}
+
+void QAutopilot::landedStateUpdate(int landedState,
+                                   const QString &fallbackName)
+{
+    if (m_landedState == landedState &&
+        m_landedStateFallbackName == fallbackName) {
+        return;
+    }
+    m_landedState = landedState;
+    m_landedStateFallbackName = fallbackName;
+    emit landedStateChanged();
+}
+
+void QAutopilot::rawGpsUpdate(float hdop, float vdop, float velocityMS,
+                              float courseDeg, float horizontalUncertaintyM,
+                              float verticalUncertaintyM,
+                              float velocityUncertaintyMS,
+                              float headingUncertaintyDeg)
+{
+    m_gpsHdop = hdop;
+    m_gpsVdop = vdop;
+    m_gpsVelocityMS = velocityMS;
+    m_gpsCourseDeg = courseDeg;
+    m_gpsHorizontalUncertaintyM = horizontalUncertaintyM;
+    m_gpsVerticalUncertaintyM = verticalUncertaintyM;
+    m_gpsVelocityUncertaintyMS = velocityUncertaintyMS;
+    m_gpsHeadingUncertaintyDeg = headingUncertaintyDeg;
+    emit rawGpsChanged();
 }
 
 void QAutopilot::rcStatusUpdate(bool isAvailable, float signalStrengthPercent) {

@@ -18,6 +18,12 @@ class MINIGCS_EXPORT QAutopilotStatus
     Q_PROPERTY(QString gpsStatus READ gpsStatus)
     Q_PROPERTY(float batteryVoltage READ batteryVoltage)
     Q_PROPERTY(float batteryRemaining READ batteryRemaining)
+    Q_PROPERTY(int batteryId READ batteryId)
+    Q_PROPERTY(float batteryTemperatureC READ batteryTemperatureC)
+    Q_PROPERTY(float batteryCurrentA READ batteryCurrentA)
+    Q_PROPERTY(float batteryConsumedAh READ batteryConsumedAh)
+    Q_PROPERTY(float batteryTimeRemainingS READ batteryTimeRemainingS)
+    Q_PROPERTY(QString batteryFunction READ batteryFunction)
     Q_PROPERTY(bool isGyrometerCalibrationOk READ isGyrometerCalibrationOk)
     Q_PROPERTY(bool isAccelerometerCalibrationOk READ isAccelerometerCalibrationOk)
     Q_PROPERTY(bool isMagnetometerCalibrationOk READ isMagnetometerCalibrationOk)
@@ -40,6 +46,12 @@ public:
     float batteryVoltage() const { return m_batteryVoltage; }
     
     float batteryRemaining() const { return m_batteryRemaining; }
+    int batteryId() const { return m_batteryId; }
+    float batteryTemperatureC() const { return m_batteryTemperatureC; }
+    float batteryCurrentA() const { return m_batteryCurrentA; }
+    float batteryConsumedAh() const { return m_batteryConsumedAh; }
+    float batteryTimeRemainingS() const { return m_batteryTimeRemainingS; }
+    QString batteryFunction() const { return m_batteryFunction; }
     
     bool isGyrometerCalibrationOk() const { return m_isGyrometerCalibrationOk; }
     
@@ -70,6 +82,12 @@ private:
     void setGpsStatus(const QString &gpsStatus);
     void setBatteryVoltage(float batteryVoltage);
     void setBatteryRemaining(float batteryRemaining);
+    void setBatteryId(int batteryId);
+    void setBatteryTemperatureC(float temperatureC);
+    void setBatteryCurrentA(float currentA);
+    void setBatteryConsumedAh(float consumedAh);
+    void setBatteryTimeRemainingS(float seconds);
+    void setBatteryFunction(const QString &function);
     void setGyrometerCalibrationOk(bool isOk);
     void setAccelerometerCalibrationOk(bool isOk);
     void setMagnetometerCalibrationOk(bool isOk);
@@ -84,6 +102,12 @@ private:
     QString m_gpsStatus;              ///< GPS状态
     float m_batteryVoltage{0.0f};   ///< 电池电压（伏特）
     float m_batteryRemaining{0.0f};  ///< 电池电量（百分比，0-100）
+    int m_batteryId{0};
+    float m_batteryTemperatureC{0.0f};
+    float m_batteryCurrentA{0.0f};
+    float m_batteryConsumedAh{0.0f};
+    float m_batteryTimeRemainingS{0.0f};
+    QString m_batteryFunction;
     bool m_isGyrometerCalibrationOk{false};      ///< 陀螺仪是否已校准
     bool m_isAccelerometerCalibrationOk{false};  ///< 加速度计是否已校准
     bool m_isMagnetometerCalibrationOk{false};   ///< 磁力计是否已校准

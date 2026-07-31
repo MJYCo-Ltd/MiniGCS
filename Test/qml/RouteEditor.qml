@@ -16,8 +16,8 @@ Rectangle {
 
     signal uploadRequested(bool groupCommand, var waypoints)
 
-    width: 360
-    height: 326
+    implicitWidth: 360
+    implicitHeight: 326
     radius: 8
     color: "#eeffffff"
     border.color: "#cbd5e1"

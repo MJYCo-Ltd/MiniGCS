@@ -49,9 +49,12 @@ qt_add_qml_module(${PROJECT_NAME}
         qml/CommandConfirmDialog.qml
         qml/DroneControlPanel.qml
         qml/DroneMap.qml
+        qml/DroneStatusPage.qml
         qml/GroupDroneControl.qml
+        qml/LinkConfigPage.qml
         qml/LogPanel.qml
         qml/Main.qml
+        qml/MapConfigPage.qml
         qml/RouteEditor.qml
         qml/SingleDroneControl.qml
     RESOURCES

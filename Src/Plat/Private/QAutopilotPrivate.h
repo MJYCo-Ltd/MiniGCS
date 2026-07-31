@@ -77,6 +77,10 @@ protected:
     mavsdk::Telemetry::PositionHandle m_positionHandle;
     mavsdk::Telemetry::HeadingHandle m_headingHandle;
     mavsdk::Telemetry::BatteryHandle m_batteryHandle;
+    mavsdk::Telemetry::RawGpsHandle m_rawGpsHandle;
+    mavsdk::Telemetry::AttitudeEulerHandle m_attitudeEulerHandle;
+    mavsdk::Telemetry::FlightModeHandle m_flightModeHandle;
+    mavsdk::Telemetry::LandedStateHandle m_landedStateHandle;
     mavsdk::Telemetry::HealthHandle m_healthHandle;
     mavsdk::Telemetry::GpsInfoHandle m_gpsInfoHandle;
     mavsdk::Telemetry::PositionVelocityNedHandle m_positionVelocityHandle;

@@ -9,6 +9,7 @@ ColumnLayout {
 
     property int selectedDroneId: -1
     signal commandRequested(int command)
+    signal statusRequested()
 
     spacing: 10
 
@@ -167,6 +168,13 @@ ColumnLayout {
             enabled: root.selectedDroneId >= 0
             onClicked: root.commandRequested(
                            DroneControl.downloadMissionCommand)
+        }
+        Button {
+            text: qsTr("查看详细状态")
+            Layout.columnSpan: 2
+            Layout.fillWidth: true
+            enabled: root.selectedDroneId >= 0
+            onClicked: root.statusRequested()
         }
     }
 }

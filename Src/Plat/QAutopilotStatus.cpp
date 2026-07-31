@@ -8,7 +8,9 @@ QAutopilotStatus::QAutopilotStatus()
       m_gpsStatus(QMavsdkTextCatalog::text(
           QStringLiteral("gpsFixType"), -1)),
       m_batteryVoltage(0.0f),
-      m_batteryRemaining(0.0f)
+      m_batteryRemaining(0.0f),
+      m_batteryFunction(QMavsdkTextCatalog::text(
+          QStringLiteral("batteryFunction"), -1))
 {
 }
 
@@ -37,6 +39,36 @@ void QAutopilotStatus::setBatteryVoltage(float batteryVoltage)
 void QAutopilotStatus::setBatteryRemaining(float batteryRemaining)
 {
     m_batteryRemaining = batteryRemaining;
+}
+
+void QAutopilotStatus::setBatteryId(int batteryId)
+{
+    m_batteryId = batteryId;
+}
+
+void QAutopilotStatus::setBatteryTemperatureC(float temperatureC)
+{
+    m_batteryTemperatureC = temperatureC;
+}
+
+void QAutopilotStatus::setBatteryCurrentA(float currentA)
+{
+    m_batteryCurrentA = currentA;
+}
+
+void QAutopilotStatus::setBatteryConsumedAh(float consumedAh)
+{
+    m_batteryConsumedAh = consumedAh;
+}
+
+void QAutopilotStatus::setBatteryTimeRemainingS(float seconds)
+{
+    m_batteryTimeRemainingS = seconds;
+}
+
+void QAutopilotStatus::setBatteryFunction(const QString &function)
+{
+    m_batteryFunction = function;
 }
 
 void QAutopilotStatus::setGyrometerCalibrationOk(bool isOk)
@@ -90,6 +122,12 @@ bool QAutopilotStatus::operator==(const QAutopilotStatus &other) const
            m_gpsStatus == other.m_gpsStatus &&
            qFuzzyCompare(m_batteryVoltage, other.m_batteryVoltage) &&
            qFuzzyCompare(m_batteryRemaining, other.m_batteryRemaining) &&
+           m_batteryId == other.m_batteryId &&
+           qFuzzyCompare(m_batteryTemperatureC, other.m_batteryTemperatureC) &&
+           qFuzzyCompare(m_batteryCurrentA, other.m_batteryCurrentA) &&
+           qFuzzyCompare(m_batteryConsumedAh, other.m_batteryConsumedAh) &&
+           qFuzzyCompare(m_batteryTimeRemainingS, other.m_batteryTimeRemainingS) &&
+           m_batteryFunction == other.m_batteryFunction &&
            m_isGyrometerCalibrationOk == other.m_isGyrometerCalibrationOk &&
            m_isAccelerometerCalibrationOk == other.m_isAccelerometerCalibrationOk &&
            m_isMagnetometerCalibrationOk == other.m_isMagnetometerCalibrationOk &&
