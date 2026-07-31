@@ -2,6 +2,7 @@
 #include <QMetaMethod>
 #include <QByteArray>
 #include <QPointer>
+#include <QThreadPool>
 
 #include "Private/QGroundControlStationPrivate.h"
 #include "Plat/Private/QAutopilotPrivate.h"
@@ -9,6 +10,7 @@
 #include "QGroundControlStation.h"
 #include "Link/QDataLink.h"
 #include "Link/QLinkManager.h"
+#include "Extern/XmlToMavSDK.h"
 
 #include "QGCSConfig.h"
 #include "Private/QGCSLog.h"
@@ -32,9 +34,6 @@ QGroundControlStationPrivate::~QGroundControlStationPrivate()
     if (m_connectionErrorHandle.valid()) {
         m_mavsdk->unsubscribe_connection_errors(m_connectionErrorHandle);
     }
-    if (m_incomingMessagesHandle.valid()) {
-        m_mavsdk->unsubscribe_incoming_messages_json(m_incomingMessagesHandle);
-    }
 }
 
 template<>struct fmt::formatter<mavsdk::ConnectionResult>:ostream_formatter{};
@@ -52,15 +51,56 @@ void QGroundControlStationPrivate::initializeMavsdk()
     config.set_component_id(QGCSConfig::instance()->gcsComponentId());
     m_mavsdk = std::make_shared<mavsdk::Mavsdk>(config);
 
-    m_incomingMessagesHandle = m_mavsdk->subscribe_incoming_messages_json(
-        [](mavsdk::Mavsdk::MavlinkMessage msg) {
-            QGCSConfig::instance()->dealMavsdkMessage(msg.system_id,
-                                                      msg.fields_json);
-            return (true);
-        });
+    /// 解析 APM 扩展 XML（命令表 + 内容缓存）；注入 MAVSDK 等首个 System 出现时只做一次
+    m_xmlExtension = std::make_shared<XmlToMavSDK>(
+        QGCSConfig::instance()->mavMessageExtension());
+    if (!m_xmlExtension->hasXmlContent()) {
+        spdlog::warn(
+            SYS_FMT_STR,
+            "mav message extension",
+            QGCSConfig::instance()->mavMessageExtension().toUtf8().constData());
+    }
 
     /// 连接由 QLinkManager 通过 addTcpServer/addSerial 等添加
     m_isInitialized = true;
+}
+
+template<>struct fmt::formatter<mavsdk::MavlinkDirect::Result>:ostream_formatter{};
+
+void QGroundControlStationPrivate::ensureCustomXmlLoaded(
+    const std::shared_ptr<mavsdk::System> &system)
+{
+    if (!system || !m_xmlExtension) {
+        return;
+    }
+    if (m_xmlExtension->isCustomXmlApplied()) {
+        return;
+    }
+    if (!m_xmlExtension->hasXmlContent()) {
+        return;
+    }
+
+    const auto extension = m_xmlExtension;
+    const std::weak_ptr<mavsdk::System> weakSystem = system;
+    QThreadPool::globalInstance()->start([extension, weakSystem]() {
+        const auto currentSystem = weakSystem.lock();
+        if (!currentSystem || !extension) {
+            return;
+        }
+
+        mavsdk::MavlinkDirect mavlinkDirect(*currentSystem);
+        const auto result = extension->applyCustomXmlOnce(mavlinkDirect);
+        if (!result.has_value()) {
+            return;
+        }
+        if (mavsdk::MavlinkDirect::Result::Success != *result) {
+            spdlog::error(PLAT_FMT_STR, currentSystem->get_system_id(),
+                          "load_custom_xml", *result);
+        } else {
+            spdlog::info(PLAT_FMT_STR, currentSystem->get_system_id(),
+                         "load_custom_xml", "success");
+        }
+    });
 }
 
 QVector<std::shared_ptr<mavsdk::System>> QGroundControlStationPrivate::getConnectedSystems() const
@@ -185,19 +225,28 @@ void QGroundControlStationPrivate::setupNewSystemDiscoveryCallback(
     QPointer<QGroundControlStation> station =
         qobject_cast<QGroundControlStation *>(parent);
     std::weak_ptr<mavsdk::Mavsdk> weakMavsdk = m_mavsdk;
+    QGroundControlStationPrivate *self = this;
 
     // 订阅新系统发现
-    m_newSystemHandle = m_mavsdk->subscribe_on_new_system([station, weakMavsdk]() {
+    m_newSystemHandle = m_mavsdk->subscribe_on_new_system([station, weakMavsdk, self]() {
         if (!station) {
             return;
         }
-        QMetaObject::invokeMethod(station, [station, weakMavsdk]() {
+        QMetaObject::invokeMethod(station, [station, weakMavsdk, self]() {
             const auto mavsdk = weakMavsdk.lock();
-            if (!station || !mavsdk) {
+            if (!station || !mavsdk || !self) {
                 return;
             }
             // 获取所有系统
             auto systems = mavsdk->systems();
+
+            /// 扩展方言只需注入一次（任意已连接 System 即可）
+            for (const auto &system : systems) {
+                if (system && system->is_connected()) {
+                    self->ensureCustomXmlLoaded(system);
+                    break;
+                }
+            }
 
             // 检查是否有新系统
             for (auto system : systems) {

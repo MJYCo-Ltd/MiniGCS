@@ -238,7 +238,7 @@ autopilot->uploadAirLine(waypoints);
 | `GCS/SystemId` | `246` | 地面站 MAVLink 系统 ID |
 | `GCS/ComponentId` | `191` | 地面站组件 ID |
 | `Logging/Level` | `debug` | `trace` / `debug` / `info` / `warn` / `error` / `critical` / `off` |
-| `MavMessage/Extension` | `ardupilotmega.xml` | MAV 消息扩展定义 |
+| `MavMessage/Extension` | `ardupilotmega.xml` | APM/ArduPilot 扩展消息与命令 XML；相对路径基于配置文件目录，由地面站整站加载一次 |
 | `Mavsdk/TypeTextFile` | `mavsdk_zh_CN.json` | MAVSDK 类型文本映射文件；相对路径基于配置文件目录 |
 | `TimeSync/Enabled` | `true` | 是否启用时间同步 |
 | `Motion/StartHorizontalSpeedMS` | `0.7` | 判定开始移动的水平速度阈值（m/s） |

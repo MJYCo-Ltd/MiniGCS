@@ -294,55 +294,47 @@ void QGCSConfig::dealMavsdkMessage(uint32_t systemID,
         return;
     const QJsonObject obj = doc.object();
     if (obj.value("message_name").toString() == "STATUSTEXT") {
-        const int severity = obj.value("severity").toInt();
-        const QString text = obj.value("text").toString();
-        if (severity >= MavSeverityEmergency &&
-            severity <= MavSeverityWarning) {
-            const QString formatted =
-                QStringLiteral("[%1] [MAVLink] [system_id=%2] %3")
-                    .arg(QDateTime::currentDateTime().toString(
-                             QStringLiteral("yyyy-MM-dd HH:mm:ss.zzz")))
-                    .arg(systemID)
-                    .arg(text);
-            emit firmwareWarningMessage(
-                static_cast<quint32>(systemID), severity, formatted);
-        }
+        dealMavsdkStatusText(systemID, obj.value("severity").toInt(),
+                            obj.value("text").toString());
+    }
+}
 
-        const FirmwareLogScope firmwareLogScope;
-        switch (severity) {
-        case MavSeverityEmergency:
-            spdlog::critical(PLAT_FMT_STR, systemID, "text",
-                             text.toUtf8().data());
-            break;
-        case MavSeverityAlert:
-            spdlog::critical(PLAT_FMT_STR, systemID, "text",
-                             text.toUtf8().data());
-            break;
-        case MavSeverityCritical:
-            spdlog::critical(PLAT_FMT_STR, systemID, "text",
-                             text.toUtf8().data());
-            break;
-        case MavSeverityError:
-            spdlog::error(PLAT_FMT_STR, systemID, "text",
-                          text.toUtf8().data());
-            break;
-        case MavSeverityWarning:
-            spdlog::warn(PLAT_FMT_STR, systemID, "text",
+void QGCSConfig::dealMavsdkStatusText(uint32_t systemID, int severity,
+                                      const QString &text)
+{
+    if (severity >= MavSeverityEmergency &&
+        severity <= MavSeverityWarning) {
+        const QString formatted =
+            QStringLiteral("[%1] [MAVLink] [system_id=%2] %3")
+                .arg(QDateTime::currentDateTime().toString(
+                         QStringLiteral("yyyy-MM-dd HH:mm:ss.zzz")))
+                .arg(systemID)
+                .arg(text);
+        emit firmwareWarningMessage(
+            static_cast<quint32>(systemID), severity, formatted);
+    }
+
+    const FirmwareLogScope firmwareLogScope;
+    switch (severity) {
+    case MavSeverityEmergency:
+    case MavSeverityAlert:
+    case MavSeverityCritical:
+        spdlog::critical(PLAT_FMT_STR, systemID, "text",
                          text.toUtf8().data());
-            break;
-        case MavSeverityNotice:
-            spdlog::info(PLAT_FMT_STR, systemID, "text",
-                         text.toUtf8().data());
-            break;
-        case MavSeverityInfo:
-            spdlog::info(PLAT_FMT_STR, systemID, "text",
-                         text.toUtf8().data());
-            break;
-        case MavSeverityDebug:
-            spdlog::debug(PLAT_FMT_STR, systemID, "text",
-                          text.toUtf8().data());
-            break;
-        }
+        break;
+    case MavSeverityError:
+        spdlog::error(PLAT_FMT_STR, systemID, "text", text.toUtf8().data());
+        break;
+    case MavSeverityWarning:
+        spdlog::warn(PLAT_FMT_STR, systemID, "text", text.toUtf8().data());
+        break;
+    case MavSeverityNotice:
+    case MavSeverityInfo:
+        spdlog::info(PLAT_FMT_STR, systemID, "text", text.toUtf8().data());
+        break;
+    case MavSeverityDebug:
+        spdlog::debug(PLAT_FMT_STR, systemID, "text", text.toUtf8().data());
+        break;
     }
 }
 
@@ -374,10 +366,47 @@ uint8_t QGCSConfig::gcsComponentId() const {
 }
 
 QString QGCSConfig::mavMessageExtension() const {
-    if (!m_settings) {
-        return QString::fromLatin1(DEFAULT_MAV_MESSAGE_EXTENSION);
+    QString configured = QString::fromLatin1(DEFAULT_MAV_MESSAGE_EXTENSION);
+    if (m_settings) {
+        configured =
+            m_settings->value(KEY_MAV_MESSAGE_EXTENSION,
+                              DEFAULT_MAV_MESSAGE_EXTENSION).toString().trimmed();
     }
-    return m_settings->value(KEY_MAV_MESSAGE_EXTENSION, DEFAULT_MAV_MESSAGE_EXTENSION).toString();
+    if (configured.isEmpty()) {
+        configured = QString::fromLatin1(DEFAULT_MAV_MESSAGE_EXTENSION);
+    }
+
+    const QFileInfo configuredFile(configured);
+    if (configuredFile.isAbsolute()) {
+        return configuredFile.absoluteFilePath();
+    }
+
+    QString configDirectory;
+    if (!m_configFilePath.isEmpty()) {
+        configDirectory = QFileInfo(m_configFilePath).absolutePath();
+    } else {
+        configDirectory =
+            QDir(QCoreApplication::applicationDirPath()).filePath("Config");
+    }
+    const QString primaryPath = QDir(configDirectory).filePath(configured);
+    if (QFileInfo::exists(primaryPath) ||
+        configured != QString::fromLatin1(DEFAULT_MAV_MESSAGE_EXTENSION)) {
+        return primaryPath;
+    }
+
+    const QString buildTreePath =
+        QDir(QCoreApplication::applicationDirPath())
+            .filePath(QStringLiteral("../Config/%1").arg(configured));
+    if (QFileInfo::exists(buildTreePath)) {
+        return QFileInfo(buildTreePath).absoluteFilePath();
+    }
+
+    const QString workingDirectoryPath =
+        QDir::current().filePath(QStringLiteral("Config/%1").arg(configured));
+    if (QFileInfo::exists(workingDirectoryPath)) {
+        return QFileInfo(workingDirectoryPath).absoluteFilePath();
+    }
+    return primaryPath;
 }
 
 QString QGCSConfig::mavsdkTypeTextFile() const {

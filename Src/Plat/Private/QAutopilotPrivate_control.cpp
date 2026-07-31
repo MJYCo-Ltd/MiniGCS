@@ -1,6 +1,8 @@
 #include <cmath>
 #include <QCoreApplication>
 #include <QPointer>
+#include <QThreadPool>
+#include <memory>
 #include <utility>
 
 #include "Plat/Private/QAutopilotPrivate.h"
@@ -39,32 +41,38 @@ void QAutopilotPrivate::downloadAirLine(quint64 requestId)
             return;
         }
 
-        QList<QGpsPosition> waypoints;
-        waypoints.reserve(
-            static_cast<qsizetype>(missionPlan.mission_items.size()));
-        for (const mavsdk::Mission::MissionItem &item :
-             missionPlan.mission_items) {
-            if (!std::isfinite(item.longitude_deg) ||
-                !std::isfinite(item.latitude_deg) ||
-                !std::isfinite(item.relative_altitude_m) ||
-                item.longitude_deg < -180.0 ||
-                item.longitude_deg > 180.0 ||
-                item.latitude_deg < -90.0 ||
-                item.latitude_deg > 90.0) {
-                continue;
+        auto plan = std::make_shared<mavsdk::Mission::MissionPlan>(
+            std::move(missionPlan));
+        QThreadPool::globalInstance()->start([autopilot, requestId, plan]() {
+            QList<QGpsPosition> waypoints;
+            waypoints.reserve(
+                static_cast<qsizetype>(plan->mission_items.size()));
+            for (const mavsdk::Mission::MissionItem &item :
+                 plan->mission_items) {
+                if (!std::isfinite(item.longitude_deg) ||
+                    !std::isfinite(item.latitude_deg) ||
+                    !std::isfinite(item.relative_altitude_m) ||
+                    item.longitude_deg < -180.0 ||
+                    item.longitude_deg > 180.0 ||
+                    item.latitude_deg < -90.0 ||
+                    item.latitude_deg > 90.0) {
+                    continue;
+                }
+                waypoints.append(QGpsPosition(item.longitude_deg,
+                                              item.latitude_deg,
+                                              item.relative_altitude_m));
             }
-            waypoints.append(QGpsPosition(item.longitude_deg,
-                                          item.latitude_deg,
-                                          item.relative_altitude_m));
-        }
 
-        QMetaObject::invokeMethod(autopilot,
-            [autopilot, requestId, waypoints]() {
+            QMetaObject::invokeMethod(
+                autopilot,
+                [autopilot, requestId,
+                 waypoints = std::move(waypoints)]() {
                 if (autopilot) {
                     autopilot->completeAirLineDownload(requestId, waypoints);
                 }
             },
             Qt::QueuedConnection);
+        });
     });
 }
 

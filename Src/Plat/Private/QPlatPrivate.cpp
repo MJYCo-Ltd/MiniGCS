@@ -1,4 +1,3 @@
-#include <QFile>
 #include <QDebug>
 #include <QPointer>
 #include <QThreadPool>
@@ -61,7 +60,6 @@ QString QPlatPrivate::toString() const {
     return QString::fromStdString(oss.str());
 }
 
-template<>struct fmt::formatter<mavsdk::MavlinkDirect::Result>:ostream_formatter{};
 void QPlatPrivate::setSystem(std::shared_ptr<mavsdk::System> system) {
     m_infoState->active = false;
     m_infoState = std::make_shared<InfoState>();
@@ -99,40 +97,42 @@ void QPlatPrivate::setSystem(std::shared_ptr<mavsdk::System> system) {
     m_pMavlinkDirect = std::make_shared<mavsdk::MavlinkDirect>(*system);
 
     const QPointer<QPlat> plat(q_ptr);
+    const uint32_t systemId = m_pSystem->get_system_id();
     m_statusTextHandle = m_pMavlinkDirect->subscribe_message(
-        "STATUSTEXT", [plat](mavsdk::MavlinkDirect::MavlinkMessage msg) {
-            QJsonParseError err;
-            QJsonDocument doc =
-                QJsonDocument::fromJson(msg.fields_json.c_str(), &err);
-            if (err.error != QJsonParseError::NoError || !doc.isObject())
+        "STATUSTEXT", [plat, systemId](
+                          mavsdk::MavlinkDirect::MavlinkMessage msg) {
+            if (!plat) {
                 return;
-            const QJsonObject obj = doc.object();
-            if (plat && obj.value("severity").toInt() < 5) {
-                QMetaObject::invokeMethod(
-                    plat, "errorInfo", Qt::QueuedConnection,
-                    Q_ARG(QString, obj.value("text").toString()));
             }
+            std::string fieldsJson = std::move(msg.fields_json);
+            QMetaObject::invokeMethod(
+                plat,
+                [plat, systemId, fieldsJson = std::move(fieldsJson)]() {
+                    if (!plat) {
+                        return;
+                    }
+                    QJsonParseError error;
+                    const QJsonDocument document = QJsonDocument::fromJson(
+                        QByteArray::fromStdString(fieldsJson), &error);
+                    if (error.error != QJsonParseError::NoError ||
+                        !document.isObject()) {
+                        return;
+                    }
+                    const QJsonObject object = document.object();
+                    const int severity = object.value("severity").toInt();
+                    const QString text = object.value("text").toString();
+                    QGCSConfig::instance()->dealMavsdkStatusText(
+                        systemId, severity, text);
+                    if (severity < 5) {
+                        emit plat->errorInfo(text);
+                    }
+                },
+                Qt::QueuedConnection);
         });
 
     // 通过 Info 插件获取版本信息
+    // 扩展 XML 由 QGroundControlStationPrivate 整站注入一次，此处不再每机加载
     updateVersionInfo();
-
-    QFile file(QGCSConfig::instance()->mavMessageExtension());
-    if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        std::string fileInfo = file.readAll().toStdString();
-        const auto mavlinkDirect = m_pMavlinkDirect;
-        const auto currentSystem = m_pSystem;
-        QThreadPool::globalInstance()->start(
-            [mavlinkDirect, currentSystem, fileInfo = std::move(fileInfo)]() {
-            auto result = mavlinkDirect->load_custom_xml(fileInfo);
-            if (mavsdk::MavlinkDirect::Result::Success != result) {
-                spdlog::error(PLAT_FMT_STR, currentSystem->get_system_id(),
-                              "load_custom_xml", result);
-            }
-        });
-    } else {
-        spdlog::error(SYS_FMT_STR, "打开文件失败", file.fileName().toUtf8().data());
-    }
 }
 
 std::shared_ptr<mavsdk::System> QPlatPrivate::getSystem() const {

@@ -16,6 +16,7 @@
 struct ConnectionConfig;
 class QPlat;
 class QGroundControlStation;
+class XmlToMavSDK;
 
 /**
  * @brief QGroundControlStation的私有实现类
@@ -117,20 +118,33 @@ public:
 
     std::shared_ptr<mavsdk::Mavsdk> mavsdk() const { return m_mavsdk; }
 
+    /**
+     * @brief APM 扩展 XML/命令表（整站一份，可为空）
+     */
+    std::shared_ptr<XmlToMavSDK> mavMessageExtension() const
+    {
+        return m_xmlExtension;
+    }
+
 private:
     void handleConnectionError(
         const mavsdk::Mavsdk::ConnectionError &error,
         QGroundControlStation *station);
 
+    /**
+     * @brief 在首个可用 System 上将扩展 XML 注入 MAVSDK（只执行一次）
+     */
+    void ensureCustomXmlLoaded(const std::shared_ptr<mavsdk::System> &system);
+
     std::shared_ptr<mavsdk::Mavsdk> m_mavsdk;        ///< MAVSDK实例
     bool m_isInitialized;                            ///< 是否已初始化
+    std::shared_ptr<XmlToMavSDK> m_xmlExtension;     ///< APM 扩展命令/消息
 
     // 连接管理（connectionUrl -> handle）
     std::map<std::string, mavsdk::Mavsdk::ConnectionHandle> m_connectionHandles;
     mavsdk::Mavsdk::NewSystemHandle m_newSystemHandle;
     mavsdk::Mavsdk::RawBytesHandle m_rawBytesHandle;
     mavsdk::Mavsdk::ConnectionErrorHandle m_connectionErrorHandle;
-    mavsdk::Mavsdk::InterceptJsonHandle m_incomingMessagesHandle;
     QPointer<class QDataLink> m_rawDataLink;  ///< Raw 模式下的数据链路，用于接收回调
 };
 

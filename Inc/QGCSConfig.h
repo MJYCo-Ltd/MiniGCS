@@ -50,6 +50,12 @@ public:
     void dealMavsdkMessage(uint32_t systemID, const std::string &fields_json);
 
     /**
+     * @brief 处理已解析的 MAVLink STATUSTEXT，应在 Qt 对象线程调用
+     */
+    void dealMavsdkStatusText(uint32_t systemID, int severity,
+                              const QString &text);
+
+    /**
    * @brief 获取日志等级字符串（例如 "debug","info","warn","error"）
    */
     QString logLevel() const;
@@ -67,8 +73,8 @@ public:
     uint8_t gcsComponentId() const;
 
     /**
-   * @brief 获取MAV消息扩展文件名
-   * @return MAV消息扩展文件名（如 "ardupilotmega.xml"）
+   * @brief 获取 MAV 消息扩展 XML 路径（支持相对/绝对路径，解析规则同文本目录）
+   * @return 扩展 XML 文件路径（如 Config 下的 ardupilotmega.xml）
    */
     QString mavMessageExtension() const;
 

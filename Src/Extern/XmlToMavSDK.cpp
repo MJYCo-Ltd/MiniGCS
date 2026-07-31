@@ -1,126 +1,186 @@
 #include <QDebug>
+#include <QFile>
+#include <QXmlStreamReader>
+
 #include "Extern/XmlToMavSDK.h"
 #include "QGCSConfig.h"
 
 XmlToMavSDK::XmlToMavSDK(const QString& xmlPath)
 {
-    loadXml(xmlPath);
+    if (!xmlPath.isEmpty()) {
+        loadXml(xmlPath);
+    }
 }
 
-// 查找命令
 const XmlToMavSDK::ExternCmd* XmlToMavSDK::findCmd(const QString& name) const
 {
     auto it = m_mapExternCMDs.find(name);
-    if (it != m_mapExternCMDs.end()) return &it.value();
+    if (it != m_mapExternCMDs.end()) {
+        return &it.value();
+    }
     return nullptr;
 }
 
-// 列出所有命令
-QStringList XmlToMavSDK::listCmdNames() const {
+QStringList XmlToMavSDK::listCmdNames() const
+{
     return m_mapExternCMDs.keys();
 }
 
 void XmlToMavSDK::setSystem(std::shared_ptr<mavsdk::System> system)
 {
-    m_pSystem = system;
-    m_pMavlinkDirect = std::make_shared<mavsdk::MavlinkDirect>(system);
+    m_pSystem = std::move(system);
+    if (m_pSystem) {
+        m_pMavlinkDirect = std::make_shared<mavsdk::MavlinkDirect>(m_pSystem);
+    } else {
+        m_pMavlinkDirect.reset();
+    }
 }
 
-// 发送命令（参数数量不足时自动补0）
-mavsdk::MavlinkDirect::Result XmlToMavSDK::sendCmd(const QString& name, uint32_t uComponentID, const QVector<float>& params)
+std::optional<mavsdk::MavlinkDirect::Result> XmlToMavSDK::applyCustomXmlOnce(
+    mavsdk::MavlinkDirect& mavlinkDirect)
 {
-    if(!m_bLoadXml)
-    {
+    if (m_customXmlApplied.load()) {
+        return std::nullopt;
+    }
+    if (m_xmlContent.empty()) {
+        m_customXmlApplied.store(true);
+        return mavsdk::MavlinkDirect::Result::Unknown;
+    }
+
+    bool expected = false;
+    if (!m_customXmlApplyStarted.compare_exchange_strong(expected, true)) {
+        return std::nullopt;
+    }
+
+    const auto result = mavlinkDirect.load_custom_xml(m_xmlContent);
+    /// 无论成败只尝试一次，避免多机场景重复注入
+    m_customXmlApplied.store(true);
+    return result;
+}
+
+mavsdk::MavlinkDirect::Result XmlToMavSDK::sendCmd(
+    const QString& name,
+    uint32_t uComponentID,
+    const QVector<float>& params)
+{
+    if (!m_pSystem || !m_pMavlinkDirect) {
+        qWarning() << "XmlToMavSDK::sendCmd: system not set";
+        return mavsdk::MavlinkDirect::Result::Unknown;
+    }
+    return sendCmd(*m_pMavlinkDirect, *m_pSystem, name, uComponentID, params);
+}
+
+mavsdk::MavlinkDirect::Result XmlToMavSDK::sendCmd(
+    mavsdk::MavlinkDirect& mavlinkDirect,
+    const mavsdk::System& system,
+    const QString& name,
+    uint32_t uComponentID,
+    const QVector<float>& params) const
+{
+    if (!m_bCmdTableLoaded) {
         return mavsdk::MavlinkDirect::Result::Unknown;
     }
 
     const ExternCmd* cmd = findCmd(name);
-    if (!cmd)
-    {
+    if (!cmd) {
         qWarning() << "Command not found:" << name;
         return mavsdk::MavlinkDirect::Result::Unknown;
     }
 
     QVector<float> realParams = params;
-    while (realParams.size() < 7) realParams.append(0);
+    while (realParams.size() < 7) {
+        realParams.append(0);
+    }
 
-    // 构建 COMMAND_LONG 消息的 JSON 字段
-    QString fieldsJson = QString(R"({
-        "param1": %1,
-        "param2": %2,
-        "param3": %3,
-        "param4": %4,
-        "param5": %5,
-        "param6": %6,
-        "param7": %7
-    })")
-    .arg(realParams[0])
-    .arg(realParams[1])
-    .arg(realParams[2])
-    .arg(realParams[3])
-    .arg(realParams[4])
-    .arg(realParams[5])
-    .arg(realParams[6]);
+    const QString fieldsJson = QStringLiteral(
+        R"({"command":%1,"confirmation":0,"param1":%2,"param2":%3,"param3":%4,"param4":%5,"param5":%6,"param6":%7,"param7":%8})")
+        .arg(cmd->value)
+        .arg(realParams[0], 0, 'g', 8)
+        .arg(realParams[1], 0, 'g', 8)
+        .arg(realParams[2], 0, 'g', 8)
+        .arg(realParams[3], 0, 'g', 8)
+        .arg(realParams[4], 0, 'g', 8)
+        .arg(realParams[5], 0, 'g', 8)
+        .arg(realParams[6], 0, 'g', 8);
 
     mavsdk::MavlinkDirect::MavlinkMessage message;
-    message.message_name = cmd->name.toStdString();
+    message.message_name = "COMMAND_LONG";
     message.component_id = QGCSConfig::instance()->gcsComponentId();
     message.system_id = QGCSConfig::instance()->gcsSystemId();
-    message.target_system_id = m_pSystem->get_system_id();
+    message.target_system_id = system.get_system_id();
     message.target_component_id = uComponentID;
     message.fields_json = fieldsJson.toStdString();
 
-    return m_pMavlinkDirect->send_message(message);
+    return mavlinkDirect.send_message(message);
 }
 
-void XmlToMavSDK::loadXml(const QString& xmlPath) {
+bool XmlToMavSDK::loadXml(const QString& xmlPath)
+{
+    m_mapExternCMDs.clear();
+    m_xmlContent.clear();
+    m_bCmdTableLoaded = false;
+
     QFile file(xmlPath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         qWarning() << "Failed to open xml:" << xmlPath;
-        return;
+        return false;
     }
 
-    if(mavsdk::MavlinkDirect::Result::Success == m_pMavlinkDirect->load_custom_xml(file.readAll().toStdString()))
-    {
-        m_bLoadXml = true;
+    const QByteArray data = file.readAll();
+    file.close();
+    if (data.isEmpty()) {
+        qWarning() << "Empty mav message extension xml:" << xmlPath;
+        return false;
     }
 
-    QXmlStreamReader xml(&file);
+    m_xmlContent = data.toStdString();
 
+    QXmlStreamReader xml(data);
     while (!xml.atEnd() && !xml.hasError()) {
         xml.readNext();
-        if (xml.isStartElement() && xml.name() == "enum" &&
-            xml.attributes().value("name") == "MAV_CMD") {
-            // 进入 MAV_CMD 枚举
-            while (!(xml.isEndElement() && xml.name() == "enum")) {
+        if (xml.isStartElement() && xml.name() == QLatin1String("enum") &&
+            xml.attributes().value(QLatin1String("name")) ==
+                QLatin1String("MAV_CMD")) {
+            while (!(xml.isEndElement() && xml.name() == QLatin1String("enum"))) {
                 xml.readNext();
-                if (xml.isStartElement() && xml.name() == "entry") {
+                if (xml.isStartElement() && xml.name() == QLatin1String("entry")) {
                     ExternCmd cmd;
-                    cmd.name = xml.attributes().value("name").toString();
-                    cmd.value = xml.attributes().value("value").toString().toUShort();
-                    // 处理内部
-                    while (!(xml.isEndElement() && xml.name() == "entry")) {
+                    cmd.name = xml.attributes().value(QLatin1String("name")).toString();
+                    cmd.value =
+                        xml.attributes().value(QLatin1String("value")).toString().toUShort();
+                    while (!(xml.isEndElement() &&
+                             xml.name() == QLatin1String("entry"))) {
                         xml.readNext();
                         if (xml.isStartElement()) {
-                            if (xml.name() == "description") {
+                            if (xml.name() == QLatin1String("description")) {
                                 cmd.description = xml.readElementText();
-                            } else if (xml.name() == "param") {
+                            } else if (xml.name() == QLatin1String("param")) {
                                 CommandParam param;
-                                param.index = xml.attributes().value("index").toInt();
-                                param.label = xml.attributes().hasAttribute("label")
-                                                  ? xml.attributes().value("label").toString()
-                                                  : QString("param%1").arg(param.index);
+                                param.index =
+                                    xml.attributes().value(QLatin1String("index")).toInt();
+                                param.label =
+                                    xml.attributes().hasAttribute(QLatin1String("label"))
+                                        ? xml.attributes()
+                                              .value(QLatin1String("label"))
+                                              .toString()
+                                        : QStringLiteral("param%1").arg(param.index);
                                 cmd.params.append(param);
                             }
                         }
                     }
-                    m_mapExternCMDs[cmd.name] = cmd;
+                    if (!cmd.name.isEmpty()) {
+                        m_mapExternCMDs.insert(cmd.name, cmd);
+                    }
                 }
             }
         }
     }
+
     if (xml.hasError()) {
-        qWarning() << "XML parse error:" << xml.errorString();
+        qWarning() << "XML parse error:" << xml.errorString() << "in" << xmlPath;
+        return false;
     }
-    file.close();
+
+    m_bCmdTableLoaded = true;
+    return true;
 }

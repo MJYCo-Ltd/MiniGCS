@@ -250,15 +250,6 @@ void QAutopilotPrivate::setTelemetryRate() {
             }
         });
 
-    /// 设置 距离传感器 发送频率
-    m_telemetry->set_rate_distance_sensor_async(
-        1, [systemId](mavsdk::Telemetry::Result result) {
-            if (mavsdk::Telemetry::Result::Success != result) {
-                spdlog::error(PLAT_FMT_STR, systemId,
-                              "set_rate_distance_sensor", result);
-            }
-        });
-
     /// 设置空速
     m_telemetry->set_rate_fixedwing_metrics_async(1,[systemId](mavsdk::Telemetry::Result result) {
         if (mavsdk::Telemetry::Result::Success != result) {
@@ -276,18 +267,6 @@ void QAutopilotPrivate::setTelemetryRate() {
     //     });
 }
 
-template<>struct fmt::formatter<mavsdk::Telemetry::Position>:ostream_formatter{};
-template<>struct fmt::formatter<mavsdk::Telemetry::Heading>:ostream_formatter{};
-template<>struct fmt::formatter<mavsdk::Telemetry::Battery>:ostream_formatter{};
-template<>struct fmt::formatter<mavsdk::Telemetry::FlightMode>:ostream_formatter{};
-template<>struct fmt::formatter<mavsdk::Telemetry::Health>:ostream_formatter{};
-template<>struct fmt::formatter<mavsdk::Telemetry::GpsInfo>:ostream_formatter{};
-template<>struct fmt::formatter<mavsdk::Telemetry::Imu>:ostream_formatter{};
-template<>struct fmt::formatter<mavsdk::Telemetry::PositionVelocityNed>:ostream_formatter{};
-template<>struct fmt::formatter<mavsdk::Telemetry::DistanceSensor>:ostream_formatter{};
-template<>struct fmt::formatter<mavsdk::Telemetry::RcStatus>:ostream_formatter{};
-template<>struct fmt::formatter<mavsdk::Telemetry::FixedwingMetrics>:ostream_formatter{};
-
 void QAutopilotPrivate::setupMessageHandling() {
     if (!m_telemetry || !m_pSystem) {
         return;
@@ -299,11 +278,8 @@ void QAutopilotPrivate::setupMessageHandling() {
     const uint8_t systemId = m_pSystem->get_system_id();
 
     /// 位置信息
-    m_positionHandle = m_telemetry->subscribe_position([autopilot, systemId](
+    m_positionHandle = m_telemetry->subscribe_position([autopilot](
                                         mavsdk::Telemetry::Position position) {
-        spdlog::info(PLAT_FMT_STR, systemId, "position",
-                     position);
-
         if (autopilot) {
             QMetaObject::invokeMethod(
                 autopilot, "positionUpdate", Qt::QueuedConnection,
@@ -314,32 +290,23 @@ void QAutopilotPrivate::setupMessageHandling() {
     });
 
     /// 航向
-    m_headingHandle = m_telemetry->subscribe_heading([autopilot, systemId](mavsdk::Telemetry::Heading heading) {
+    m_headingHandle = m_telemetry->subscribe_heading([autopilot](mavsdk::Telemetry::Heading heading) {
         if (autopilot) {
             QMetaObject::invokeMethod(
                 autopilot, "headingUpdate", Qt::QueuedConnection,
                 Q_ARG(double, heading.heading_deg));
         }
-        spdlog::info(PLAT_FMT_STR, systemId, "heading", heading);
     });
 
     /// 电池状态
-    m_batteryHandle = m_telemetry->subscribe_battery([autopilot, systemId](mavsdk::Telemetry::Battery battery) {
+    m_batteryHandle = m_telemetry->subscribe_battery([autopilot](mavsdk::Telemetry::Battery battery) {
         if (autopilot) {
             QMetaObject::invokeMethod(
                 autopilot, "batteryUpdate", Qt::QueuedConnection,
                 Q_ARG(float, battery.voltage_v),
                 Q_ARG(float, battery.remaining_percent));
         }
-        spdlog::info(PLAT_FMT_STR, systemId, "battery", battery);
     });
-
-    /// 飞行状态
-    m_flightModeHandle = m_telemetry->subscribe_flight_mode(
-        [systemId](mavsdk::Telemetry::FlightMode flightMode) {
-            spdlog::info(PLAT_FMT_STR, systemId, "flightMode",
-                         flightMode);
-        });
 
     m_telemetry->set_rate_in_air_async(
         1, [systemId](mavsdk::Telemetry::Result result) {
@@ -350,7 +317,7 @@ void QAutopilotPrivate::setupMessageHandling() {
         });
 
     /// 健康状态
-    m_healthHandle = m_telemetry->subscribe_health([autopilot, systemId](mavsdk::Telemetry::Health h) {
+    m_healthHandle = m_telemetry->subscribe_health([autopilot](mavsdk::Telemetry::Health h) {
         if (autopilot) {
             QMetaObject::invokeMethod(
                 autopilot, "healthUpdate", Qt::QueuedConnection,
@@ -362,28 +329,23 @@ void QAutopilotPrivate::setupMessageHandling() {
                 Q_ARG(bool, h.is_home_position_ok),
                 Q_ARG(bool, h.is_armable));
         }
-        spdlog::info(PLAT_FMT_STR, systemId, "health", h);
     });
 
     /// GPS状态
     m_gpsInfoHandle = m_telemetry->subscribe_gps_info(
-        [autopilot, systemId](mavsdk::Telemetry::GpsInfo gps) {
+        [autopilot](mavsdk::Telemetry::GpsInfo gps) {
         if (autopilot) {
             QMetaObject::invokeMethod(
                 autopilot, "gpsInfoUpdate", Qt::QueuedConnection,
                 Q_ARG(int, gps.num_satellites),
                 Q_ARG(int, static_cast<int>(gps.fix_type)));
         }
-        spdlog::info(PLAT_FMT_STR, systemId, "gpsInfo", gps);
         });
 
     /// 本地坐标
     m_positionVelocityHandle =
         m_telemetry->subscribe_position_velocity_ned(
-        [autopilot, systemId](mavsdk::Telemetry::PositionVelocityNed pvNed) {
-            spdlog::info(PLAT_FMT_STR, systemId,
-                         "positionVelocityNed", pvNed);
-
+        [autopilot](mavsdk::Telemetry::PositionVelocityNed pvNed) {
             // 通过Qt元系统调用parent的nedUpdate方法
             if (autopilot) {
                 QMetaObject::invokeMethod(
@@ -415,17 +377,8 @@ void QAutopilotPrivate::setupMessageHandling() {
             }
         });
 
-    /// 距离传感器
-    m_distanceSensorHandle = m_telemetry->subscribe_distance_sensor(
-        [systemId](mavsdk::Telemetry::DistanceSensor sensor) {
-            spdlog::info(PLAT_FMT_STR, systemId, "distanceSensor",
-                         sensor);
-        });
-
     /// 订阅home点
-    m_homeHandle = m_telemetry->subscribe_home([autopilot, systemId](mavsdk::Telemetry::Position home) {
-        spdlog::info(PLAT_FMT_STR, systemId, "home", home);
-
+    m_homeHandle = m_telemetry->subscribe_home([autopilot](mavsdk::Telemetry::Position home) {
         // 通过Qt元系统调用parent的homeUpdate方法
         if (autopilot) {
             QMetaObject::invokeMethod(
@@ -437,11 +390,8 @@ void QAutopilotPrivate::setupMessageHandling() {
     });
 
     /// 订阅 rc状态
-    m_rcStatusHandle = m_telemetry->subscribe_rc_status([autopilot, systemId](
+    m_rcStatusHandle = m_telemetry->subscribe_rc_status([autopilot](
                                          mavsdk::Telemetry::RcStatus rcStatus) {
-        spdlog::info(PLAT_FMT_STR, systemId, "rcStatus",
-                     rcStatus);
-
         // 通过Qt元系统调用parent的rcStatusUpdate方法
         if (autopilot) {
             QMetaObject::invokeMethod(
@@ -452,9 +402,7 @@ void QAutopilotPrivate::setupMessageHandling() {
     });
 
     /// 订阅固定翼指标
-    m_fixedwingMetricsHandle = m_telemetry->subscribe_fixedwing_metrics([autopilot, systemId](mavsdk::Telemetry::FixedwingMetrics fixMetrics){
-        spdlog::info(PLAT_FMT_STR, systemId, "fixMetrics",
-                     fixMetrics);
+    m_fixedwingMetricsHandle = m_telemetry->subscribe_fixedwing_metrics([autopilot](mavsdk::Telemetry::FixedwingMetrics fixMetrics){
         // 通过Qt元系统调用parent的fixedwingUpdate方法
         if (autopilot) {
             QMetaObject::invokeMethod(
