@@ -38,6 +38,8 @@ qt_add_executable(${PROJECT_NAME}
     main.cpp
     QTestGCSConfig.cpp
     QTestGCSConfig.h
+    QDroneControlManager.cpp
+    QDroneControlManager.h
 )
 
 # 添加 QML 模块
@@ -45,6 +47,16 @@ qt_add_qml_module(${PROJECT_NAME}
     URI MiniGCS
     QML_FILES
         qml/Main.qml
+    RESOURCES
+        qml/images/boat.svg
+        qml/images/fixed-wing.svg
+        qml/images/helicopter.svg
+        qml/images/multirotor.svg
+        qml/images/rocket.svg
+        qml/images/rover.svg
+        qml/images/submarine.svg
+        qml/images/unknown.svg
+        qml/images/vtol.svg
 )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES

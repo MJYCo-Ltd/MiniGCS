@@ -6,7 +6,9 @@
 #include "Link/QLinkManager.h"
 #include "Link/QDataLink.h"
 #include "QTestGCSConfig.h"
+#include "QDroneControlManager.h"
 #include "QGroundControlStation.h"
+#include "Plat/QAutoVehicleType.h"
 #include "Plat/QPlat.h"
 
 static LinkKind linkKindFromString(const QString &type)
@@ -99,21 +101,32 @@ int main(int argc, char *argv[]) {
                          qWarning() << "链路创建失败:" << reason;
                      });
 
-    QObject::connect(&app, &QCoreApplication::aboutToQuit, [&]() {
-        delete pGroundStation;
-        pGroundStation = nullptr;
-
-        QTestGCSConfig::instance()->release();
-    });
-
     qmlRegisterType<QGroundControlStation>("MiniGCS", 1, 0, "GroundControlStation");
     qmlRegisterType<QPlat>("MiniGCS", 1, 0, "Plat");
+    qmlRegisterUncreatableMetaObject(
+        QAutoVehicleType::staticMetaObject,
+        "MiniGCS", 1, 0, "AutoVehicleType",
+        "AutoVehicleType only provides vehicle and autopilot enums");
+    auto *droneControl =
+        new QDroneControlManager(pGroundStation, &app);
+    qmlRegisterSingletonInstance(
+        "MiniGCS", 1, 0, "DroneControl", droneControl);
 
-    QQmlApplicationEngine engine;
-    QObject::connect(
-        &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
-        []() { QCoreApplication::exit(-1); }, Qt::QueuedConnection);
-    engine.loadFromModule("MiniGCS", "Main");
+    int exitCode = 0;
+    {
+        QQmlApplicationEngine engine;
+        QObject::connect(
+            &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
+            []() { QCoreApplication::exit(-1); }, Qt::QueuedConnection);
+        engine.loadFromModule("MiniGCS", "Main");
+        exitCode = app.exec();
+    }
 
-    return app.exec();
+    // QML 已完全销毁后再释放其单例及 MAVSDK，避免退出信号处理中
+    // 同步销毁连接线程。
+    delete droneControl;
+    delete pGroundStation;
+    QTestGCSConfig::instance()->release();
+
+    return exitCode;
 }

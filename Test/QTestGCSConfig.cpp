@@ -6,6 +6,8 @@ namespace {
 const char *KEY_MAP_NAME = "Map/Name";
 const char *KEY_LINKS_COUNT = "Links/Count";
 const char *KEY_LINK_GROUP_PREFIX = "Link";
+const char *KEY_DRONE_GROUPS_COUNT = "DroneGroups/Count";
+const char *KEY_DRONE_GROUP_PREFIX = "DroneGroup";
 
 const char *DEFAULT_MAP_NAME = "OpenStreetMap";
 } // namespace
@@ -168,6 +170,149 @@ void QTestGCSConfig::saveLinkConfigs()
         m_settings->sync();
 }
 
+QString QTestGCSConfig::droneName(int systemId) const
+{
+    if (!m_settings || systemId < 0 || systemId > 255) {
+        return {};
+    }
+    return m_settings
+        ->value(QString("Drones/%1/Name").arg(systemId),
+                QString("无人机 %1").arg(systemId))
+        .toString();
+}
+
+void QTestGCSConfig::setDroneName(int systemId, const QString &name)
+{
+    if (!m_settings || systemId < 0 || systemId > 255) {
+        return;
+    }
+    const QString normalized = name.trimmed();
+    m_settings->setValue(
+        QString("Drones/%1/Name").arg(systemId),
+        normalized.isEmpty() ? QString("无人机 %1").arg(systemId) : normalized);
+    m_settings->sync();
+}
+
+QString QTestGCSConfig::droneGroupKey(int index) const
+{
+    return QString("%1%2").arg(KEY_DRONE_GROUP_PREFIX).arg(index);
+}
+
+int QTestGCSConfig::findDroneGroup(const QString &name) const
+{
+    if (!m_settings) {
+        return -1;
+    }
+    const QString normalized = name.trimmed();
+    const int count = m_settings->value(KEY_DRONE_GROUPS_COUNT, 0).toInt();
+    for (int index = 0; index < count; ++index) {
+        m_settings->beginGroup(droneGroupKey(index));
+        const QString currentName = m_settings->value("Name").toString();
+        m_settings->endGroup();
+        if (currentName == normalized) {
+            return index;
+        }
+    }
+    return -1;
+}
+
+QVariantList QTestGCSConfig::droneGroupList() const
+{
+    QVariantList groups;
+    if (!m_settings) {
+        return groups;
+    }
+    const int count = m_settings->value(KEY_DRONE_GROUPS_COUNT, 0).toInt();
+    for (int index = 0; index < count; ++index) {
+        m_settings->beginGroup(droneGroupKey(index));
+        QVariantMap group;
+        group.insert("name", m_settings->value("Name").toString());
+        QVariantList members;
+        const QStringList storedMembers =
+            m_settings->value("Members").toStringList();
+        for (const QString &member : storedMembers) {
+            bool ok = false;
+            const int systemId = member.toInt(&ok);
+            if (ok && systemId >= 0 && systemId <= 255) {
+                members.append(systemId);
+            }
+        }
+        group.insert("members", members);
+        m_settings->endGroup();
+        groups.append(group);
+    }
+    return groups;
+}
+
+bool QTestGCSConfig::addDroneGroup(const QString &name)
+{
+    if (!m_settings) {
+        return false;
+    }
+    const QString normalized = name.trimmed();
+    if (normalized.isEmpty() || findDroneGroup(normalized) >= 0) {
+        return false;
+    }
+    const int count = m_settings->value(KEY_DRONE_GROUPS_COUNT, 0).toInt();
+    m_settings->beginGroup(droneGroupKey(count));
+    m_settings->setValue("Name", normalized);
+    m_settings->setValue("Members", QStringList());
+    m_settings->endGroup();
+    m_settings->setValue(KEY_DRONE_GROUPS_COUNT, count + 1);
+    m_settings->sync();
+    return true;
+}
+
+bool QTestGCSConfig::removeDroneGroup(const QString &name)
+{
+    const int index = findDroneGroup(name);
+    if (!m_settings || index < 0) {
+        return false;
+    }
+    const int count = m_settings->value(KEY_DRONE_GROUPS_COUNT, 0).toInt();
+    for (int current = index; current < count - 1; ++current) {
+        m_settings->beginGroup(droneGroupKey(current + 1));
+        const QString nextName = m_settings->value("Name").toString();
+        const QStringList nextMembers =
+            m_settings->value("Members").toStringList();
+        m_settings->endGroup();
+
+        m_settings->beginGroup(droneGroupKey(current));
+        m_settings->setValue("Name", nextName);
+        m_settings->setValue("Members", nextMembers);
+        m_settings->endGroup();
+    }
+    m_settings->remove(droneGroupKey(count - 1));
+    m_settings->setValue(KEY_DRONE_GROUPS_COUNT, count - 1);
+    m_settings->sync();
+    return true;
+}
+
+bool QTestGCSConfig::setDroneGroupMembers(
+    const QString &name, const QVariantList &systemIds)
+{
+    const int index = findDroneGroup(name);
+    if (!m_settings || index < 0) {
+        return false;
+    }
+    QStringList members;
+    for (const QVariant &value : systemIds) {
+        bool ok = false;
+        const int systemId = value.toInt(&ok);
+        if (ok && systemId >= 0 && systemId <= 255) {
+            const QString id = QString::number(systemId);
+            if (!members.contains(id)) {
+                members.append(id);
+            }
+        }
+    }
+    m_settings->beginGroup(droneGroupKey(index));
+    m_settings->setValue("Members", members);
+    m_settings->endGroup();
+    m_settings->sync();
+    return true;
+}
+
 void QTestGCSConfig::initializeDefaults()
 {
     QGCSConfig::initializeDefaults();
@@ -178,6 +323,9 @@ void QTestGCSConfig::initializeDefaults()
     }
     if (!m_settings->contains(KEY_LINKS_COUNT)) {
         m_settings->setValue(KEY_LINKS_COUNT, 0);
+    }
+    if (!m_settings->contains(KEY_DRONE_GROUPS_COUNT)) {
+        m_settings->setValue(KEY_DRONE_GROUPS_COUNT, 0);
     }
     m_settings->sync();
 }

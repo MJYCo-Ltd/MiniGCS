@@ -18,11 +18,17 @@ class MINIGCS_EXPORT QAutopilot : public QPlat
 {
     Q_OBJECT
     Q_PROPERTY(QGpsPosition gpsPosition READ gpsPosition NOTIFY gpsPositionChanged)
+    Q_PROPERTY(bool hasGpsPosition READ hasGpsPosition NOTIFY hasGpsPositionChanged)
     Q_PROPERTY(QNEDPosition nedPosition READ nedPosition NOTIFY nedPositionChanged)
     Q_PROPERTY(QGpsPosition homePosition READ homePosition NOTIFY homePositionChanged)
     Q_PROPERTY(QAutopilotStatus status READ status NOTIFY statusChanged)
     Q_PROPERTY(QAutopilotFixedwing fixedwing READ fixedwing NOTIFY fixedwingChanged)
     Q_PROPERTY(double heading READ heading NOTIFY headingChanged)
+    Q_PROPERTY(double groundSpeedMS READ groundSpeedMS NOTIFY motionChanged)
+    Q_PROPERTY(double verticalSpeedMS READ verticalSpeedMS NOTIFY motionChanged)
+    Q_PROPERTY(bool moving READ moving NOTIFY motionChanged)
+    Q_PROPERTY(bool armed READ armed NOTIFY armedChanged)
+    Q_PROPERTY(bool inAir READ inAir NOTIFY inAirChanged)
     Q_PROPERTY(bool airLineDownloading READ airLineDownloading NOTIFY airLineDownloadingChanged)
     Q_PROPERTY(QAutoVehicleType::Vehicle vehicleType READ vehicleType WRITE setVehicleType NOTIFY vehicleTypeChanged)
     Q_PROPERTY(QAutoVehicleType::Autopilot autopilotType READ autopilotType WRITE setAutopilotType NOTIFY autopilotTypeChanged)
@@ -34,7 +40,11 @@ public:
     /**
      * @brief 解锁无人机
      */
-    void arm();
+    Q_INVOKABLE void arm();
+    Q_INVOKABLE void disarm();
+    Q_INVOKABLE void takeoff();
+    Q_INVOKABLE void land();
+    Q_INVOKABLE void returnToLaunch();
 
     /**
      * @brief 显式下载当前任务航线
@@ -47,6 +57,7 @@ public:
      * @return GPS位置
      */
     QGpsPosition gpsPosition() const { return m_gpsPosition; }
+    bool hasGpsPosition() const { return m_hasGpsPosition; }
 
     /**
      * @brief 获取NED位置
@@ -77,6 +88,11 @@ public:
      * @return 航向角（度）
      */
     double heading() const { return m_heading; }
+    double groundSpeedMS() const { return m_groundSpeedMS; }
+    double verticalSpeedMS() const { return m_verticalSpeedMS; }
+    bool moving() const { return m_moving; }
+    bool armed() const { return m_armed; }
+    bool inAir() const { return m_inAir; }
 
     /**
      * @brief 设置航向角
@@ -115,6 +131,7 @@ signals:
      * @param position 新的GPS位置信息
      */
     void gpsPositionChanged(const QGpsPosition &position);
+    void hasGpsPositionChanged(bool available);
 
     /**
      * @brief NED位置信息变化信号
@@ -139,6 +156,9 @@ signals:
      * @param heading 新的航向角（度）
      */
     void headingChanged(double heading);
+    void motionChanged();
+    void armedChanged(bool armed);
+    void inAirChanged(bool inAir);
 
     /**
      * @brief 固定翼状态变化信号
@@ -172,7 +192,11 @@ signals:
 
 protected slots:
     void positionUpdate(double dLon, double dLat, float dH);
-    void nedUpdate(float dNorth, float dEast, float dDown);
+    void nedUpdate(float dNorth, float dEast, float dDown,
+                   float velocityNorth, float velocityEast,
+                   float velocityDown);
+    void armedUpdate(bool armed);
+    void inAirUpdate(bool inAir);
     void gpsInfoUpdate(int gpsCount, int gpsStatus);
     void batteryUpdate(float batteryVoltage, float batteryRemaining);
     void rcStatusUpdate(bool isAvailable, float signalStrengthPercent);
@@ -191,6 +215,7 @@ protected:
                                  const QList<QGpsPosition> &waypoints);
     void failAirLineDownload(quint64 requestId, const QString &reason);
     void cancelAirLineDownload();
+    void updateMovingState();
     /**
      * @brief 获取QAutopilotPrivate指针的辅助方法
      * @return QAutopilotPrivate指针
@@ -199,11 +224,19 @@ protected:
     const QAutopilotPrivate* d_func() const;
 
     QGpsPosition m_gpsPosition;
+    bool m_hasGpsPosition{false};
     QNEDPosition m_nedPosition;
     QGpsPosition m_homePosition;
     QAutopilotStatus m_status;
     QAutopilotFixedwing m_fixedwing;
     double m_heading{0.0};  ///< 航向角（度）
+    double m_groundSpeedMS{0.0};
+    double m_verticalSpeedMS{0.0};
+    bool m_moving{false};
+    bool m_armed{false};
+    bool m_inAir{false};
+    int m_motionStartSamples{0};
+    int m_motionStopSamples{0};
     QAutoVehicleType::Vehicle m_vehicleType{QAutoVehicleType::Vehicle_Unknown};  ///< 载具类型
     QAutoVehicleType::Autopilot m_autopilotType{QAutoVehicleType::Autopilot_Unknown};  ///< 自动驾驶仪类型
     bool m_airLineDownloading{false};

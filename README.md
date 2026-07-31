@@ -247,6 +247,9 @@ cmake --build build --target Test
 ```
 
 程序从 `QTestGCSConfig` 读取链路列表并自动 `addLink`，QML 界面见 `Test/qml/Main.qml`。
+界面支持按 MAVLink 系统 ID 配置无人机别名、创建编组并维护成员，也可以向
+单机或编组中的在线成员发送解锁、上锁、起飞、降落、返航和任务下载命令。
+无人机别名与编组配置保存在演示程序的 INI 配置文件中。
 
 ---
 

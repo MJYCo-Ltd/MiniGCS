@@ -8,6 +8,7 @@
 #include "MiniGCSExport.h"
 
 class QPlatPrivate;
+class QGroundControlStation;
 /**
  * @brief QPlat类 - 平台类
  * 
@@ -18,6 +19,7 @@ class MINIGCS_EXPORT QPlat : public QObject
     Q_OBJECT
     Q_PROPERTY(QString firmwareVersion READ getFirmwareVersion NOTIFY infoUpdated)
     Q_PROPERTY(QString softwareVersion READ getSoftwareVersion NOTIFY infoUpdated)
+    Q_PROPERTY(int systemId READ systemId CONSTANT)
     Q_PROPERTY(bool connected READ isConnected NOTIFY connectionStatusChanged)
     Q_PROPERTY(QDateTime lastConnectedTime READ getLastConnectedTime NOTIFY infoUpdated)
     Q_PROPERTY(QDateTime lastDisconnectedTime READ getLastDisconnectedTime NOTIFY infoUpdated)
@@ -25,6 +27,7 @@ class MINIGCS_EXPORT QPlat : public QObject
 public:
     explicit QPlat(QObject *parent = nullptr);
     ~QPlat();
+    int systemId() const { return m_systemId; }
 
     /**
      * @brief 获取固件版本
@@ -96,11 +99,14 @@ protected slots:
     void updateConnection(bool bConnected);
 protected:
     void SetPrivate(QPlatPrivate* pPlatPrivate);
+    void setSystemId(int systemId) { m_systemId = systemId; }
 protected:
     friend class QGroundControlStationPrivate;
+    friend class QGroundControlStation;
     QDateTime m_lastConnectedTime;          ///< 最后连接时间
     QDateTime m_lastDisconnectedTime;       ///< 最后断开时间
     bool      m_bConnected{true};
+    int       m_systemId{-1};
 
     std::unique_ptr<QPlatPrivate> d_ptr;    ///< 私有实现指针
 };

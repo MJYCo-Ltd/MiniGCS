@@ -66,6 +66,15 @@ public:
     /** 保存链路配置到文件（修改后需调用以持久化） */
     Q_INVOKABLE void saveLinkConfigs();
 
+    // ---------- 无人机与编组配置 ----------
+    Q_INVOKABLE QString droneName(int systemId) const;
+    Q_INVOKABLE void setDroneName(int systemId, const QString &name);
+    Q_INVOKABLE QVariantList droneGroupList() const;
+    Q_INVOKABLE bool addDroneGroup(const QString &name);
+    Q_INVOKABLE bool removeDroneGroup(const QString &name);
+    Q_INVOKABLE bool setDroneGroupMembers(
+        const QString &name, const QVariantList &systemIds);
+
     void release() override;
 
 protected:
@@ -77,6 +86,8 @@ private:
     Q_DISABLE_COPY(QTestGCSConfig)
 
     QString linkGroupKey(int index) const;
+    QString droneGroupKey(int index) const;
+    int findDroneGroup(const QString &name) const;
 
     static QTestGCSConfig *s_instance;
 };

@@ -4,6 +4,16 @@
 #include <QDateTime>
 #include <QDebug>
 #include <QtGlobal>
+#include <cmath>
+
+namespace {
+constexpr double MotionStartHorizontalMS = 0.7;
+constexpr double MotionStartVerticalMS = 0.5;
+constexpr double MotionStopHorizontalMS = 0.25;
+constexpr double MotionStopVerticalMS = 0.2;
+constexpr int MotionStartSampleCount = 2;
+constexpr int MotionStopSampleCount = 5;
+}
 
 QAutopilot::QAutopilot(QObject *parent)
     : QPlat(parent)
@@ -24,6 +34,34 @@ void QAutopilot::arm()
 {
     if (d_func()) {
         d_func()->arm();
+    }
+}
+
+void QAutopilot::disarm()
+{
+    if (d_func()) {
+        d_func()->disarm();
+    }
+}
+
+void QAutopilot::takeoff()
+{
+    if (d_func()) {
+        d_func()->takeoff();
+    }
+}
+
+void QAutopilot::land()
+{
+    if (d_func()) {
+        d_func()->land();
+    }
+}
+
+void QAutopilot::returnToLaunch()
+{
+    if (d_func()) {
+        d_func()->returnToLaunch();
     }
 }
 
@@ -98,17 +136,25 @@ void QAutopilot::setAutopilotType(QAutoVehicleType::Autopilot autopilotType) {
 }
 
 void QAutopilot::positionUpdate(double dLon, double dLat, float dH) {
-    if (!qFuzzyCompare(m_gpsPosition.longitude(), dLon) ||
+    const bool firstPosition = !m_hasGpsPosition;
+    if (firstPosition ||
+        !qFuzzyCompare(m_gpsPosition.longitude(), dLon) ||
         !qFuzzyCompare(m_gpsPosition.latitude(), dLat) ||
         !qFuzzyCompare(m_gpsPosition.altitude(), dH)) {
+        m_hasGpsPosition = true;
         m_gpsPosition.setLongitude(dLon);
         m_gpsPosition.setLatitude(dLat);
         m_gpsPosition.setAltitude(dH);
+        if (firstPosition) {
+            emit hasGpsPositionChanged(true);
+        }
         emit gpsPositionChanged(m_gpsPosition);
     }
 }
 
-void QAutopilot::nedUpdate(float dNorth, float dEast, float dDown) {
+void QAutopilot::nedUpdate(float dNorth, float dEast, float dDown,
+                           float velocityNorth, float velocityEast,
+                           float velocityDown) {
     if (!qFuzzyCompare(m_nedPosition.north(), dNorth) ||
         !qFuzzyCompare(m_nedPosition.east(), dEast) ||
         !qFuzzyCompare(m_nedPosition.down(), dDown)) {
@@ -116,6 +162,79 @@ void QAutopilot::nedUpdate(float dNorth, float dEast, float dDown) {
         m_nedPosition.setEast(dEast);
         m_nedPosition.setDown(dDown);
         emit nedPositionChanged(m_nedPosition);
+    }
+
+    const double northSpeed = static_cast<double>(velocityNorth);
+    const double eastSpeed = static_cast<double>(velocityEast);
+    const double downSpeed = static_cast<double>(velocityDown);
+    if (!std::isfinite(northSpeed) ||
+        !std::isfinite(eastSpeed) ||
+        !std::isfinite(downSpeed)) {
+        return;
+    }
+
+    m_groundSpeedMS = std::hypot(northSpeed, eastSpeed);
+    m_verticalSpeedMS = std::abs(downSpeed);
+    updateMovingState();
+    emit motionChanged();
+}
+
+void QAutopilot::armedUpdate(bool armed)
+{
+    if (m_armed == armed) {
+        return;
+    }
+    m_armed = armed;
+    emit armedChanged(m_armed);
+}
+
+void QAutopilot::inAirUpdate(bool inAir)
+{
+    if (m_inAir == inAir) {
+        return;
+    }
+    m_inAir = inAir;
+    updateMovingState();
+    emit inAirChanged(m_inAir);
+    emit motionChanged();
+}
+
+void QAutopilot::updateMovingState()
+{
+    const bool movementCandidate =
+        m_inAir ||
+        m_groundSpeedMS >= MotionStartHorizontalMS ||
+        m_verticalSpeedMS >= MotionStartVerticalMS;
+    const bool stationaryCandidate =
+        !m_inAir &&
+        m_groundSpeedMS <= MotionStopHorizontalMS &&
+        m_verticalSpeedMS <= MotionStopVerticalMS;
+
+    if (!m_moving) {
+        m_motionStopSamples = 0;
+        if (movementCandidate) {
+            ++m_motionStartSamples;
+            const int requiredSamples =
+                m_inAir ? 1 : MotionStartSampleCount;
+            if (m_motionStartSamples >= requiredSamples) {
+                m_moving = true;
+                m_motionStartSamples = 0;
+            }
+        } else {
+            m_motionStartSamples = 0;
+        }
+        return;
+    }
+
+    m_motionStartSamples = 0;
+    if (stationaryCandidate) {
+        ++m_motionStopSamples;
+        if (m_motionStopSamples >= MotionStopSampleCount) {
+            m_moving = false;
+            m_motionStopSamples = 0;
+        }
+    } else {
+        m_motionStopSamples = 0;
     }
 }
 

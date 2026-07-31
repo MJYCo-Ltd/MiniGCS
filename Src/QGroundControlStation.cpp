@@ -15,13 +15,16 @@ QGroundControlStation::QGroundControlStation(QObject *parent)
 
 QGroundControlStation::~QGroundControlStation()
 {
-    ClearAllLinks();
-
-    // QPlat 是 QObject 子对象，必须在 MAVSDK 私有实现销毁前停止其订阅和后台任务。
+    // 先销毁飞控插件并取消其订阅。退出阶段不能逐条调用
+    // Mavsdk::remove_connection：MAVSDK 的连接线程仍在运行时，该调用可能在
+    // join() 中等待持锁线程，导致主线程无法退出。
     const QList<QPlat *> platformChildren =
         findChildren<QPlat *>(QString(), Qt::FindDirectChildrenOnly);
     qDeleteAll(platformChildren);
     m_mapId2Standalone.clear();
+
+    // 由 Mavsdk 自身的析构流程统一停止工作线程和连接。
+    d_ptr.reset();
 }
 
 void QGroundControlStation::Init()
@@ -67,6 +70,7 @@ QPlat *QGroundControlStation::getOrCreatePlat(uint8_t uId, bool bIsAutopilot)
         } else {
             pPlat = new QPlat(this);
         }
+        pPlat->setSystemId(uId);
         m_mapId2Standalone.insert(uId, pPlat);
         registryChanged = true;
     } else {
@@ -74,6 +78,7 @@ QPlat *QGroundControlStation::getOrCreatePlat(uint8_t uId, bool bIsAutopilot)
             if (nullptr != qobject_cast<QAutopilot *>(pPlat)) {
                 pPlat->deleteLater();
                 pPlat = new QPlat(this);
+                pPlat->setSystemId(uId);
                 m_mapId2Standalone[uId] = pPlat;
                 registryChanged = true;
             }
@@ -81,6 +86,7 @@ QPlat *QGroundControlStation::getOrCreatePlat(uint8_t uId, bool bIsAutopilot)
             if (nullptr == qobject_cast<QAutopilot *>(pPlat)) {
                 pPlat->deleteLater();
                 pPlat = new QAutopilot(this);
+                pPlat->setSystemId(uId);
                 m_mapId2Standalone[uId] = pPlat;
                 registryChanged = true;
             }

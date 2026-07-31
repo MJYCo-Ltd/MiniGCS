@@ -11,6 +11,11 @@ QAutopilotPrivate::~QAutopilotPrivate()
     if (m_mission) {
         m_mission->cancel_mission_download();
     }
+    clearTelemetrySubscriptions();
+    m_mission.reset();
+    m_action.reset();
+    m_telemetry.reset();
+    QPlatPrivate::setSystem(nullptr);
 }
 
 QAutopilot *QAutopilotPrivate::q_func() {
@@ -27,6 +32,10 @@ void QAutopilotPrivate::setSystem(std::shared_ptr<mavsdk::System> system) {
         m_mission->cancel_mission_download();
         q_func()->cancelAirLineDownload();
     }
+    clearTelemetrySubscriptions();
+    m_mission.reset();
+    m_action.reset();
+    m_telemetry.reset();
 
     QPlatPrivate::setSystem(system);
     if (!system) {
@@ -60,6 +69,122 @@ void QAutopilotPrivate::arm() {
             spdlog::error(PLAT_FMT_STR, systemId, "arm", result);
         }
     });
+}
+
+void QAutopilotPrivate::clearTelemetrySubscriptions()
+{
+    if (!m_telemetry) {
+        return;
+    }
+
+    if (m_positionHandle.valid()) {
+        m_telemetry->unsubscribe_position(m_positionHandle);
+        m_positionHandle = {};
+    }
+    if (m_headingHandle.valid()) {
+        m_telemetry->unsubscribe_heading(m_headingHandle);
+        m_headingHandle = {};
+    }
+    if (m_batteryHandle.valid()) {
+        m_telemetry->unsubscribe_battery(m_batteryHandle);
+        m_batteryHandle = {};
+    }
+    if (m_flightModeHandle.valid()) {
+        m_telemetry->unsubscribe_flight_mode(m_flightModeHandle);
+        m_flightModeHandle = {};
+    }
+    if (m_healthHandle.valid()) {
+        m_telemetry->unsubscribe_health(m_healthHandle);
+        m_healthHandle = {};
+    }
+    if (m_gpsInfoHandle.valid()) {
+        m_telemetry->unsubscribe_gps_info(m_gpsInfoHandle);
+        m_gpsInfoHandle = {};
+    }
+    if (m_positionVelocityHandle.valid()) {
+        m_telemetry->unsubscribe_position_velocity_ned(
+            m_positionVelocityHandle);
+        m_positionVelocityHandle = {};
+    }
+    if (m_armedHandle.valid()) {
+        m_telemetry->unsubscribe_armed(m_armedHandle);
+        m_armedHandle = {};
+    }
+    if (m_inAirHandle.valid()) {
+        m_telemetry->unsubscribe_in_air(m_inAirHandle);
+        m_inAirHandle = {};
+    }
+    if (m_distanceSensorHandle.valid()) {
+        m_telemetry->unsubscribe_distance_sensor(m_distanceSensorHandle);
+        m_distanceSensorHandle = {};
+    }
+    if (m_homeHandle.valid()) {
+        m_telemetry->unsubscribe_home(m_homeHandle);
+        m_homeHandle = {};
+    }
+    if (m_rcStatusHandle.valid()) {
+        m_telemetry->unsubscribe_rc_status(m_rcStatusHandle);
+        m_rcStatusHandle = {};
+    }
+    if (m_fixedwingMetricsHandle.valid()) {
+        m_telemetry->unsubscribe_fixedwing_metrics(
+            m_fixedwingMetricsHandle);
+        m_fixedwingMetricsHandle = {};
+    }
+}
+
+void QAutopilotPrivate::disarm()
+{
+    if (!m_action || !m_pSystem) {
+        return;
+    }
+    const uint8_t systemId = m_pSystem->get_system_id();
+    m_action->disarm_async([systemId](mavsdk::Action::Result result) {
+        if (mavsdk::Action::Result::Success != result) {
+            spdlog::error(PLAT_FMT_STR, systemId, "disarm", result);
+        }
+    });
+}
+
+void QAutopilotPrivate::takeoff()
+{
+    if (!m_action || !m_pSystem) {
+        return;
+    }
+    const uint8_t systemId = m_pSystem->get_system_id();
+    m_action->takeoff_async([systemId](mavsdk::Action::Result result) {
+        if (mavsdk::Action::Result::Success != result) {
+            spdlog::error(PLAT_FMT_STR, systemId, "takeoff", result);
+        }
+    });
+}
+
+void QAutopilotPrivate::land()
+{
+    if (!m_action || !m_pSystem) {
+        return;
+    }
+    const uint8_t systemId = m_pSystem->get_system_id();
+    m_action->land_async([systemId](mavsdk::Action::Result result) {
+        if (mavsdk::Action::Result::Success != result) {
+            spdlog::error(PLAT_FMT_STR, systemId, "land", result);
+        }
+    });
+}
+
+void QAutopilotPrivate::returnToLaunch()
+{
+    if (!m_action || !m_pSystem) {
+        return;
+    }
+    const uint8_t systemId = m_pSystem->get_system_id();
+    m_action->return_to_launch_async(
+        [systemId](mavsdk::Action::Result result) {
+            if (mavsdk::Action::Result::Success != result) {
+                spdlog::error(
+                    PLAT_FMT_STR, systemId, "return_to_launch", result);
+            }
+        });
 }
 
 template<>struct fmt::formatter<mavsdk::Telemetry::Result>:ostream_formatter{};
@@ -165,12 +290,13 @@ void QAutopilotPrivate::setupMessageHandling() {
         return;
     }
 
+    clearTelemetrySubscriptions();
     QPlatPrivate::setupMessageHandling();
     const QPointer<QAutopilot> autopilot(q_func());
     const uint8_t systemId = m_pSystem->get_system_id();
 
     /// 位置信息
-    m_telemetry->subscribe_position([autopilot, systemId](
+    m_positionHandle = m_telemetry->subscribe_position([autopilot, systemId](
                                         mavsdk::Telemetry::Position position) {
         spdlog::info(PLAT_FMT_STR, systemId, "position",
                      position);
@@ -185,7 +311,7 @@ void QAutopilotPrivate::setupMessageHandling() {
     });
 
     /// 航向
-    m_telemetry->subscribe_heading([autopilot, systemId](mavsdk::Telemetry::Heading heading) {
+    m_headingHandle = m_telemetry->subscribe_heading([autopilot, systemId](mavsdk::Telemetry::Heading heading) {
         if (autopilot) {
             QMetaObject::invokeMethod(
                 autopilot, "headingUpdate", Qt::QueuedConnection,
@@ -195,7 +321,7 @@ void QAutopilotPrivate::setupMessageHandling() {
     });
 
     /// 电池状态
-    m_telemetry->subscribe_battery([autopilot, systemId](mavsdk::Telemetry::Battery battery) {
+    m_batteryHandle = m_telemetry->subscribe_battery([autopilot, systemId](mavsdk::Telemetry::Battery battery) {
         if (autopilot) {
             QMetaObject::invokeMethod(
                 autopilot, "batteryUpdate", Qt::QueuedConnection,
@@ -206,14 +332,22 @@ void QAutopilotPrivate::setupMessageHandling() {
     });
 
     /// 飞行状态
-    m_telemetry->subscribe_flight_mode(
+    m_flightModeHandle = m_telemetry->subscribe_flight_mode(
         [systemId](mavsdk::Telemetry::FlightMode flightMode) {
             spdlog::info(PLAT_FMT_STR, systemId, "flightMode",
                          flightMode);
         });
 
+    m_telemetry->set_rate_in_air_async(
+        1, [systemId](mavsdk::Telemetry::Result result) {
+            if (mavsdk::Telemetry::Result::Success != result) {
+                spdlog::error(PLAT_FMT_STR, systemId,
+                              "set_rate_in_air", result);
+            }
+        });
+
     /// 健康状态
-    m_telemetry->subscribe_health([autopilot, systemId](mavsdk::Telemetry::Health h) {
+    m_healthHandle = m_telemetry->subscribe_health([autopilot, systemId](mavsdk::Telemetry::Health h) {
         if (autopilot) {
             QMetaObject::invokeMethod(
                 autopilot, "healthUpdate", Qt::QueuedConnection,
@@ -229,7 +363,7 @@ void QAutopilotPrivate::setupMessageHandling() {
     });
 
     /// GPS状态
-    m_telemetry->subscribe_gps_info(
+    m_gpsInfoHandle = m_telemetry->subscribe_gps_info(
         [autopilot, systemId](mavsdk::Telemetry::GpsInfo gps) {
         if (autopilot) {
             QMetaObject::invokeMethod(
@@ -241,7 +375,8 @@ void QAutopilotPrivate::setupMessageHandling() {
         });
 
     /// 本地坐标
-    m_telemetry->subscribe_position_velocity_ned(
+    m_positionVelocityHandle =
+        m_telemetry->subscribe_position_velocity_ned(
         [autopilot, systemId](mavsdk::Telemetry::PositionVelocityNed pvNed) {
             spdlog::info(PLAT_FMT_STR, systemId,
                          "positionVelocityNed", pvNed);
@@ -252,19 +387,40 @@ void QAutopilotPrivate::setupMessageHandling() {
                     autopilot, "nedUpdate", Qt::QueuedConnection,
                     Q_ARG(float, pvNed.position.north_m),
                     Q_ARG(float, pvNed.position.east_m),
-                    Q_ARG(float, pvNed.position.down_m));
+                    Q_ARG(float, pvNed.position.down_m),
+                    Q_ARG(float, pvNed.velocity.north_m_s),
+                    Q_ARG(float, pvNed.velocity.east_m_s),
+                    Q_ARG(float, pvNed.velocity.down_m_s));
+            }
+        });
+
+    m_armedHandle = m_telemetry->subscribe_armed(
+        [autopilot](bool armed) {
+            if (autopilot) {
+                QMetaObject::invokeMethod(
+                    autopilot, "armedUpdate", Qt::QueuedConnection,
+                    Q_ARG(bool, armed));
+            }
+        });
+
+    m_inAirHandle = m_telemetry->subscribe_in_air(
+        [autopilot](bool inAir) {
+            if (autopilot) {
+                QMetaObject::invokeMethod(
+                    autopilot, "inAirUpdate", Qt::QueuedConnection,
+                    Q_ARG(bool, inAir));
             }
         });
 
     /// 距离传感器
-    m_telemetry->subscribe_distance_sensor(
+    m_distanceSensorHandle = m_telemetry->subscribe_distance_sensor(
         [systemId](mavsdk::Telemetry::DistanceSensor sensor) {
             spdlog::info(PLAT_FMT_STR, systemId, "distanceSensor",
                          sensor);
         });
 
     /// 订阅home点
-    m_telemetry->subscribe_home([autopilot, systemId](mavsdk::Telemetry::Position home) {
+    m_homeHandle = m_telemetry->subscribe_home([autopilot, systemId](mavsdk::Telemetry::Position home) {
         spdlog::info(PLAT_FMT_STR, systemId, "home", home);
 
         // 通过Qt元系统调用parent的homeUpdate方法
@@ -278,7 +434,7 @@ void QAutopilotPrivate::setupMessageHandling() {
     });
 
     /// 订阅 rc状态
-    m_telemetry->subscribe_rc_status([autopilot, systemId](
+    m_rcStatusHandle = m_telemetry->subscribe_rc_status([autopilot, systemId](
                                          mavsdk::Telemetry::RcStatus rcStatus) {
         spdlog::info(PLAT_FMT_STR, systemId, "rcStatus",
                      rcStatus);
@@ -293,7 +449,7 @@ void QAutopilotPrivate::setupMessageHandling() {
     });
 
     /// 订阅固定翼指标
-    m_telemetry->subscribe_fixedwing_metrics([autopilot, systemId](mavsdk::Telemetry::FixedwingMetrics fixMetrics){
+    m_fixedwingMetricsHandle = m_telemetry->subscribe_fixedwing_metrics([autopilot, systemId](mavsdk::Telemetry::FixedwingMetrics fixMetrics){
         spdlog::info(PLAT_FMT_STR, systemId, "fixMetrics",
                      fixMetrics);
         // 通过Qt元系统调用parent的fixedwingUpdate方法

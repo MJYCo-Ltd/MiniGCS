@@ -164,8 +164,6 @@ void QGroundControlStationPrivate::handleConnectionError(
 
     if (!connectionString.isEmpty()) {
         removeConnection(connectionString);
-    } else {
-        m_mavsdk->remove_connection(error.connection_handle);
     }
     if (!connectionString.isEmpty() && station->linkManager()) {
         station->linkManager()->handleConnectionError(connectionString,
@@ -333,9 +331,10 @@ void QGroundControlStationPrivate::removeConnection(const QString &connectionUrl
     }
     auto it = m_connectionHandles.find(url);
     if (it != m_connectionHandles.end()) {
-        if (it->second.valid()) {
-            m_mavsdk->remove_connection(it->second);
-        }
+        const mavsdk::Mavsdk::ConnectionHandle handle = it->second;
         m_connectionHandles.erase(it);
+        if (handle.valid()) {
+            m_mavsdk->remove_connection(handle);
+        }
     }
 }
