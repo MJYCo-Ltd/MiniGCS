@@ -51,14 +51,25 @@ void QGroundControlStationPrivate::initializeMavsdk()
     config.set_component_id(QGCSConfig::instance()->gcsComponentId());
     m_mavsdk = std::make_shared<mavsdk::Mavsdk>(config);
 
-    /// 解析 APM 扩展 XML（命令表 + 内容缓存）；注入 MAVSDK 等首个 System 出现时只做一次
+    /// 解析扩展 XML 中的 MAV_CMD 表。
+    /// MAVSDK 已内嵌 ARDUPILOTMEGA；仅当配置指向额外自定义 XML 时才注入共享 MessageSet。
     m_xmlExtension = std::make_shared<XmlToMavSDK>(
         QGCSConfig::instance()->mavMessageExtension());
-    if (!m_xmlExtension->hasXmlContent()) {
+    if (!m_xmlExtension->isCmdTableLoaded()) {
         spdlog::warn(
             SYS_FMT_STR,
             "mav message extension",
             QGCSConfig::instance()->mavMessageExtension().toUtf8().constData());
+    } else if (m_xmlExtension->needsMessageSetInject()) {
+        spdlog::info(
+            SYS_FMT_STR,
+            "mav message extension",
+            "custom dialect will be injected once into shared MessageSet");
+    } else {
+        spdlog::info(
+            SYS_FMT_STR,
+            "mav message extension",
+            "ardupilotmega catalog loaded; MessageSet already embedded in MAVSDK");
     }
 
     /// 连接由 QLinkManager 通过 addTcpServer/addSerial 等添加
@@ -73,7 +84,9 @@ void QGroundControlStationPrivate::ensureCustomXmlLoaded(
     if (!system || !m_xmlExtension) {
         return;
     }
-    if (m_xmlExtension->isCustomXmlApplied()) {
+    /// 默认 ardupilotmega 已内嵌，无需注入；自定义方言才写入共享 MessageSet
+    if (!m_xmlExtension->needsMessageSetInject() ||
+        m_xmlExtension->isCustomXmlApplied()) {
         return;
     }
     if (!m_xmlExtension->hasXmlContent()) {
@@ -88,6 +101,7 @@ void QGroundControlStationPrivate::ensureCustomXmlLoaded(
             return;
         }
 
+        /// 任意 System 上的 MavlinkDirect 均可，最终写入 MavsdkImpl 全局 MessageSet
         mavsdk::MavlinkDirect mavlinkDirect(*currentSystem);
         const auto result = extension->applyCustomXmlOnce(mavlinkDirect);
         if (!result.has_value()) {
@@ -240,44 +254,51 @@ void QGroundControlStationPrivate::setupNewSystemDiscoveryCallback(
             // 获取所有系统
             auto systems = mavsdk->systems();
 
-            /// 扩展方言只需注入一次（任意已连接 System 即可）
-            for (const auto &system : systems) {
-                if (system && system->is_connected()) {
-                    self->ensureCustomXmlLoaded(system);
-                    break;
-                }
-            }
-
             // 检查是否有新系统
-            for (auto system : systems) {
-                /// system 断开也会触发subscribe_on_new_system
-                if (system->is_connected()) {
-                    uint8_t systemId = system->get_system_id();
-                    bool bHaveAutopilot = system->has_autopilot();
-                    if (station) {
-                        QPlat *pPlat =
-                            station->getOrCreatePlat(systemId, bHaveAutopilot);
-                        /// 如果平台的Private 指针没有设置 或者 Private的
-                        /// system与现在的不一致
-                        if (nullptr == pPlat->d_ptr.get() ||
-                            pPlat->d_ptr.get()->getSystem() != system) {
-                            if (bHaveAutopilot) {
-                                QPlatPrivate *localQPlatPrivate = new QAutopilotPrivate(pPlat);
-                                localQPlatPrivate->setSystem(system);
-                                pPlat->SetPrivate(localQPlatPrivate);
-                            } else {
-                                QPlatPrivate *localQPlatPrivate = new QPlatPrivate(pPlat);
-                                localQPlatPrivate->setSystem(system);
-                                pPlat->SetPrivate(localQPlatPrivate);
-                            }
-                            /// 发送信号给qt
-                            emit station->newPlatFind(pPlat);
-                        }
-                    }
-                }
+            for (const auto &system : systems) {
+                self->bindConnectedSystem(station, system);
             }
         });
     });
+}
+
+void QGroundControlStationPrivate::refreshConnectedSystem(
+    QGroundControlStation *station, uint8_t systemId)
+{
+    if (!station || !m_mavsdk) {
+        return;
+    }
+    for (const auto &system : m_mavsdk->systems()) {
+        if (system && system->get_system_id() == systemId) {
+            bindConnectedSystem(station, system);
+            return;
+        }
+    }
+}
+
+void QGroundControlStationPrivate::bindConnectedSystem(
+    QGroundControlStation *station,
+    const std::shared_ptr<mavsdk::System> &system)
+{
+    if (!station || !system || !system->is_connected()) {
+        return;
+    }
+
+    ensureCustomXmlLoaded(system);
+    const uint8_t systemId = system->get_system_id();
+    const bool hasAutopilot = system->has_autopilot();
+    QPlat *platform = station->getOrCreatePlat(systemId, hasAutopilot);
+    if (platform->d_ptr && platform->d_ptr->getSystem() == system) {
+        return;
+    }
+
+    QPlatPrivate *implementation = hasAutopilot
+        ? static_cast<QPlatPrivate *>(new QAutopilotPrivate(platform))
+        : new QPlatPrivate(platform);
+    implementation->setMavMessageExtension(m_xmlExtension);
+    implementation->setSystem(system);
+    platform->SetPrivate(implementation);
+    emit station->newPlatFind(platform);
 }
 
 void QGroundControlStationPrivate::processReceivedRawData(const QByteArray &data)

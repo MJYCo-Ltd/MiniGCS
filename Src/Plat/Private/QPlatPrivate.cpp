@@ -9,6 +9,7 @@
 #include "Private/QGCSLog.h"
 #include "Private/QMavsdkTextCatalog.h"
 #include "QGCSConfig.h"
+#include "Extern/XmlToMavSDK.h"
 #include "Plat/Private/QPlatPrivate.h"
 #include "Plat/QPlat.h"
 
@@ -82,7 +83,6 @@ void QPlatPrivate::setSystem(std::shared_ptr<mavsdk::System> system) {
     m_pSystem = system;
     if (!m_pSystem) {
         m_pInfo.reset();
-        m_pParam.reset();
         m_pMavlinkDirect.reset();
         return;
     }
@@ -93,7 +93,6 @@ void QPlatPrivate::setSystem(std::shared_ptr<mavsdk::System> system) {
     }
     // 创建插件实例
     m_pInfo = std::make_shared<mavsdk::Info>(*system);
-    m_pParam = std::make_unique<mavsdk::Param>(*system);
     m_pMavlinkDirect = std::make_shared<mavsdk::MavlinkDirect>(*system);
 
     const QPointer<QPlat> plat(q_ptr);
@@ -123,7 +122,8 @@ void QPlatPrivate::setSystem(std::shared_ptr<mavsdk::System> system) {
                     const QString text = object.value("text").toString();
                     QGCSConfig::instance()->dealMavsdkStatusText(
                         systemId, severity, text);
-                    if (severity < 5) {
+                    /// MAV_SEVERITY_EMERGENCY..WARNING
+                    if (severity <= 4) {
                         emit plat->errorInfo(text);
                     }
                 },
@@ -157,10 +157,17 @@ void QPlatPrivate::setupMessageHandling() {
 
     // 订阅组件发现
     m_hCommonpentDiscovered = m_pSystem->subscribe_component_discovered(
-        [](mavsdk::ComponentType componentType) {
-            // 这里可以处理新组件发现
+        [plat](mavsdk::ComponentType componentType) {
             qDebug() << "QVehiclePrivate: Component discovered:"
                      << static_cast<int>(componentType);
+            if (plat) {
+                QMetaObject::invokeMethod(
+                    plat, [plat]() {
+                        if (plat) {
+                            emit plat->componentsChanged();
+                        }
+                    }, Qt::QueuedConnection);
+            }
         });
 }
 

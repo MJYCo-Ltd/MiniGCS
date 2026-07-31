@@ -57,6 +57,16 @@ void QAutopilot::returnToLaunch()
     }
 }
 
+bool QAutopilot::sendExternCommand(const QString &name,
+                                   quint32 componentId,
+                                   const QVector<float> &params)
+{
+    if (!d_func()) {
+        return false;
+    }
+    return d_func()->sendExternCommand(name, componentId, params);
+}
+
 void QAutopilot::downloadAirLine()
 {
     if (m_airLineDownloading || m_airLineUploading) {

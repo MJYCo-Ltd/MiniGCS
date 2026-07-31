@@ -4,7 +4,6 @@
 #include <QObject>
 #include <QString>
 #include <cstdint>
-#include <string>
 #include "MiniGCSExport.h"
 
 class QSettings;
@@ -44,14 +43,8 @@ public:
     virtual void release();
 
     /**
-   * @brief 处理mavsdk消息
-   * @param event
+   * @brief 处理已解析的 MAVLink STATUSTEXT，应在 Qt 对象线程调用
    */
-    void dealMavsdkMessage(uint32_t systemID, const std::string &fields_json);
-
-    /**
-     * @brief 处理已解析的 MAVLink STATUSTEXT，应在 Qt 对象线程调用
-     */
     void dealMavsdkStatusText(uint32_t systemID, int severity,
                               const QString &text);
 
@@ -87,6 +80,11 @@ public:
      * @brief 从 MAVSDK 文本目录读取字符串键对应的文本
      */
     QString mavsdkText(const QString &section, const QString &key) const;
+
+    /**
+     * @brief 扩展 COMMAND_LONG 等待最终 COMMAND_ACK 的超时时间
+     */
+    int mavCommandAckTimeoutMs() const;
 
     /**
    * @brief 获取是否开启时间同步

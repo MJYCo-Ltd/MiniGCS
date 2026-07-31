@@ -176,6 +176,16 @@ ApplicationWindow {
             controlPanel.statusText = qsTr("命令未发送：%1").arg(reason)
         }
 
+        function onCommandResult(systemId, command, success, reason) {
+            controlPanel.statusText = success
+                    ? qsTr("无人机 %1 已确认“%2”")
+                        .arg(systemId).arg(DroneControl.commandName(command))
+                    : qsTr("无人机 %1 执行“%2”失败：%3")
+                        .arg(systemId)
+                        .arg(DroneControl.commandName(command))
+                        .arg(reason)
+        }
+
         function onMissionDownloaded(systemId, waypoints) {
             if (Number(systemId) ===
                     Number(controlPanel.selectedDroneId)) {

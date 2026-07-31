@@ -8,10 +8,11 @@
 #include <mavsdk/system.h>
 #include <mavsdk/plugins/mavlink_direct/mavlink_direct.h>
 #include <mavsdk/plugins/info/info.h>
-#include <mavsdk/plugins/param/param.h>
 
 // 前向声明
 class QPlat;
+
+class XmlToMavSDK;
 
 /**
  * @brief QStandalone的私有实现类
@@ -66,6 +67,19 @@ public:
     std::shared_ptr<mavsdk::System> getSystem() const;
 
     /**
+     * @brief 设置整站共享的扩展命令表（MAV_CMD 目录 / 可选自定义 MessageSet 注入源）
+     */
+    void setMavMessageExtension(const std::shared_ptr<XmlToMavSDK> &extension)
+    {
+        m_xmlExtension = extension;
+    }
+
+    std::shared_ptr<XmlToMavSDK> mavMessageExtension() const
+    {
+        return m_xmlExtension;
+    }
+
+    /**
      * @brief 设置消息处理回调
      * @param parent QVehicle实例指针，用于信号发射
      */
@@ -92,8 +106,8 @@ protected:
     // MAVSDK相关
     std::shared_ptr<mavsdk::System> m_pSystem; ///< 系统对象
     std::shared_ptr<mavsdk::Info> m_pInfo;     ///< 信息插件
-    std::unique_ptr<mavsdk::Param> m_pParam;
     std::shared_ptr<mavsdk::MavlinkDirect> m_pMavlinkDirect;
+    std::shared_ptr<XmlToMavSDK> m_xmlExtension; ///< 整站一份，按名发扩展命令
 
     mavsdk::System::IsConnectedHandle m_hConntecd;
     mavsdk::System::ComponentDiscoveredHandle m_hCommonpentDiscovered;

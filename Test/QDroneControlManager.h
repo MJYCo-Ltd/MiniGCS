@@ -80,6 +80,8 @@ signals:
     void firmwareLogsChanged();
     void commandDispatched(
         int command, const QString &target, int count);
+    void commandResult(
+        int systemId, int command, bool success, const QString &reason);
     void commandRejected(const QString &reason);
     void missionDownloaded(int systemId, const QVariantList &waypoints);
     void missionUploadResult(

@@ -15,15 +15,14 @@ QGroundControlStation::QGroundControlStation(QObject *parent)
 
 QGroundControlStation::~QGroundControlStation()
 {
-    // 先销毁飞控插件并取消其订阅。退出阶段不能逐条调用
-    // Mavsdk::remove_connection：MAVSDK 的连接线程仍在运行时，该调用可能在
-    // join() 中等待持锁线程，导致主线程无法退出。
+    // 先销毁飞控插件并取消其订阅，再由 Mavsdk 析构统一停止 I/O 线程和连接。
+    // 当前 MAVSDK 已允许安全地显式 remove_connection；这里保留统一析构，避免
+    // 在退出路径重复逐条清理同一批连接。
     const QList<QPlat *> platformChildren =
         findChildren<QPlat *>(QString(), Qt::FindDirectChildrenOnly);
     qDeleteAll(platformChildren);
     m_mapId2Standalone.clear();
 
-    // 由 Mavsdk 自身的析构流程统一停止工作线程和连接。
     d_ptr.reset();
 }
 
@@ -94,6 +93,12 @@ QPlat *QGroundControlStation::getOrCreatePlat(uint8_t uId, bool bIsAutopilot)
     }
 
     if (registryChanged) {
+        connect(pPlat, &QPlat::componentsChanged, this,
+                [this, uId]() {
+                    if (d_ptr) {
+                        d_ptr->refreshConnectedSystem(this, uId);
+                    }
+                });
         emit platsChanged();
     }
 

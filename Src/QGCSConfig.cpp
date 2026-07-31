@@ -2,8 +2,6 @@
 #include <QDebug>
 #include <QDateTime>
 #include <QDir>
-#include <QJsonDocument>
-#include <QJsonObject>
 #include <QSettings>
 #include <QFileInfo>
 #include <QPointer>
@@ -25,6 +23,7 @@ const char *KEY_GCS_COMPONENT_ID = "GCS/ComponentId";
 const char *KEY_LOG_LEVEL = "Logging/Level";
 const char *KEY_MAV_MESSAGE_EXTENSION = "MavMessage/Extension";
 const char *KEY_MAVSDK_TYPE_TEXT_FILE = "Mavsdk/TypeTextFile";
+const char *KEY_MAV_COMMAND_ACK_TIMEOUT_MS = "Mavsdk/CommandAckTimeoutMs";
 const char *KEY_TIME_SYNC_ENABLED = "TimeSync/Enabled";
 const char *KEY_MOTION_START_HORIZONTAL = "Motion/StartHorizontalSpeedMS";
 const char *KEY_MOTION_START_VERTICAL = "Motion/StartVerticalSpeedMS";
@@ -39,6 +38,7 @@ const uint8_t DEFAULT_GCS_COMPONENT_ID = 191;
 const char *DEFAULT_LOG_LEVEL = "debug";
 const char *DEFAULT_MAV_MESSAGE_EXTENSION = "ardupilotmega.xml";
 const char *DEFAULT_MAVSDK_TYPE_TEXT_FILE = "mavsdk_zh_CN.json";
+constexpr int DEFAULT_MAV_COMMAND_ACK_TIMEOUT_MS = 5000;
 const bool DEFAULT_TIME_SYNC_ENABLED = true;
 constexpr double DEFAULT_MOTION_START_HORIZONTAL = 0.7;
 constexpr double DEFAULT_MOTION_START_VERTICAL = 0.5;
@@ -286,19 +286,6 @@ void QGCSConfig::release() {
     m_pSInsatance = nullptr;
 }
 
-void QGCSConfig::dealMavsdkMessage(uint32_t systemID,
-                                   const std::string &jsonMessage) {
-    QJsonParseError err;
-    QJsonDocument doc = QJsonDocument::fromJson(jsonMessage.c_str(), &err);
-    if (err.error != QJsonParseError::NoError || !doc.isObject())
-        return;
-    const QJsonObject obj = doc.object();
-    if (obj.value("message_name").toString() == "STATUSTEXT") {
-        dealMavsdkStatusText(systemID, obj.value("severity").toInt(),
-                            obj.value("text").toString());
-    }
-}
-
 void QGCSConfig::dealMavsdkStatusText(uint32_t systemID, int severity,
                                       const QString &text)
 {
@@ -459,6 +446,15 @@ QString QGCSConfig::mavsdkText(
     return QMavsdkTextCatalog::text(section, key);
 }
 
+int QGCSConfig::mavCommandAckTimeoutMs() const
+{
+    const int configured = m_settings
+        ? m_settings->value(KEY_MAV_COMMAND_ACK_TIMEOUT_MS,
+                            DEFAULT_MAV_COMMAND_ACK_TIMEOUT_MS).toInt()
+        : DEFAULT_MAV_COMMAND_ACK_TIMEOUT_MS;
+    return qBound(1000, configured, 60000);
+}
+
 bool QGCSConfig::timeSyncEnabled() const {
     if (!m_settings) {
         return DEFAULT_TIME_SYNC_ENABLED;
@@ -557,6 +553,10 @@ void QGCSConfig::initializeDefaults() {
     if (!m_settings->contains(KEY_MAVSDK_TYPE_TEXT_FILE)) {
         m_settings->setValue(KEY_MAVSDK_TYPE_TEXT_FILE,
                              DEFAULT_MAVSDK_TYPE_TEXT_FILE);
+    }
+    if (!m_settings->contains(KEY_MAV_COMMAND_ACK_TIMEOUT_MS)) {
+        m_settings->setValue(KEY_MAV_COMMAND_ACK_TIMEOUT_MS,
+                             DEFAULT_MAV_COMMAND_ACK_TIMEOUT_MS);
     }
     if (!m_settings->contains(KEY_TIME_SYNC_ENABLED)) {
         m_settings->setValue(KEY_TIME_SYNC_ENABLED, DEFAULT_TIME_SYNC_ENABLED);

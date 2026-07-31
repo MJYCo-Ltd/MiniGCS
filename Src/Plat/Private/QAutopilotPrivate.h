@@ -4,6 +4,10 @@
 #include <mavsdk/plugins/action/action.h>
 #include <mavsdk/plugins/telemetry/telemetry.h>
 #include <mavsdk/plugins/mission/mission.h>
+#include <QVector>
+#include <optional>
+#include <string>
+#include <cstdint>
 #include "AirLine/QGpsPosition.h"
 #include "QPlatPrivate.h"
 
@@ -37,8 +41,27 @@ public:
     void uploadAirLine(quint64 requestId,
                        const QList<QGpsPosition> &waypoints);
 
+    /**
+     * @brief 按 MAV_CMD 名发送扩展 COMMAND_LONG（使用整站命令表 + 本机 MavlinkDirect）
+     */
+    bool sendExternCommand(const QString &name,
+                           quint32 componentId,
+                           const QVector<float> &params);
+
 protected:
     void clearTelemetrySubscriptions();
+    void clearExternalCommandSubscription();
+    void setupExternalCommandSubscription();
+    void handleExternalCommandAck(
+        uint32_t sourceComponentId, const std::string &fieldsJson);
+    void scheduleExternalCommandTimeout(quint64 generation);
+
+    struct PendingExternalCommand {
+        QString name;
+        int commandId{};
+        uint32_t componentId{};
+        quint64 generation{};
+    };
 
     /**
      * @brief 获取QAutopilotPrivate指针的辅助方法
@@ -54,7 +77,6 @@ protected:
     mavsdk::Telemetry::PositionHandle m_positionHandle;
     mavsdk::Telemetry::HeadingHandle m_headingHandle;
     mavsdk::Telemetry::BatteryHandle m_batteryHandle;
-    mavsdk::Telemetry::FlightModeHandle m_flightModeHandle;
     mavsdk::Telemetry::HealthHandle m_healthHandle;
     mavsdk::Telemetry::GpsInfoHandle m_gpsInfoHandle;
     mavsdk::Telemetry::PositionVelocityNedHandle m_positionVelocityHandle;
@@ -64,6 +86,9 @@ protected:
     mavsdk::Telemetry::HomeHandle m_homeHandle;
     mavsdk::Telemetry::RcStatusHandle m_rcStatusHandle;
     mavsdk::Telemetry::FixedwingMetricsHandle m_fixedwingMetricsHandle;
+    mavsdk::MavlinkDirect::MessageHandle m_commandAckHandle;
+    std::optional<PendingExternalCommand> m_pendingExternalCommand;
+    quint64 m_externalCommandGeneration{};
 };
 
 #endif // Q_SUTOPILOT_PRIVATE_H

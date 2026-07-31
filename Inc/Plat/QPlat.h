@@ -91,6 +91,11 @@ signals:
     void infoUpdated();
 
     /**
+     * @brief MAVSDK System 发现了新组件
+     */
+    void componentsChanged();
+
+    /**
      * @brief 有错误发生
      * @param sError
      */
@@ -105,7 +110,7 @@ protected:
     friend class QGroundControlStation;
     QDateTime m_lastConnectedTime;          ///< 最后连接时间
     QDateTime m_lastDisconnectedTime;       ///< 最后断开时间
-    bool      m_bConnected{true};
+    bool      m_bConnected{false};
     int       m_systemId{-1};
 
     std::unique_ptr<QPlatPrivate> d_ptr;    ///< 私有实现指针

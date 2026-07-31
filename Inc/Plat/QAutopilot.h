@@ -9,6 +9,8 @@
 #include "Plat/QAutoVehicleType.h"
 #include "MiniGCSExport.h"
 
+#include <QVector>
+
 /**
  * @brief QAutopilot类 - 具备自动驾驶功能的系统
  * 
@@ -36,6 +38,15 @@ class MINIGCS_EXPORT QAutopilot : public QPlat
     Q_PROPERTY(QString autopilotName READ autopilotName NOTIFY autopilotNameChanged)
 
 public:
+    enum ActionCommand {
+        ArmAction,
+        DisarmAction,
+        TakeoffAction,
+        LandAction,
+        ReturnToLaunchAction
+    };
+    Q_ENUM(ActionCommand)
+
     explicit QAutopilot(QObject *parent = nullptr);
     ~QAutopilot();
 
@@ -47,6 +58,17 @@ public:
     Q_INVOKABLE void takeoff();
     Q_INVOKABLE void land();
     Q_INVOKABLE void returnToLaunch();
+
+    /**
+     * @brief 按 MAV_CMD 枚举名发送 APM/扩展 COMMAND_LONG
+     * @param name 例如 "MAV_CMD_DO_SET_MODE"
+     * @param componentId 目标组件 ID（通常为 1）
+     * @param params 最多 7 个参数，不足补 0
+     * @return 是否成功交给本机 MavlinkDirect 发送并开始等待 COMMAND_ACK
+     */
+    Q_INVOKABLE bool sendExternCommand(const QString &name,
+                                       quint32 componentId,
+                                       const QVector<float> &params);
 
     /**
      * @brief 显式下载当前任务航线
@@ -136,6 +158,20 @@ public:
 
 
 signals:
+    /**
+     * @brief MAVSDK Action 命令完成（飞控确认、拒绝或请求超时）
+     */
+    void actionCommandFinished(
+        QAutopilot::ActionCommand command, bool success,
+        int mavsdkResult, const QString &reason);
+
+    /**
+     * @brief APM/扩展 COMMAND_LONG 获得最终 COMMAND_ACK 或等待超时
+     */
+    void externCommandFinished(
+        const QString &name, bool success,
+        int mavResult, const QString &reason);
+
     /**
      * @brief GPS位置信息变化信号
      * @param position 新的GPS位置信息

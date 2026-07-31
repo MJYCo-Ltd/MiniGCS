@@ -29,11 +29,12 @@ void QAutopilotPrivate::downloadAirLine(quint64 requestId)
         }
 
         if (result != mavsdk::Mission::Result::Success) {
-            const QString reason = QMavsdkTextCatalog::text(
-                QStringLiteral("missionResult"), static_cast<int>(result));
             QMetaObject::invokeMethod(autopilot,
-                [autopilot, requestId, reason]() {
+                [autopilot, requestId, result]() {
                     if (autopilot) {
+                        const QString reason = QMavsdkTextCatalog::text(
+                            QStringLiteral("missionResult"),
+                            static_cast<int>(result));
                         autopilot->failAirLineDownload(requestId, reason);
                     }
                 },
@@ -108,12 +109,13 @@ void QAutopilotPrivate::uploadAirLine(
         }
 
         if (result != mavsdk::Mission::Result::Success) {
-            const QString reason = QMavsdkTextCatalog::text(
-                QStringLiteral("missionResult"), static_cast<int>(result));
             QMetaObject::invokeMethod(
                 autopilot,
-                [autopilot, requestId, reason]() {
+                [autopilot, requestId, result]() {
                     if (autopilot) {
+                        const QString reason = QMavsdkTextCatalog::text(
+                            QStringLiteral("missionResult"),
+                            static_cast<int>(result));
                         autopilot->failAirLineUpload(requestId, reason);
                     }
                 },

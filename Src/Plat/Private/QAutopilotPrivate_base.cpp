@@ -1,6 +1,63 @@
 #include "Plat/QAutopilot.h"
 #include "Plat/Private/QAutopilotPrivate.h"
 #include <QPointer>
+#include <QCoreApplication>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QTimer>
+
+#include "Extern/XmlToMavSDK.h"
+#include "QGCSConfig.h"
+#include "Private/QGCSLog.h"
+#include "Private/QMavsdkTextCatalog.h"
+
+template<>struct fmt::formatter<mavsdk::Action::Result>:ostream_formatter{};
+
+namespace {
+bool hasFixedWingMetrics(QAutoVehicleType::Vehicle vehicle)
+{
+    switch (vehicle) {
+    case QAutoVehicleType::FixedWing:
+    case QAutoVehicleType::VtolTailsitterDuorotor:
+    case QAutoVehicleType::VtolTailsitterQuadrotor:
+    case QAutoVehicleType::VtolTiltrotor:
+    case QAutoVehicleType::VtolFixedrotor:
+    case QAutoVehicleType::VtolTailsitter:
+    case QAutoVehicleType::VtolTiltwing:
+        return true;
+    default:
+        return false;
+    }
+}
+
+void dispatchActionResult(
+    const QPointer<QAutopilot> &autopilot,
+    QAutopilot::ActionCommand command,
+    mavsdk::Action::Result result,
+    uint8_t systemId,
+    const char *operation)
+{
+    if (result != mavsdk::Action::Result::Success) {
+        spdlog::error(PLAT_FMT_STR, systemId, operation, result);
+    }
+    if (!autopilot) {
+        return;
+    }
+    QMetaObject::invokeMethod(
+        autopilot,
+        [autopilot, command, result]() {
+            if (!autopilot) {
+                return;
+            }
+            const QString reason = QMavsdkTextCatalog::text(
+                QStringLiteral("actionResult"), static_cast<int>(result));
+            emit autopilot->actionCommandFinished(
+                command, result == mavsdk::Action::Result::Success,
+                static_cast<int>(result), reason);
+        },
+        Qt::QueuedConnection);
+}
+} // namespace
 
 QAutopilotPrivate::QAutopilotPrivate(QPlat *pPlat)
     : QPlatPrivate(pPlat)
@@ -12,6 +69,7 @@ QAutopilotPrivate::~QAutopilotPrivate()
         m_mission->cancel_mission_download();
         m_mission->cancel_mission_upload();
     }
+    clearExternalCommandSubscription();
     clearTelemetrySubscriptions();
     m_mission.reset();
     m_action.reset();
@@ -35,6 +93,7 @@ void QAutopilotPrivate::setSystem(std::shared_ptr<mavsdk::System> system) {
         q_func()->cancelAirLineDownload();
         q_func()->cancelAirLineUpload();
     }
+    clearExternalCommandSubscription();
     clearTelemetrySubscriptions();
     m_mission.reset();
     m_action.reset();
@@ -51,6 +110,7 @@ void QAutopilotPrivate::setSystem(std::shared_ptr<mavsdk::System> system) {
     m_telemetry = std::make_unique<mavsdk::Telemetry>(*system);
     m_action = std::make_unique<mavsdk::Action>(*system);
     m_mission = std::make_unique<mavsdk::Mission>(*system);
+    setupExternalCommandSubscription();
 
     q_func()->setAutopilotType(static_cast<QAutoVehicleType::Autopilot>(system->autopilot_type()));
     q_func()->setVehicleType(static_cast<QAutoVehicleType::Vehicle>(system->vehicle_type()));
@@ -58,19 +118,15 @@ void QAutopilotPrivate::setSystem(std::shared_ptr<mavsdk::System> system) {
     // arm();
 }
 
-#include "Private/QGCSLog.h"
-
-template<>struct fmt::formatter<mavsdk::Action::Result>:ostream_formatter{};
-
 void QAutopilotPrivate::arm() {
     if (!m_action || !m_pSystem) {
         return;
     }
     const uint8_t systemId = m_pSystem->get_system_id();
-    m_action->arm_async([systemId](mavsdk::Action::Result result) {
-        if (mavsdk::Action::Result::Success != result) {
-            spdlog::error(PLAT_FMT_STR, systemId, "arm", result);
-        }
+    const QPointer<QAutopilot> autopilot(q_func());
+    m_action->arm_async([autopilot, systemId](mavsdk::Action::Result result) {
+        dispatchActionResult(autopilot, QAutopilot::ArmAction,
+                             result, systemId, "arm");
     });
 }
 
@@ -91,10 +147,6 @@ void QAutopilotPrivate::clearTelemetrySubscriptions()
     if (m_batteryHandle.valid()) {
         m_telemetry->unsubscribe_battery(m_batteryHandle);
         m_batteryHandle = {};
-    }
-    if (m_flightModeHandle.valid()) {
-        m_telemetry->unsubscribe_flight_mode(m_flightModeHandle);
-        m_flightModeHandle = {};
     }
     if (m_healthHandle.valid()) {
         m_telemetry->unsubscribe_health(m_healthHandle);
@@ -142,10 +194,10 @@ void QAutopilotPrivate::disarm()
         return;
     }
     const uint8_t systemId = m_pSystem->get_system_id();
-    m_action->disarm_async([systemId](mavsdk::Action::Result result) {
-        if (mavsdk::Action::Result::Success != result) {
-            spdlog::error(PLAT_FMT_STR, systemId, "disarm", result);
-        }
+    const QPointer<QAutopilot> autopilot(q_func());
+    m_action->disarm_async([autopilot, systemId](mavsdk::Action::Result result) {
+        dispatchActionResult(autopilot, QAutopilot::DisarmAction,
+                             result, systemId, "disarm");
     });
 }
 
@@ -155,10 +207,10 @@ void QAutopilotPrivate::takeoff()
         return;
     }
     const uint8_t systemId = m_pSystem->get_system_id();
-    m_action->takeoff_async([systemId](mavsdk::Action::Result result) {
-        if (mavsdk::Action::Result::Success != result) {
-            spdlog::error(PLAT_FMT_STR, systemId, "takeoff", result);
-        }
+    const QPointer<QAutopilot> autopilot(q_func());
+    m_action->takeoff_async([autopilot, systemId](mavsdk::Action::Result result) {
+        dispatchActionResult(autopilot, QAutopilot::TakeoffAction,
+                             result, systemId, "takeoff");
     });
 }
 
@@ -168,10 +220,10 @@ void QAutopilotPrivate::land()
         return;
     }
     const uint8_t systemId = m_pSystem->get_system_id();
-    m_action->land_async([systemId](mavsdk::Action::Result result) {
-        if (mavsdk::Action::Result::Success != result) {
-            spdlog::error(PLAT_FMT_STR, systemId, "land", result);
-        }
+    const QPointer<QAutopilot> autopilot(q_func());
+    m_action->land_async([autopilot, systemId](mavsdk::Action::Result result) {
+        dispatchActionResult(autopilot, QAutopilot::LandAction,
+                             result, systemId, "land");
     });
 }
 
@@ -181,13 +233,176 @@ void QAutopilotPrivate::returnToLaunch()
         return;
     }
     const uint8_t systemId = m_pSystem->get_system_id();
+    const QPointer<QAutopilot> autopilot(q_func());
     m_action->return_to_launch_async(
-        [systemId](mavsdk::Action::Result result) {
-            if (mavsdk::Action::Result::Success != result) {
-                spdlog::error(
-                    PLAT_FMT_STR, systemId, "return_to_launch", result);
-            }
+        [autopilot, systemId](mavsdk::Action::Result result) {
+            dispatchActionResult(autopilot, QAutopilot::ReturnToLaunchAction,
+                                 result, systemId, "return_to_launch");
         });
+}
+
+template<>struct fmt::formatter<mavsdk::MavlinkDirect::Result>:ostream_formatter{};
+
+void QAutopilotPrivate::clearExternalCommandSubscription()
+{
+    if (m_pMavlinkDirect && m_commandAckHandle.valid()) {
+        m_pMavlinkDirect->unsubscribe_message(m_commandAckHandle);
+        m_commandAckHandle = {};
+    }
+    m_pendingExternalCommand.reset();
+    ++m_externalCommandGeneration;
+}
+
+void QAutopilotPrivate::setupExternalCommandSubscription()
+{
+    if (!m_pMavlinkDirect || !m_pSystem) {
+        return;
+    }
+
+    const QPointer<QAutopilot> autopilot(q_func());
+    const std::weak_ptr<mavsdk::System> weakSystem(m_pSystem);
+    m_commandAckHandle = m_pMavlinkDirect->subscribe_message(
+        "COMMAND_ACK",
+        [autopilot, weakSystem](mavsdk::MavlinkDirect::MavlinkMessage message) {
+            if (!autopilot) {
+                return;
+            }
+            const uint32_t sourceComponentId = message.component_id;
+            std::string fieldsJson = std::move(message.fields_json);
+            QMetaObject::invokeMethod(
+                autopilot,
+                [autopilot, weakSystem,
+                 sourceComponentId,
+                 fieldsJson = std::move(fieldsJson)]() {
+                    const auto system = weakSystem.lock();
+                    if (!autopilot || !system || !autopilot->d_func() ||
+                        autopilot->d_func()->getSystem() != system) {
+                        return;
+                    }
+                    autopilot->d_func()->handleExternalCommandAck(
+                        sourceComponentId, fieldsJson);
+                },
+                Qt::QueuedConnection);
+        });
+}
+
+void QAutopilotPrivate::handleExternalCommandAck(
+    uint32_t sourceComponentId, const std::string &fieldsJson)
+{
+    if (!m_pendingExternalCommand) {
+        return;
+    }
+    if (m_pendingExternalCommand->componentId != 0 &&
+        m_pendingExternalCommand->componentId != sourceComponentId) {
+        return;
+    }
+
+    QJsonParseError error;
+    const QJsonDocument document = QJsonDocument::fromJson(
+        QByteArray::fromStdString(fieldsJson), &error);
+    if (error.error != QJsonParseError::NoError || !document.isObject()) {
+        return;
+    }
+
+    const QJsonObject object = document.object();
+    const int commandId = object.value(QStringLiteral("command")).toInt(-1);
+    if (commandId != m_pendingExternalCommand->commandId) {
+        return;
+    }
+
+    const int mavResult = object.value(QStringLiteral("result")).toInt(-1);
+    if (mavResult == MAV_RESULT_IN_PROGRESS) {
+        const quint64 generation = ++m_externalCommandGeneration;
+        m_pendingExternalCommand->generation = generation;
+        scheduleExternalCommandTimeout(generation);
+        return;
+    }
+
+    const QString name = m_pendingExternalCommand->name;
+    m_pendingExternalCommand.reset();
+    ++m_externalCommandGeneration;
+    const bool success = mavResult == MAV_RESULT_ACCEPTED;
+    const QString reason = QMavsdkTextCatalog::text(
+        QStringLiteral("commandAckResult"), mavResult);
+    emit q_func()->externCommandFinished(name, success, mavResult, reason);
+}
+
+void QAutopilotPrivate::scheduleExternalCommandTimeout(quint64 generation)
+{
+    const QPointer<QAutopilot> autopilot(q_func());
+    if (!autopilot) {
+        return;
+    }
+    QTimer::singleShot(
+        QGCSConfig::instance()->mavCommandAckTimeoutMs(), autopilot.data(),
+        [autopilot, generation]() {
+            if (!autopilot || !autopilot->d_func()) {
+                return;
+            }
+            QAutopilotPrivate *implementation = autopilot->d_func();
+            if (!implementation->m_pendingExternalCommand ||
+                implementation->m_pendingExternalCommand->generation !=
+                    generation) {
+                return;
+            }
+            const QString name =
+                implementation->m_pendingExternalCommand->name;
+            implementation->m_pendingExternalCommand.reset();
+            ++implementation->m_externalCommandGeneration;
+            emit autopilot->externCommandFinished(
+                name, false, -1,
+                QCoreApplication::translate(
+                    "QAutopilot", "等待 COMMAND_ACK 超时"));
+        });
+}
+
+bool QAutopilotPrivate::sendExternCommand(const QString &name,
+                                          quint32 componentId,
+                                          const QVector<float> &params)
+{
+    if (!m_xmlExtension || !m_pMavlinkDirect || !m_pSystem) {
+        spdlog::error(SYS_FMT_STR, "sendExternCommand",
+                      "extension or system not ready");
+        return false;
+    }
+    if (m_pendingExternalCommand) {
+        spdlog::warn(PLAT_FMT_STR, m_pSystem->get_system_id(),
+                     "sendExternCommand", "another command is pending");
+        return false;
+    }
+    if (componentId > 255 || params.size() > 7) {
+        spdlog::error(PLAT_FMT_STR, m_pSystem->get_system_id(),
+                      "sendExternCommand", "invalid component or params");
+        return false;
+    }
+    if (!m_xmlExtension->isCmdTableLoaded()) {
+        spdlog::error(SYS_FMT_STR, "sendExternCommand",
+                      "MAV_CMD catalog not loaded");
+        return false;
+    }
+
+    const XmlToMavSDK::ExternCmd *command = m_xmlExtension->findCmd(name);
+    if (!command) {
+        spdlog::error(PLAT_FMT_STR, m_pSystem->get_system_id(),
+                      "sendExternCommand", "command not found");
+        return false;
+    }
+
+    const quint64 generation = ++m_externalCommandGeneration;
+    m_pendingExternalCommand = PendingExternalCommand{
+        name, static_cast<int>(command->value), componentId, generation};
+
+    const auto result = m_xmlExtension->sendCmd(
+        *m_pMavlinkDirect, *m_pSystem, name, componentId, params);
+    if (mavsdk::MavlinkDirect::Result::Success != result) {
+        m_pendingExternalCommand.reset();
+        ++m_externalCommandGeneration;
+        spdlog::error(PLAT_FMT_STR, m_pSystem->get_system_id(),
+                      name.toUtf8().constData(), result);
+        return false;
+    }
+    scheduleExternalCommandTimeout(generation);
+    return true;
 }
 
 template<>struct fmt::formatter<mavsdk::Telemetry::Result>:ostream_formatter{};
@@ -250,13 +465,15 @@ void QAutopilotPrivate::setTelemetryRate() {
             }
         });
 
-    /// 设置空速
-    m_telemetry->set_rate_fixedwing_metrics_async(1,[systemId](mavsdk::Telemetry::Result result) {
-        if (mavsdk::Telemetry::Result::Success != result) {
-            spdlog::error(PLAT_FMT_STR, systemId,
-                          "set_rate_fixedwing_metrics", result);
-        }
-    });
+    if (hasFixedWingMetrics(q_func()->vehicleType())) {
+        m_telemetry->set_rate_fixedwing_metrics_async(
+            1, [systemId](mavsdk::Telemetry::Result result) {
+                if (mavsdk::Telemetry::Result::Success != result) {
+                    spdlog::error(PLAT_FMT_STR, systemId,
+                                  "set_rate_fixedwing_metrics", result);
+                }
+            });
+    }
 
     /// 设置 遥控器状态 发送频率 Unsupported and System status is usually fixed at
     /// 1 Hz
@@ -401,20 +618,21 @@ void QAutopilotPrivate::setupMessageHandling() {
         }
     });
 
-    /// 订阅固定翼指标
-    m_fixedwingMetricsHandle = m_telemetry->subscribe_fixedwing_metrics([autopilot](mavsdk::Telemetry::FixedwingMetrics fixMetrics){
-        // 通过Qt元系统调用parent的fixedwingUpdate方法
-        if (autopilot) {
-            QMetaObject::invokeMethod(
-                autopilot, "fixedwingUpdate", Qt::QueuedConnection,
-                Q_ARG(float, fixMetrics.airspeed_m_s),
-                Q_ARG(float, fixMetrics.throttle_percentage),
-                Q_ARG(float, fixMetrics.climb_rate_m_s),
-                Q_ARG(float, fixMetrics.groundspeed_m_s),
-                Q_ARG(float, fixMetrics.heading_deg),
-                Q_ARG(float, fixMetrics.absolute_altitude_m));
-        }
-    });
+    if (hasFixedWingMetrics(q_func()->vehicleType())) {
+        m_fixedwingMetricsHandle = m_telemetry->subscribe_fixedwing_metrics(
+            [autopilot](mavsdk::Telemetry::FixedwingMetrics metrics) {
+                if (autopilot) {
+                    QMetaObject::invokeMethod(
+                        autopilot, "fixedwingUpdate", Qt::QueuedConnection,
+                        Q_ARG(float, metrics.airspeed_m_s),
+                        Q_ARG(float, metrics.throttle_percentage),
+                        Q_ARG(float, metrics.climb_rate_m_s),
+                        Q_ARG(float, metrics.groundspeed_m_s),
+                        Q_ARG(float, metrics.heading_deg),
+                        Q_ARG(float, metrics.absolute_altitude_m));
+                }
+            });
+    }
 
     /// 开始订阅消息
     setTelemetryRate();

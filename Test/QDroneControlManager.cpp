@@ -60,6 +60,30 @@ void QDroneControlManager::registerPlatform(QObject *platform)
     m_autopilots.insert(systemId, autopilot);
     connect(autopilot, &QPlat::connectionStatusChanged,
             this, &QDroneControlManager::dronesChanged);
+    connect(autopilot, &QAutopilot::actionCommandFinished,
+            this, [this, systemId](QAutopilot::ActionCommand action,
+                                   bool success, int,
+                                   const QString &reason) {
+                Command command = InvalidCommand;
+                switch (action) {
+                case QAutopilot::ArmAction:
+                    command = ArmCommand;
+                    break;
+                case QAutopilot::DisarmAction:
+                    command = DisarmCommand;
+                    break;
+                case QAutopilot::TakeoffAction:
+                    command = TakeoffCommand;
+                    break;
+                case QAutopilot::LandAction:
+                    command = LandCommand;
+                    break;
+                case QAutopilot::ReturnToLaunchAction:
+                    command = ReturnToLaunchCommand;
+                    break;
+                }
+                emit commandResult(systemId, command, success, reason);
+            });
     connect(autopilot, &QAutopilot::airLineDownloaded,
             this, [this, systemId](const QList<QGpsPosition> &waypoints) {
                 QVariantList values;

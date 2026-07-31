@@ -67,6 +67,12 @@ public:
     void setupNewSystemDiscoveryCallback(QObject* parent);
 
     /**
+     * @brief 组件集合变化后重新判断平台是否具备 autopilot 能力
+     */
+    void refreshConnectedSystem(
+        QGroundControlStation *station, uint8_t systemId);
+
+    /**
      * @brief 设置系统连接状态回调
      * @param parent QGroundControlStation实例指针，用于信号发射
      */
@@ -135,6 +141,9 @@ private:
      * @brief 在首个可用 System 上将扩展 XML 注入 MAVSDK（只执行一次）
      */
     void ensureCustomXmlLoaded(const std::shared_ptr<mavsdk::System> &system);
+    void bindConnectedSystem(
+        QGroundControlStation *station,
+        const std::shared_ptr<mavsdk::System> &system);
 
     std::shared_ptr<mavsdk::Mavsdk> m_mavsdk;        ///< MAVSDK实例
     bool m_isInitialized;                            ///< 是否已初始化

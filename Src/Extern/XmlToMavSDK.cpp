@@ -1,5 +1,6 @@
 #include <QDebug>
 #include <QFile>
+#include <QFileInfo>
 #include <QXmlStreamReader>
 
 #include "Extern/XmlToMavSDK.h"
@@ -10,6 +11,12 @@ XmlToMavSDK::XmlToMavSDK(const QString& xmlPath)
     if (!xmlPath.isEmpty()) {
         loadXml(xmlPath);
     }
+}
+
+bool XmlToMavSDK::isDefaultArdupilotDialectFile(const QString& xmlPath)
+{
+    return QFileInfo(xmlPath).fileName().compare(
+               QStringLiteral("ardupilotmega.xml"), Qt::CaseInsensitive) == 0;
 }
 
 const XmlToMavSDK::ExternCmd* XmlToMavSDK::findCmd(const QString& name) const
@@ -26,19 +33,13 @@ QStringList XmlToMavSDK::listCmdNames() const
     return m_mapExternCMDs.keys();
 }
 
-void XmlToMavSDK::setSystem(std::shared_ptr<mavsdk::System> system)
-{
-    m_pSystem = std::move(system);
-    if (m_pSystem) {
-        m_pMavlinkDirect = std::make_shared<mavsdk::MavlinkDirect>(m_pSystem);
-    } else {
-        m_pMavlinkDirect.reset();
-    }
-}
-
 std::optional<mavsdk::MavlinkDirect::Result> XmlToMavSDK::applyCustomXmlOnce(
     mavsdk::MavlinkDirect& mavlinkDirect)
 {
+    if (!m_needsMessageSetInject) {
+        m_customXmlApplied.store(true);
+        return std::nullopt;
+    }
     if (m_customXmlApplied.load()) {
         return std::nullopt;
     }
@@ -52,22 +53,15 @@ std::optional<mavsdk::MavlinkDirect::Result> XmlToMavSDK::applyCustomXmlOnce(
         return std::nullopt;
     }
 
+    /// 写入 MavsdkImpl 共享 MessageSet，对所有 System 立即生效
     const auto result = mavlinkDirect.load_custom_xml(m_xmlContent);
-    /// 无论成败只尝试一次，避免多机场景重复注入
-    m_customXmlApplied.store(true);
-    return result;
-}
-
-mavsdk::MavlinkDirect::Result XmlToMavSDK::sendCmd(
-    const QString& name,
-    uint32_t uComponentID,
-    const QVector<float>& params)
-{
-    if (!m_pSystem || !m_pMavlinkDirect) {
-        qWarning() << "XmlToMavSDK::sendCmd: system not set";
-        return mavsdk::MavlinkDirect::Result::Unknown;
+    if (result == mavsdk::MavlinkDirect::Result::Success) {
+        m_customXmlApplied.store(true);
+    } else {
+        /// 失败时允许后续系统发现或重连再次尝试。
+        m_customXmlApplyStarted.store(false);
     }
-    return sendCmd(*m_pMavlinkDirect, *m_pSystem, name, uComponentID, params);
+    return result;
 }
 
 mavsdk::MavlinkDirect::Result XmlToMavSDK::sendCmd(
@@ -119,6 +113,9 @@ bool XmlToMavSDK::loadXml(const QString& xmlPath)
     m_mapExternCMDs.clear();
     m_xmlContent.clear();
     m_bCmdTableLoaded = false;
+    m_needsMessageSetInject = false;
+    m_customXmlApplied.store(false);
+    m_customXmlApplyStarted.store(false);
 
     QFile file(xmlPath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
@@ -132,8 +129,6 @@ bool XmlToMavSDK::loadXml(const QString& xmlPath)
         qWarning() << "Empty mav message extension xml:" << xmlPath;
         return false;
     }
-
-    m_xmlContent = data.toStdString();
 
     QXmlStreamReader xml(data);
     while (!xml.atEnd() && !xml.hasError()) {
@@ -178,9 +173,16 @@ bool XmlToMavSDK::loadXml(const QString& xmlPath)
 
     if (xml.hasError()) {
         qWarning() << "XML parse error:" << xml.errorString() << "in" << xmlPath;
+        m_mapExternCMDs.clear();
         return false;
     }
 
+    m_xmlContent = data.toStdString();
     m_bCmdTableLoaded = true;
+    /// 非默认方言文件才需要写入共享 MessageSet；ardupilotmega 已由 MAVSDK 内嵌
+    m_needsMessageSetInject = !isDefaultArdupilotDialectFile(xmlPath);
+    if (!m_needsMessageSetInject) {
+        m_customXmlApplied.store(true);
+    }
     return true;
 }
