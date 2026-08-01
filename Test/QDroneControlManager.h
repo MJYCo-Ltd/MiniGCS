@@ -6,7 +6,7 @@
 #include <QPointer>
 #include <QStringList>
 #include <QVariantList>
-#include "AirLine/QGpsPosition.h"
+#include "Common/QGpsPosition.h"
 
 class QAutopilot;
 class QGroundControlStation;

@@ -14,9 +14,54 @@ MapView {
     property var routeCoordinates: []
     property bool routeEditing: false
     property bool centeredOnDrone: false
+    /** 选中时尚无 GPS 时，待该机首次有效定位后再居中 */
+    property int pendingLocateDroneId: -1
 
     signal droneSelected(int systemId)
     signal routeCoordinateRequested(var coordinate)
+
+    function isValidGps(vehicle) {
+        return vehicle
+                && vehicle.hasGpsPosition
+                && isFinite(vehicle.gpsPosition.latitude)
+                && isFinite(vehicle.gpsPosition.longitude)
+                && vehicle.gpsPosition.latitude >= -90
+                && vehicle.gpsPosition.latitude <= 90
+                && vehicle.gpsPosition.longitude >= -180
+                && vehicle.gpsPosition.longitude <= 180
+    }
+
+    /** 将地图居中到指定无人机当前位置；成功返回 true */
+    function centerOnDrone(systemId) {
+        if (systemId < 0)
+            return false
+        for (let index = 0; index < drones.length; ++index) {
+            const entry = drones[index]
+            if (Number(entry.systemId) !== Number(systemId))
+                continue
+            const vehicle = entry.vehicle
+            if (!isValidGps(vehicle))
+                return false
+            map.center = QtPositioning.coordinate(
+                vehicle.gpsPosition.latitude,
+                vehicle.gpsPosition.longitude,
+                vehicle.gpsPosition.altitude)
+            map.zoomLevel = AppConfig.mapVehicleZoom()
+            centeredOnDrone = true
+            pendingLocateDroneId = -1
+            return true
+        }
+        return false
+    }
+
+    onSelectedDroneIdChanged: {
+        if (selectedDroneId < 0) {
+            pendingLocateDroneId = -1
+            return
+        }
+        if (!centerOnDrone(selectedDroneId))
+            pendingLocateDroneId = selectedDroneId
+    }
 
     map.plugin: Plugin {
         name: AppConfig.mapName()
@@ -84,14 +129,7 @@ MapView {
             property var vehicle: modelData.vehicle
             property bool coordinateInitialized: false
             property var displayedCoordinate: QtPositioning.coordinate()
-            property bool positionAvailable: vehicle
-                && vehicle.hasGpsPosition
-                && isFinite(vehicle.gpsPosition.latitude)
-                && isFinite(vehicle.gpsPosition.longitude)
-                && vehicle.gpsPosition.latitude >= -90
-                && vehicle.gpsPosition.latitude <= 90
-                && vehicle.gpsPosition.longitude >= -180
-                && vehicle.gpsPosition.longitude <= 180
+            property bool positionAvailable: root.isValidGps(vehicle)
 
             function acceptCurrentPosition(forceUpdate) {
                 if (!positionAvailable)
@@ -102,6 +140,10 @@ MapView {
                         vehicle.gpsPosition.longitude,
                         vehicle.gpsPosition.altitude)
                     coordinateInitialized = true
+                }
+                if (Number(root.pendingLocateDroneId) ===
+                        Number(modelData.systemId)) {
+                    root.centerOnDrone(modelData.systemId)
                 }
             }
 
@@ -148,7 +190,7 @@ MapView {
                                 droneMarker.vehicle.vehicleType)
                     fillMode: Image.PreserveAspectFit
                     mipmap: true
-                    rotation: droneMarker.vehicle.heading
+                    rotation: droneMarker.vehicle.attitude.headingDeg
                     transformOrigin: Item.Center
                     scale: root.selectedDroneId ===
                            droneMarker.modelData.systemId ? 1.12 : 1.0

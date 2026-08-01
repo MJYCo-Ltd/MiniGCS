@@ -1,14 +1,13 @@
 #include <QtGlobal>
-#include "AirLine/QGpsPosition.h"
+#include "Common/QGpsPosition.h"
 
-// QGpsPosition 实现
 QGpsPosition::QGpsPosition()
-    : m_longitude(0.0), m_latitude(0.0), m_altitude(0.0)
+    : m_longitude(0.0), m_latitude(0.0), m_altitude(0.0f)
 {
 }
 
 QGpsPosition::QGpsPosition(double longitude, double latitude, double altitude)
-    : m_longitude(longitude), m_latitude(latitude), m_altitude(altitude)
+    : m_longitude(longitude), m_latitude(latitude), m_altitude(static_cast<float>(altitude))
 {
 }
 
@@ -38,4 +37,3 @@ bool QGpsPosition::operator!=(const QGpsPosition &other) const
 {
     return !(*this == other);
 }
-

@@ -13,32 +13,29 @@ class QGroundControlStation;
 class QDataLink;
 
 /**
- * @brief 链路类型枚举
- *
- * 用于判断并生成连接字符串
+ * @brief 链路类型
  */
 class MINIGCS_EXPORT LinkTypes
 {
     Q_GADGET
 public:
     enum class Kind {
-        TcpServer,   ///< TCP 服务器（监听）
-        TcpClient,   ///< TCP 客户端（连接）
-        UdpServer,   ///< UDP 服务器（监听）
-        UdpClient,   ///< UDP 客户端（连接）
-        Serial,      ///< 串口
-        Raw          ///< 原始字节（自定义 I/O）
+        TcpServer,
+        TcpClient,
+        UdpServer,
+        UdpClient,
+        Serial,
+        Raw  ///< 高级：自定义原始字节 I/O，非常规业务链路
     };
     Q_ENUM(Kind)
 };
 using LinkKind = LinkTypes::Kind;
 
 /**
- * @brief 链路参数结构体
+ * @brief 链路参数
  *
- * 根据 LinkKind 使用不同字段：
- * Server 用 hostName（绑定地址，空则 0.0.0.0）+ port；
- * Client 用 hostName+port；Serial 用 portName+baudRate
+ * Server：hostName 为绑定地址（空则绑定全部网卡）+ port；
+ * Client：hostName + port；Serial：portName + baudRate。
  */
 struct MINIGCS_EXPORT LinkParams {
     Q_GADGET
@@ -48,18 +45,29 @@ struct MINIGCS_EXPORT LinkParams {
     Q_PROPERTY(int baudRate MEMBER baudRate)
 public:
     quint16 port{0};
-    QString hostName;   ///< Server 为绑定地址；Client 为远端主机
-    QString portName;   ///< 串口名称（Serial 专用）
-    int baudRate{0};    ///< 波特率（Serial 专用）
+    QString hostName;
+    QString portName;
+    int baudRate{0};
 };
+
+inline bool operator==(const LinkParams &lhs, const LinkParams &rhs)
+{
+    return lhs.port == rhs.port
+        && lhs.baudRate == rhs.baudRate
+        && lhs.hostName == rhs.hostName
+        && lhs.portName == rhs.portName;
+}
+
+inline bool operator!=(const LinkParams &lhs, const LinkParams &rhs)
+{
+    return !(lhs == rhs);
+}
 
 Q_DECLARE_METATYPE(LinkKind)
 Q_DECLARE_METATYPE(LinkParams)
 
 /**
- * @brief QLinkManager类 - 链路管理器
- *
- * 通过 LinkKind 和 LinkParams 创建/移除连接。
+ * @brief QLinkManager - 链路管理器
  */
 class MINIGCS_EXPORT QLinkManager : public QObject
 {
@@ -69,42 +77,12 @@ public:
     explicit QLinkManager(QGroundControlStation *groundStation, QObject *parent = nullptr);
     ~QLinkManager();
 
-    /**
-     * @brief 根据 LinkKind 和 LinkParams 新增链路
-     * @param type 链路类型
-     * @param params 链路参数
-     * @return 成功返回 QDataLink*，失败返回 nullptr
-     */
     Q_INVOKABLE QDataLink *addLink(LinkKind type, const LinkParams &params);
-
-    /**
-     * @brief 根据 LinkKind 和 LinkParams 移除链路
-     * @param type 链路类型
-     * @param params 链路参数
-     */
     Q_INVOKABLE void removeLink(LinkKind type, const LinkParams &params);
-
-    /**
-     * @brief 移除指定链路
-     * @param link 链路对象
-     */
     Q_INVOKABLE void removeLink(QDataLink *link);
-
-    /**
-     * @brief 清除所有连接
-     */
     Q_INVOKABLE void clearAll();
 
-    /**
-     * @brief 根据链路类型和参数构建连接字符串
-     * @param type 链路类型
-     * @param params 链路参数
-     * @return 连接字符串
-     */
-    Q_INVOKABLE static QString buildConnectionString(LinkKind type, const LinkParams &params);
-
 signals:
-    /** 创建失败（如重复连接）时发出 */
     void linkCreateFailed(const QString &reason);
     void linkConnectionError(QDataLink *link, const QString &reason);
     void linkReconnected(QDataLink *link);
@@ -112,6 +90,7 @@ signals:
 
 private:
     friend class QGroundControlStationPrivate;
+    friend class QLinkManagerPrivate;
     void handleConnectionError(const QString &connectionString,
                                const QString &reason);
 

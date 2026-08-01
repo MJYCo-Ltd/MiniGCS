@@ -13,6 +13,7 @@
 #include "Extern/XmlToMavSDK.h"
 
 #include "QGCSConfig.h"
+#include "Private/QGCSConfigInternal.h"
 #include "Private/QGCSLog.h"
 
 QGroundControlStationPrivate::QGroundControlStationPrivate()
@@ -47,19 +48,20 @@ void QGroundControlStationPrivate::initializeMavsdk()
     /// 创建MAVSDK实例，配置为地面站模式
     mavsdk::Mavsdk::Configuration config(
         mavsdk::ComponentType::GroundStation);
-    config.set_system_id(QGCSConfig::instance()->gcsSystemId());
-    config.set_component_id(QGCSConfig::instance()->gcsComponentId());
+    config.set_system_id(QGCSConfig::instance()->stationId());
+    config.set_component_id(QGCSConfig::instance()->stationComponentId());
     m_mavsdk = std::make_shared<mavsdk::Mavsdk>(config);
 
     /// 解析扩展 XML 中的 MAV_CMD 表。
     /// MAVSDK 已内嵌 ARDUPILOTMEGA；仅当配置指向额外自定义 XML 时才注入共享 MessageSet。
-    m_xmlExtension = std::make_shared<XmlToMavSDK>(
-        QGCSConfig::instance()->mavMessageExtension());
+    const QString messageExtension =
+        QGCSConfigInternal::messageExtensionFile();
+    m_xmlExtension = std::make_shared<XmlToMavSDK>(messageExtension);
     if (!m_xmlExtension->isCmdTableLoaded()) {
         spdlog::warn(
             SYS_FMT_STR,
             "mav message extension",
-            QGCSConfig::instance()->mavMessageExtension().toUtf8().constData());
+            messageExtension.toUtf8().constData());
     } else if (m_xmlExtension->needsMessageSetInject()) {
         spdlog::info(
             SYS_FMT_STR,
@@ -223,7 +225,7 @@ void QGroundControlStationPrivate::handleConnectionError(
         station->linkManager()->handleConnectionError(connectionString,
                                                       description);
     }
-    emit station->mavConnectionError(description);
+    emit station->connectionError(description);
 }
 
 void QGroundControlStationPrivate::setupNewSystemDiscoveryCallback(

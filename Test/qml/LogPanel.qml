@@ -59,7 +59,7 @@ Rectangle {
                 text: qsTr("业务 (%1)").arg(root.businessLogs.length)
             }
             TabButton {
-                text: qsTr("固件 / MAVLink (%1)")
+                text: qsTr("固件 (%1)")
                     .arg(root.firmwareLogs.length)
             }
         }

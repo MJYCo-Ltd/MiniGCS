@@ -5,21 +5,22 @@
 #include <QString>
 #include <QVector>
 #include <QDateTime>
+#include <memory>
 #include "MiniGCSExport.h"
 
 class QPlatPrivate;
 class QGroundControlStation;
 /**
- * @brief QPlat类 - 平台类
- * 
- * 该类封装了平台的一些版本信息等
+ * @brief QPlat - 飞行平台基类
+ *
+ * 封装平台连接状态与版本信息。vehicleId 为业务侧平台标识。
  */
 class MINIGCS_EXPORT QPlat : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(QString firmwareVersion READ getFirmwareVersion NOTIFY infoUpdated)
     Q_PROPERTY(QString softwareVersion READ getSoftwareVersion NOTIFY infoUpdated)
-    Q_PROPERTY(int systemId READ systemId CONSTANT)
+    Q_PROPERTY(int vehicleId READ vehicleId CONSTANT)
     Q_PROPERTY(bool connected READ isConnected NOTIFY connectionStatusChanged)
     Q_PROPERTY(QDateTime lastConnectedTime READ getLastConnectedTime NOTIFY infoUpdated)
     Q_PROPERTY(QDateTime lastDisconnectedTime READ getLastDisconnectedTime NOTIFY infoUpdated)
@@ -27,93 +28,45 @@ class MINIGCS_EXPORT QPlat : public QObject
 public:
     explicit QPlat(QObject *parent = nullptr);
     ~QPlat();
-    int systemId() const { return m_systemId; }
 
-    /**
-     * @brief 获取固件版本
-     * @return 固件版本
-     */
+    int vehicleId() const { return m_vehicleId; }
+    /** @deprecated 使用 vehicleId() */
+    int systemId() const { return vehicleId(); }
+
     QString getFirmwareVersion() const;
-
-    /**
-     * @brief 获取软件版本
-     * @return 软件版本
-     */
     QString getSoftwareVersion() const;
-
-    /**
-     * @brief 检查是否已连接
-     * @return 是否已连接
-     */
     bool isConnected() const;
-
-    /**
-     * @brief 获取最后连接时间
-     * @return 最后连接时间
-     */
     QDateTime getLastConnectedTime() const;
-
-    /**
-     * @brief 设置最后连接时间
-     * @param time 最后连接时间
-     */
     void setLastConnectedTime(const QDateTime &time);
-
-    /**
-     * @brief 获取最后断开时间
-     * @return 最后断开时间
-     */
     QDateTime getLastDisconnectedTime() const;
-
-    /**
-     * @brief 设置最后断开时间
-     * @param time 最后断开时间
-     */
     void setLastDisconnectedTime(const QDateTime &time);
-
-    /**
-     * @brief 转换为字符串表示
-     * @return 字符串表示
-     */
     QString toString() const;
 
 signals:
-
-    /**
-     * @brief 连接状态变化信号
-     * @param connected 是否连接
-     */
     void connectionStatusChanged(bool connected);
-
-    /**
-     * @brief 信息更新信号
-     */
     void infoUpdated();
-
-    /**
-     * @brief MAVSDK System 发现了新组件
-     */
+    /** 平台组件集合发生变化 */
     void componentsChanged();
-
-    /**
-     * @brief 有错误发生
-     * @param sError
-     */
     void errorInfo(const QString& sError);
+
 protected slots:
     void updateConnection(bool bConnected);
+
 protected:
     void SetPrivate(QPlatPrivate* pPlatPrivate);
-    void setSystemId(int systemId) { m_systemId = systemId; }
+    void setVehicleId(int vehicleId) { m_vehicleId = vehicleId; }
+    /** @deprecated 使用 setVehicleId() */
+    void setSystemId(int systemId) { setVehicleId(systemId); }
+
 protected:
     friend class QGroundControlStationPrivate;
     friend class QGroundControlStation;
-    QDateTime m_lastConnectedTime;          ///< 最后连接时间
-    QDateTime m_lastDisconnectedTime;       ///< 最后断开时间
+    QDateTime m_lastConnectedTime;
+    QDateTime m_lastDisconnectedTime;
     bool      m_bConnected{false};
-    int       m_systemId{-1};
+    int       m_vehicleId{-1};
 
-    std::unique_ptr<QPlatPrivate> d_ptr;    ///< 私有实现指针
+    std::unique_ptr<QPlatPrivate> d_ptr;
 };
 
 #endif // _YTY_QSTANDALONE_H

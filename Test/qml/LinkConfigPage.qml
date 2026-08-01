@@ -30,7 +30,8 @@ Rectangle {
             "type": String(pick(config, "type", "Type", "Serial")),
             "name": String(pick(config, "name", "Name", "")),
             "portName": String(pick(config, "portName", "PortName", "")),
-            "baudRate": Number(pick(config, "baudRate", "BaudRate", 115200)),
+            "baudRate": Number(pick(config, "baudRate", "BaudRate",
+                                    AppConfig.defaultBaudRate())),
             "hostName": String(pick(config, "hostName", "HostName", "127.0.0.1")),
             "port": Number(pick(config, "port", "Port", 14550))
         }
@@ -136,7 +137,7 @@ Rectangle {
             "type": "Serial",
             "name": qsTr("链路 %1").arg(linkModel.count + 1),
             "portName": portNames.length > 0 ? portNames[0] : "",
-            "baudRate": 115200
+            "baudRate": AppConfig.defaultBaudRate()
         })
         linkModel.append(config)
         selectedIndex = linkModel.count - 1

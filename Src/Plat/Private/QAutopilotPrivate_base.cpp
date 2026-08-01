@@ -9,8 +9,10 @@
 
 #include "Extern/XmlToMavSDK.h"
 #include "QGCSConfig.h"
+#include "Private/QGCSConfigInternal.h"
 #include "Private/QGCSLog.h"
 #include "Private/QMavsdkTextCatalog.h"
+#include "Plat/Private/QMavsdkTypeMap.h"
 
 template<>struct fmt::formatter<mavsdk::Action::Result>:ostream_formatter{};
 
@@ -53,8 +55,7 @@ void dispatchActionResult(
             const QString reason = QMavsdkTextCatalog::text(
                 QStringLiteral("actionResult"), static_cast<int>(result));
             emit autopilot->actionCommandFinished(
-                command, result == mavsdk::Action::Result::Success,
-                static_cast<int>(result), reason);
+                command, result == mavsdk::Action::Result::Success, reason);
         },
         Qt::QueuedConnection);
 }
@@ -113,8 +114,10 @@ void QAutopilotPrivate::setSystem(std::shared_ptr<mavsdk::System> system) {
     m_mission = std::make_unique<mavsdk::Mission>(*system);
     setupExternalCommandSubscription();
 
-    q_func()->setAutopilotType(static_cast<QAutoVehicleType::Autopilot>(system->autopilot_type()));
-    q_func()->setVehicleType(static_cast<QAutoVehicleType::Vehicle>(system->vehicle_type()));
+    q_func()->setAutopilotType(
+        MavsdkTypeMap::toAutopilot(system->autopilot_type()));
+    q_func()->setVehicleType(
+        MavsdkTypeMap::toVehicle(system->vehicle_type()));
 
     // arm();
 }
@@ -341,7 +344,13 @@ void QAutopilotPrivate::handleExternalCommandAck(
     const bool success = mavResult == MAV_RESULT_ACCEPTED;
     const QString reason = QMavsdkTextCatalog::text(
         QStringLiteral("commandAckResult"), mavResult);
-    emit q_func()->externCommandFinished(name, success, mavResult, reason);
+    if (success) {
+        spdlog::info(PLAT_FMT_STR, m_pSystem->get_system_id(),
+                     "externCommand", name.toUtf8().constData());
+    } else {
+        spdlog::warn(PLAT_FMT_STR, m_pSystem->get_system_id(),
+                     "externCommand", reason.toUtf8().constData());
+    }
 }
 
 void QAutopilotPrivate::scheduleExternalCommandTimeout(quint64 generation)
@@ -351,7 +360,7 @@ void QAutopilotPrivate::scheduleExternalCommandTimeout(quint64 generation)
         return;
     }
     QTimer::singleShot(
-        QGCSConfig::instance()->mavCommandAckTimeoutMs(), autopilot.data(),
+        QGCSConfigInternal::commandAckTimeoutMs(), autopilot.data(),
         [autopilot, generation]() {
             if (!autopilot || !autopilot->d_func()) {
                 return;
@@ -366,10 +375,9 @@ void QAutopilotPrivate::scheduleExternalCommandTimeout(quint64 generation)
                 implementation->m_pendingExternalCommand->name;
             implementation->m_pendingExternalCommand.reset();
             ++implementation->m_externalCommandGeneration;
-            emit autopilot->externCommandFinished(
-                name, false, -1,
-                QCoreApplication::translate(
-                    "QAutopilot", "等待 COMMAND_ACK 超时"));
+            spdlog::warn(PLAT_FMT_STR, autopilot->vehicleId(),
+                         "externCommandTimeout",
+                         name.toUtf8().constData());
         });
 }
 
@@ -431,7 +439,8 @@ void QAutopilotPrivate::setTelemetryRate() {
     const uint8_t systemId = m_pSystem->get_system_id();
     /// 设置 位置信息 频率
     m_telemetry->set_rate_position_async(
-        1, [systemId](mavsdk::Telemetry::Result result) {
+        QGCSConfigInternal::telemetryPositionHz(),
+        [systemId](mavsdk::Telemetry::Result result) {
             if (mavsdk::Telemetry::Result::Success != result) {
                 spdlog::error(PLAT_FMT_STR, systemId,
                               "set_rate_position", result);
@@ -439,7 +448,8 @@ void QAutopilotPrivate::setTelemetryRate() {
         });
 
     m_telemetry->set_rate_position_velocity_ned_async(
-        1, [systemId](mavsdk::Telemetry::Result result) {
+        QGCSConfigInternal::telemetryPositionVelocityNedHz(),
+        [systemId](mavsdk::Telemetry::Result result) {
             if (mavsdk::Telemetry::Result::Success != result) {
                 spdlog::error(PLAT_FMT_STR, systemId,
                               "set_rate_position_velocity_ned", result);
@@ -448,7 +458,8 @@ void QAutopilotPrivate::setTelemetryRate() {
 
     /// 设置 gps 状态 发送频率
     m_telemetry->set_rate_gps_info_async(
-        1, [systemId](mavsdk::Telemetry::Result result) {
+        QGCSConfigInternal::telemetryGpsInfoHz(),
+        [systemId](mavsdk::Telemetry::Result result) {
             if (mavsdk::Telemetry::Result::Success != result) {
                 spdlog::error(PLAT_FMT_STR, systemId,
                               "set_rate_gps_info", result);
@@ -457,7 +468,8 @@ void QAutopilotPrivate::setTelemetryRate() {
 
     /// 设置 电池信息 发送频率
     m_telemetry->set_rate_battery_async(
-        1, [systemId](mavsdk::Telemetry::Result result) {
+        QGCSConfigInternal::telemetryBatteryHz(),
+        [systemId](mavsdk::Telemetry::Result result) {
             if (mavsdk::Telemetry::Result::Success != result) {
                 spdlog::error(PLAT_FMT_STR, systemId,
                               "set_rate_battery", result);
@@ -465,7 +477,8 @@ void QAutopilotPrivate::setTelemetryRate() {
         });
 
     m_telemetry->set_rate_raw_gps_async(
-        1, [systemId](mavsdk::Telemetry::Result result) {
+        QGCSConfigInternal::telemetryRawGpsHz(),
+        [systemId](mavsdk::Telemetry::Result result) {
             if (mavsdk::Telemetry::Result::Success != result) {
                 spdlog::error(PLAT_FMT_STR, systemId,
                               "set_rate_raw_gps", result);
@@ -473,7 +486,8 @@ void QAutopilotPrivate::setTelemetryRate() {
         });
 
     m_telemetry->set_rate_attitude_euler_async(
-        2, [systemId](mavsdk::Telemetry::Result result) {
+        QGCSConfigInternal::telemetryAttitudeHz(),
+        [systemId](mavsdk::Telemetry::Result result) {
             if (mavsdk::Telemetry::Result::Success != result) {
                 spdlog::error(PLAT_FMT_STR, systemId,
                               "set_rate_attitude_euler", result);
@@ -481,7 +495,8 @@ void QAutopilotPrivate::setTelemetryRate() {
         });
 
     m_telemetry->set_rate_landed_state_async(
-        1, [systemId](mavsdk::Telemetry::Result result) {
+        QGCSConfigInternal::telemetryLandedStateHz(),
+        [systemId](mavsdk::Telemetry::Result result) {
             if (mavsdk::Telemetry::Result::Success != result) {
                 spdlog::error(PLAT_FMT_STR, systemId,
                               "set_rate_landed_state", result);
@@ -490,7 +505,8 @@ void QAutopilotPrivate::setTelemetryRate() {
 
     /// 设置 健康度 发送频率
     m_telemetry->set_rate_health_async(
-        0.5, [systemId](mavsdk::Telemetry::Result result) {
+        QGCSConfigInternal::telemetryHealthHz(),
+        [systemId](mavsdk::Telemetry::Result result) {
             if (mavsdk::Telemetry::Result::Success != result) {
                 spdlog::error(PLAT_FMT_STR, systemId,
                               "set_rate_health", result);
@@ -499,7 +515,8 @@ void QAutopilotPrivate::setTelemetryRate() {
 
     /// 设置 home 发送频率
     m_telemetry->set_rate_home_async(
-        0.1, [systemId](mavsdk::Telemetry::Result result) {
+        QGCSConfigInternal::telemetryHomeHz(),
+        [systemId](mavsdk::Telemetry::Result result) {
             if (mavsdk::Telemetry::Result::Success != result) {
                 spdlog::error(PLAT_FMT_STR, systemId,
                               "set_rate_home", result);
@@ -508,7 +525,8 @@ void QAutopilotPrivate::setTelemetryRate() {
 
     if (hasFixedWingMetrics(q_func()->vehicleType())) {
         m_telemetry->set_rate_fixedwing_metrics_async(
-            1, [systemId](mavsdk::Telemetry::Result result) {
+            QGCSConfigInternal::telemetryFixedwingMetricsHz(),
+            [systemId](mavsdk::Telemetry::Result result) {
                 if (mavsdk::Telemetry::Result::Success != result) {
                     spdlog::error(PLAT_FMT_STR, systemId,
                                   "set_rate_fixedwing_metrics", result);
@@ -607,7 +625,8 @@ void QAutopilotPrivate::setupMessageHandling() {
                 fallback << mode;
                 QMetaObject::invokeMethod(
                     autopilot, "flightModeUpdate", Qt::QueuedConnection,
-                    Q_ARG(int, static_cast<int>(mode)),
+                    Q_ARG(QAutopilot::FlightMode,
+                          MavsdkTypeMap::toFlightMode(mode)),
                     Q_ARG(QString, QString::fromStdString(fallback.str())));
             }
         });
@@ -619,7 +638,8 @@ void QAutopilotPrivate::setupMessageHandling() {
                 fallback << state;
                 QMetaObject::invokeMethod(
                     autopilot, "landedStateUpdate", Qt::QueuedConnection,
-                    Q_ARG(int, static_cast<int>(state)),
+                    Q_ARG(QAutopilot::LandedState,
+                          MavsdkTypeMap::toLandedState(state)),
                     Q_ARG(QString, QString::fromStdString(fallback.str())));
             }
         });

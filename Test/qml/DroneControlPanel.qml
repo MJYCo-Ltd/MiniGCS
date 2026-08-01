@@ -12,6 +12,11 @@ Rectangle {
 
     signal commandRequested(int command, bool groupCommand)
     signal statusRequested()
+    signal locateRequested(int systemId)
+
+    function setStatus(text) {
+        statusText = text
+    }
 
     implicitWidth: 410
     color: "#f5f7fa"
@@ -54,6 +59,9 @@ Rectangle {
                     root.commandRequested(command, false)
                 }
                 onStatusRequested: root.statusRequested()
+                onLocateRequested: function(systemId) {
+                    root.locateRequested(systemId)
+                }
             }
 
             GroupDroneControl {

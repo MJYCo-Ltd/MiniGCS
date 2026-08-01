@@ -5,7 +5,7 @@
 #include <QString>
 #include <QList>
 #include <QMetaType>
-#include "QGpsPosition.h"
+#include "Common/QGpsPosition.h"
 #include "MiniGCSExport.h"
 
 /**

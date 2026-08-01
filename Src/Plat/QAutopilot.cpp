@@ -4,12 +4,15 @@
 #include "QGCSConfig.h"
 #include <QDateTime>
 #include <QDebug>
+#include <QMetaType>
 #include <QtGlobal>
 #include <cmath>
 
 QAutopilot::QAutopilot(QObject *parent)
     : QPlat(parent)
 {
+    qRegisterMetaType<QAutopilot::FlightMode>("QAutopilot::FlightMode");
+    qRegisterMetaType<QAutopilot::LandedState>("QAutopilot::LandedState");
 }
 
 QAutopilot::~QAutopilot() {}
@@ -55,16 +58,6 @@ void QAutopilot::returnToLaunch()
     if (d_func()) {
         d_func()->returnToLaunch();
     }
-}
-
-bool QAutopilot::sendExternCommand(const QString &name,
-                                   quint32 componentId,
-                                   const QVector<float> &params)
-{
-    if (!d_func()) {
-        return false;
-    }
-    return d_func()->sendExternCommand(name, componentId, params);
 }
 
 void QAutopilot::downloadAirLine()
@@ -186,13 +179,6 @@ void QAutopilot::cancelAirLineUpload()
     emit airLineUploadingChanged(false);
 }
 
-void QAutopilot::setHeading(double heading) {
-    if (!qFuzzyCompare(m_heading, heading)) {
-        m_heading = heading;
-        emit headingChanged(m_heading);
-    }
-}
-
 void QAutopilot::setVehicleType(QAutoVehicleType::Vehicle vehicleType) {
     if (m_vehicleType != vehicleType) {
         m_vehicleType = vehicleType;
@@ -245,8 +231,9 @@ QString QAutopilot::vehicleName() const
 QString QAutopilot::flightModeName() const
 {
     const QString localized = QMavsdkTextCatalog::text(
-        QStringLiteral("flightMode"), m_flightMode);
-    const QString missing = QStringLiteral("flightMode(%1)").arg(m_flightMode);
+        QStringLiteral("flightMode"), static_cast<int>(m_flightMode));
+    const QString missing =
+        QStringLiteral("flightMode(%1)").arg(static_cast<int>(m_flightMode));
     return localized == missing && !m_flightModeFallbackName.isEmpty()
         ? m_flightModeFallbackName : localized;
 }
@@ -254,8 +241,9 @@ QString QAutopilot::flightModeName() const
 QString QAutopilot::landedStateName() const
 {
     const QString localized = QMavsdkTextCatalog::text(
-        QStringLiteral("landedState"), m_landedState);
-    const QString missing = QStringLiteral("landedState(%1)").arg(m_landedState);
+        QStringLiteral("landedState"), static_cast<int>(m_landedState));
+    const QString missing =
+        QStringLiteral("landedState(%1)").arg(static_cast<int>(m_landedState));
     return localized == missing && !m_landedStateFallbackName.isEmpty()
         ? m_landedStateFallbackName : localized;
 }
@@ -281,13 +269,12 @@ void QAutopilot::nedUpdate(float dNorth, float dEast, float dDown,
         return;
     }
 
-    m_groundSpeedMS = std::hypot(northSpeed, eastSpeed);
-    m_verticalSpeedMS = std::abs(downSpeed);
-    m_velocityNorthMS = northSpeed;
-    m_velocityEastMS = eastSpeed;
-    m_velocityDownMS = downSpeed;
+    QVelocity next(northSpeed, eastSpeed, downSpeed);
+    if (m_velocity != next) {
+        m_velocity = next;
+        emit velocityChanged(m_velocity);
+    }
     updateMovingState();
-    emit motionChanged();
 }
 
 void QAutopilot::armedUpdate(bool armed)
@@ -305,9 +292,8 @@ void QAutopilot::inAirUpdate(bool inAir)
         return;
     }
     m_inAir = inAir;
-    updateMovingState();
     emit inAirChanged(m_inAir);
-    emit motionChanged();
+    updateMovingState();
 }
 
 void QAutopilot::updateMovingState()
@@ -315,13 +301,14 @@ void QAutopilot::updateMovingState()
     const auto *config = QGCSConfig::instance();
     const bool movementCandidate =
         m_inAir ||
-        m_groundSpeedMS >= config->motionStartHorizontalSpeedMS() ||
-        m_verticalSpeedMS >= config->motionStartVerticalSpeedMS();
+        m_velocity.groundSpeedMS() >= config->motionStartHorizontalSpeedMS() ||
+        m_velocity.verticalSpeedMS() >= config->motionStartVerticalSpeedMS();
     const bool stationaryCandidate =
         !m_inAir &&
-        m_groundSpeedMS <= config->motionStopHorizontalSpeedMS() &&
-        m_verticalSpeedMS <= config->motionStopVerticalSpeedMS();
+        m_velocity.groundSpeedMS() <= config->motionStopHorizontalSpeedMS() &&
+        m_velocity.verticalSpeedMS() <= config->motionStopVerticalSpeedMS();
 
+    bool nextMoving = m_moving;
     if (!m_moving) {
         m_motionStopSamples = 0;
         if (movementCandidate) {
@@ -329,24 +316,28 @@ void QAutopilot::updateMovingState()
             const int requiredSamples =
                 m_inAir ? 1 : config->motionStartSampleCount();
             if (m_motionStartSamples >= requiredSamples) {
-                m_moving = true;
+                nextMoving = true;
                 m_motionStartSamples = 0;
             }
         } else {
             m_motionStartSamples = 0;
         }
-        return;
-    }
-
-    m_motionStartSamples = 0;
-    if (stationaryCandidate) {
-        ++m_motionStopSamples;
-        if (m_motionStopSamples >= config->motionStopSampleCount()) {
-            m_moving = false;
+    } else {
+        m_motionStartSamples = 0;
+        if (stationaryCandidate) {
+            ++m_motionStopSamples;
+            if (m_motionStopSamples >= config->motionStopSampleCount()) {
+                nextMoving = false;
+                m_motionStopSamples = 0;
+            }
+        } else {
             m_motionStopSamples = 0;
         }
-    } else {
-        m_motionStopSamples = 0;
+    }
+
+    if (m_moving != nextMoving) {
+        m_moving = nextMoving;
+        emit movingChanged(m_moving);
     }
 }
 
@@ -418,18 +409,19 @@ void QAutopilot::batteryUpdate(int batteryId, float temperatureC,
 
 void QAutopilot::attitudeUpdate(float rollDeg, float pitchDeg, float yawDeg)
 {
-    if (qFuzzyCompare(m_rollDeg, static_cast<double>(rollDeg)) &&
-        qFuzzyCompare(m_pitchDeg, static_cast<double>(pitchDeg)) &&
-        qFuzzyCompare(m_yawDeg, static_cast<double>(yawDeg))) {
+    QAttitude next = m_attitude;
+    next.setRollDeg(rollDeg);
+    next.setPitchDeg(pitchDeg);
+    next.setYawDeg(yawDeg);
+    if (m_attitude == next) {
         return;
     }
-    m_rollDeg = rollDeg;
-    m_pitchDeg = pitchDeg;
-    m_yawDeg = yawDeg;
-    emit attitudeChanged();
+    m_attitude = next;
+    emit attitudeChanged(m_attitude);
 }
 
-void QAutopilot::flightModeUpdate(int flightMode, const QString &fallbackName)
+void QAutopilot::flightModeUpdate(QAutopilot::FlightMode flightMode,
+                                   const QString &fallbackName)
 {
     if (m_flightMode == flightMode &&
         m_flightModeFallbackName == fallbackName) {
@@ -440,7 +432,7 @@ void QAutopilot::flightModeUpdate(int flightMode, const QString &fallbackName)
     emit flightModeChanged();
 }
 
-void QAutopilot::landedStateUpdate(int landedState,
+void QAutopilot::landedStateUpdate(QAutopilot::LandedState landedState,
                                    const QString &fallbackName)
 {
     if (m_landedState == landedState &&
@@ -458,15 +450,20 @@ void QAutopilot::rawGpsUpdate(float hdop, float vdop, float velocityMS,
                               float velocityUncertaintyMS,
                               float headingUncertaintyDeg)
 {
-    m_gpsHdop = hdop;
-    m_gpsVdop = vdop;
-    m_gpsVelocityMS = velocityMS;
-    m_gpsCourseDeg = courseDeg;
-    m_gpsHorizontalUncertaintyM = horizontalUncertaintyM;
-    m_gpsVerticalUncertaintyM = verticalUncertaintyM;
-    m_gpsVelocityUncertaintyMS = velocityUncertaintyMS;
-    m_gpsHeadingUncertaintyDeg = headingUncertaintyDeg;
-    emit rawGpsChanged();
+    QRawGps next = m_rawGps;
+    next.setHdop(hdop);
+    next.setVdop(vdop);
+    next.setVelocityMS(velocityMS);
+    next.setCourseDeg(courseDeg);
+    next.setHorizontalUncertaintyM(horizontalUncertaintyM);
+    next.setVerticalUncertaintyM(verticalUncertaintyM);
+    next.setVelocityUncertaintyMS(velocityUncertaintyMS);
+    next.setHeadingUncertaintyDeg(headingUncertaintyDeg);
+    if (m_rawGps == next) {
+        return;
+    }
+    m_rawGps = next;
+    emit rawGpsChanged(m_rawGps);
 }
 
 void QAutopilot::rcStatusUpdate(bool isAvailable, float signalStrengthPercent) {
@@ -487,7 +484,11 @@ void QAutopilot::rcStatusUpdate(bool isAvailable, float signalStrengthPercent) {
 }
 
 void QAutopilot::headingUpdate(double heading) {
-    setHeading(heading);
+    if (qFuzzyCompare(m_attitude.headingDeg(), heading)) {
+        return;
+    }
+    m_attitude.setHeadingDeg(heading);
+    emit attitudeChanged(m_attitude);
 }
 
 void QAutopilot::healthUpdate(bool isGyrometerCalibrationOk, bool isAccelerometerCalibrationOk,

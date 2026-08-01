@@ -118,7 +118,7 @@ Rectangle {
                     Label {
                         text: root.vehicle
                               ? qsTr("系统 ID %1 · %2")
-                                  .arg(root.vehicle.systemId)
+                                  .arg(root.vehicle.vehicleId)
                                   .arg(root.vehicle.connected
                                        ? qsTr("在线") : qsTr("离线"))
                               : qsTr("请选择无人机")
@@ -172,13 +172,13 @@ Rectangle {
                     Metric { label: qsTr("运动中"); value: root.vehicle ? root.stateText(root.vehicle.moving) : "--" }
                     Metric { label: qsTr("飞行模式"); value: root.vehicle ? root.vehicle.flightModeName : "--" }
                     Metric { label: qsTr("着陆状态"); value: root.vehicle ? root.vehicle.landedStateName : "--" }
-                    Metric { label: qsTr("航向"); value: root.vehicle ? root.numberText(root.vehicle.heading, 1, "°") : "--" }
-                    Metric { label: qsTr("横滚"); value: root.vehicle ? root.numberText(root.vehicle.rollDeg, 1, "°") : "--" }
-                    Metric { label: qsTr("俯仰"); value: root.vehicle ? root.numberText(root.vehicle.pitchDeg, 1, "°") : "--" }
-                    Metric { label: qsTr("偏航"); value: root.vehicle ? root.numberText(root.vehicle.yawDeg, 1, "°") : "--" }
-                    Metric { label: qsTr("水平速度"); value: root.vehicle ? root.numberText(root.vehicle.groundSpeedMS, 2, " m/s") : "--" }
-                    Metric { label: qsTr("垂直速度"); value: root.vehicle ? root.numberText(root.vehicle.verticalSpeedMS, 2, " m/s") : "--" }
-                    Metric { label: qsTr("N/E/D 速度"); value: root.vehicle ? root.numberText(root.vehicle.velocityNorthMS, 1, " / ") + root.numberText(root.vehicle.velocityEastMS, 1, " / ") + root.numberText(root.vehicle.velocityDownMS, 1, " m/s") : "--" }
+                    Metric { label: qsTr("航向"); value: root.vehicle ? root.numberText(root.vehicle.attitude.headingDeg, 1, "°") : "--" }
+                    Metric { label: qsTr("横滚"); value: root.vehicle ? root.numberText(root.vehicle.attitude.rollDeg, 1, "°") : "--" }
+                    Metric { label: qsTr("俯仰"); value: root.vehicle ? root.numberText(root.vehicle.attitude.pitchDeg, 1, "°") : "--" }
+                    Metric { label: qsTr("偏航"); value: root.vehicle ? root.numberText(root.vehicle.attitude.yawDeg, 1, "°") : "--" }
+                    Metric { label: qsTr("水平速度"); value: root.vehicle ? root.numberText(root.vehicle.velocity.groundSpeedMS, 2, " m/s") : "--" }
+                    Metric { label: qsTr("垂直速度"); value: root.vehicle ? root.numberText(root.vehicle.velocity.verticalSpeedMS, 2, " m/s") : "--" }
+                    Metric { label: qsTr("N/E/D 速度"); value: root.vehicle ? root.numberText(root.vehicle.velocity.northMS, 1, " / ") + root.numberText(root.vehicle.velocity.eastMS, 1, " / ") + root.numberText(root.vehicle.velocity.downMS, 1, " m/s") : "--" }
                 }
 
                 InfoSection {
@@ -194,10 +194,10 @@ Rectangle {
                     Metric { label: qsTr("纬度"); value: root.vehicle && root.vehicle.hasGpsPosition ? root.numberText(root.vehicle.gpsPosition.latitude, 7, "°") : "--" }
                     Metric { label: qsTr("海拔高度"); value: root.vehicle && root.vehicle.hasGpsPosition ? root.numberText(root.vehicle.gpsPosition.altitude, 2, " m") : "--" }
                     Metric { label: qsTr("相对高度"); value: root.vehicle ? root.numberText(root.vehicle.relativeAltitudeM, 2, " m") : "--" }
-                    Metric { label: qsTr("HDOP / VDOP"); value: root.vehicle ? root.numberText(root.vehicle.gpsHdop, 2, " / ") + root.numberText(root.vehicle.gpsVdop, 2, "") : "--" }
-                    Metric { label: qsTr("GPS 地速 / 航迹角"); value: root.vehicle ? root.numberText(root.vehicle.gpsVelocityMS, 2, " m/s · ") + root.numberText(root.vehicle.gpsCourseDeg, 1, "°") : "--" }
-                    Metric { label: qsTr("水平 / 垂直误差"); value: root.vehicle ? root.numberText(root.vehicle.gpsHorizontalUncertaintyM, 2, " / ") + root.numberText(root.vehicle.gpsVerticalUncertaintyM, 2, " m") : "--" }
-                    Metric { label: qsTr("速度 / 航向误差"); value: root.vehicle ? root.numberText(root.vehicle.gpsVelocityUncertaintyMS, 2, " m/s · ") + root.numberText(root.vehicle.gpsHeadingUncertaintyDeg, 1, "°") : "--" }
+                    Metric { label: qsTr("HDOP / VDOP"); value: root.vehicle ? root.numberText(root.vehicle.rawGps.hdop, 2, " / ") + root.numberText(root.vehicle.rawGps.vdop, 2, "") : "--" }
+                    Metric { label: qsTr("GPS 地速 / 航迹角"); value: root.vehicle ? root.numberText(root.vehicle.rawGps.velocityMS, 2, " m/s · ") + root.numberText(root.vehicle.rawGps.courseDeg, 1, "°") : "--" }
+                    Metric { label: qsTr("水平 / 垂直误差"); value: root.vehicle ? root.numberText(root.vehicle.rawGps.horizontalUncertaintyM, 2, " / ") + root.numberText(root.vehicle.rawGps.verticalUncertaintyM, 2, " m") : "--" }
+                    Metric { label: qsTr("速度 / 航向误差"); value: root.vehicle ? root.numberText(root.vehicle.rawGps.velocityUncertaintyMS, 2, " m/s · ") + root.numberText(root.vehicle.rawGps.headingUncertaintyDeg, 1, "°") : "--" }
                     Metric { label: qsTr("Home 经度 / 纬度"); value: root.vehicle ? root.numberText(root.vehicle.homePosition.longitude, 6, " / ") + root.numberText(root.vehicle.homePosition.latitude, 6, "°") : "--" }
                     Metric { label: qsTr("Home 高度"); value: root.vehicle ? root.numberText(root.vehicle.homePosition.altitude, 2, " m") : "--" }
                     Metric { label: qsTr("NED 位置"); value: root.vehicle ? root.numberText(root.vehicle.nedPosition.north, 1, " / ") + root.numberText(root.vehicle.nedPosition.east, 1, " / ") + root.numberText(root.vehicle.nedPosition.down, 1, " m") : "--" }

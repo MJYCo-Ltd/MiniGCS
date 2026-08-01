@@ -7,6 +7,7 @@
 #include <QJsonObject>
 
 #include "Private/QGCSLog.h"
+#include "Private/QGCSConfigInternal.h"
 #include "Private/QMavsdkTextCatalog.h"
 #include "QGCSConfig.h"
 #include "Extern/XmlToMavSDK.h"
@@ -120,10 +121,10 @@ void QPlatPrivate::setSystem(std::shared_ptr<mavsdk::System> system) {
                     const QJsonObject object = document.object();
                     const int severity = object.value("severity").toInt();
                     const QString text = object.value("text").toString();
-                    QGCSConfig::instance()->dealMavsdkStatusText(
+                    QGCSConfigInternal::handleFirmwareLog(
                         systemId, severity, text);
-                    /// MAV_SEVERITY_EMERGENCY..WARNING
-                    if (severity <= 4) {
+                    if (severity >= QGCSConfig::LogSeverityEmergency &&
+                        severity <= QGCSConfig::LogSeverityWarning) {
                         emit plat->errorInfo(text);
                     }
                 },

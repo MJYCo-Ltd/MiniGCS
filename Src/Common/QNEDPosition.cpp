@@ -1,9 +1,8 @@
 #include <QtGlobal>
-#include "AirLine/QNEDPosition.h"
+#include "Common/QNEDPosition.h"
 
-// QNEDPosition 实现
 QNEDPosition::QNEDPosition()
-    : m_north(0.0), m_east(0.0), m_down(0.0)
+    : m_north(0.0f), m_east(0.0f), m_down(0.0f)
 {
 }
 
@@ -38,4 +37,3 @@ bool QNEDPosition::operator!=(const QNEDPosition &other) const
 {
     return !(*this == other);
 }
-

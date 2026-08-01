@@ -9,10 +9,10 @@
 #include "MiniGCSExport.h"
 
 /**
- * @brief QDataLink类 - 数据链路
+ * @brief QDataLink - 单条数据链路
  *
  * 表示一条链路连接，可设置重连次数和自动重连。
- * Raw 模式下支持发送和接收原始数据（字符串、长度）。
+ * Raw 模式为高级能力，支持收发原始字节。
  */
 class MINIGCS_EXPORT QDataLink : public QObject
 {
@@ -22,20 +22,15 @@ class MINIGCS_EXPORT QDataLink : public QObject
     Q_PROPERTY(bool opened READ isOpened NOTIFY openStatusChanged)
     Q_PROPERTY(int reconnectAttempts READ reconnectAttempts NOTIFY reconnectAttemptsChanged)
     Q_PROPERTY(LinkKind linkKind READ linkKind CONSTANT)
-    Q_PROPERTY(QString connectionString READ connectionString CONSTANT)
 
 public:
-    explicit QDataLink(LinkKind kind, const QString &connStr, QObject *parent = nullptr);
     ~QDataLink();
 
     LinkKind linkKind() const { return m_linkKind; }
-    QString connectionString() const { return m_connectionString; }
 
-    /** 重连次数，0 表示不限制 */
     int reconnectCount() const { return m_reconnectCount; }
     void setReconnectCount(int count);
 
-    /** 是否开启自动重连 */
     bool autoReconnect() const { return m_autoReconnect; }
     void setAutoReconnect(bool enable);
 
@@ -43,16 +38,9 @@ public:
     int reconnectAttempts() const { return m_reconnectAttempts; }
 
     /**
-     * @brief 发送原始数据（仅 Raw 模式有效）
-     * @param data 数据指针
-     * @param length 数据长度
-     * @return 是否发送成功
+     * @brief 发送原始数据（仅 Raw 高级模式）
      */
     bool sendRawData(const char *data, int length);
-
-    /**
-     * @brief 发送原始数据（QByteArray 重载）
-     */
     Q_INVOKABLE bool sendRawData(const QByteArray &data);
 
 signals:
@@ -60,19 +48,17 @@ signals:
     void autoReconnectChanged();
     void openStatusChanged(bool opened);
     void reconnectAttemptsChanged(int attempts);
-
-    /**
-     * @brief 接收到原始数据（仅 Raw 模式）
-     * @param data 数据，可用 data.constData() 和 data.size() 获取指针和长度
-     */
+    /** 接收到原始数据（仅 Raw 高级模式） */
     void rawDataReceived(const QByteArray &data);
 
 private slots:
-    /** 内部使用：触发 rawDataReceived 信号 */
     void emitRawDataReceived(const QByteArray &data);
 
 private:
     friend class QLinkManagerPrivate;
+    explicit QDataLink(LinkKind kind, const QString &connStr,
+                       QObject *parent = nullptr);
+    QString connectionString() const { return m_connectionString; }
     void setOpened(bool opened);
     void setReconnectAttempts(int attempts);
 

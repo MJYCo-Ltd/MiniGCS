@@ -10,6 +10,15 @@ ColumnLayout {
     property int selectedDroneId: -1
     signal commandRequested(int command)
     signal statusRequested()
+    /** 每次点击列表项时发出（含重复选中同一架），用于地图定位 */
+    signal locateRequested(int systemId)
+
+    function selectDrone(systemId) {
+        const alreadySelected = Number(selectedDroneId) === Number(systemId)
+        selectedDroneId = systemId
+        if (alreadySelected)
+            locateRequested(systemId)
+    }
 
     spacing: 10
 
@@ -46,8 +55,8 @@ ColumnLayout {
 
                 MouseArea {
                     anchors.fill: parent
-                    onClicked: root.selectedDroneId =
-                                   droneDelegate.modelData.systemId
+                    onClicked: root.selectDrone(
+                                   droneDelegate.modelData.systemId)
                 }
 
                 ColumnLayout {
@@ -60,8 +69,8 @@ ColumnLayout {
                         RadioButton {
                             checked: root.selectedDroneId ===
                                      droneDelegate.modelData.systemId
-                            onClicked: root.selectedDroneId =
-                                           droneDelegate.modelData.systemId
+                            onClicked: root.selectDrone(
+                                           droneDelegate.modelData.systemId)
                         }
                         Label {
                             text: droneDelegate.modelData.name
@@ -72,7 +81,7 @@ ColumnLayout {
                             text: droneDelegate.modelData.vehicle.moving
                                   ? qsTr("移动 %1 m/s").arg(
                                       droneDelegate.modelData.vehicle
-                                      .groundSpeedMS.toFixed(1))
+                                      .velocity.groundSpeedMS.toFixed(1))
                                   : qsTr("静止")
                             color: droneDelegate.modelData.vehicle.moving
                                    ? "#b42318" : "#667085"

@@ -5,10 +5,12 @@
 #include <QSettings>
 #include <QFileInfo>
 #include <QPointer>
+#include <QVariant>
 #include <cstring>
 #include <mutex>
 #include <vector>
 #include "QGCSConfig.h"
+#include "Private/QGCSConfigInternal.h"
 #include "Private/QMavsdkTextCatalog.h"
 
 #include <spdlog/sinks/daily_file_sink.h>
@@ -21,9 +23,12 @@ namespace {
 const char *KEY_GCS_SYSTEM_ID = "GCS/SystemId";
 const char *KEY_GCS_COMPONENT_ID = "GCS/ComponentId";
 const char *KEY_LOG_LEVEL = "Logging/Level";
-const char *KEY_MAV_MESSAGE_EXTENSION = "MavMessage/Extension";
-const char *KEY_MAVSDK_TYPE_TEXT_FILE = "Mavsdk/TypeTextFile";
-const char *KEY_MAV_COMMAND_ACK_TIMEOUT_MS = "Mavsdk/CommandAckTimeoutMs";
+const char *KEY_MESSAGE_EXTENSION = "MessageExtension/File";
+const char *KEY_MESSAGE_EXTENSION_LEGACY = "MavMessage/Extension";
+const char *KEY_TYPE_TEXT_FILE = "TypeText/File";
+const char *KEY_TYPE_TEXT_FILE_LEGACY = "Mavsdk/TypeTextFile";
+const char *KEY_COMMAND_ACK_TIMEOUT_MS = "Command/AckTimeoutMs";
+const char *KEY_COMMAND_ACK_TIMEOUT_MS_LEGACY = "Mavsdk/CommandAckTimeoutMs";
 const char *KEY_TIME_SYNC_ENABLED = "TimeSync/Enabled";
 const char *KEY_MOTION_START_HORIZONTAL = "Motion/StartHorizontalSpeedMS";
 const char *KEY_MOTION_START_VERTICAL = "Motion/StartVerticalSpeedMS";
@@ -31,14 +36,27 @@ const char *KEY_MOTION_STOP_HORIZONTAL = "Motion/StopHorizontalSpeedMS";
 const char *KEY_MOTION_STOP_VERTICAL = "Motion/StopVerticalSpeedMS";
 const char *KEY_MOTION_START_SAMPLES = "Motion/StartSampleCount";
 const char *KEY_MOTION_STOP_SAMPLES = "Motion/StopSampleCount";
+const char *KEY_TELEMETRY_POSITION_HZ = "Telemetry/PositionHz";
+const char *KEY_TELEMETRY_POSITION_VELOCITY_NED_HZ =
+    "Telemetry/PositionVelocityNedHz";
+const char *KEY_TELEMETRY_GPS_INFO_HZ = "Telemetry/GpsInfoHz";
+const char *KEY_TELEMETRY_BATTERY_HZ = "Telemetry/BatteryHz";
+const char *KEY_TELEMETRY_RAW_GPS_HZ = "Telemetry/RawGpsHz";
+const char *KEY_TELEMETRY_ATTITUDE_HZ = "Telemetry/AttitudeHz";
+const char *KEY_TELEMETRY_LANDED_STATE_HZ = "Telemetry/LandedStateHz";
+const char *KEY_TELEMETRY_HEALTH_HZ = "Telemetry/HealthHz";
+const char *KEY_TELEMETRY_HOME_HZ = "Telemetry/HomeHz";
+const char *KEY_TELEMETRY_FIXEDWING_METRICS_HZ =
+    "Telemetry/FixedwingMetricsHz";
 
 // 默认值
 const uint8_t DEFAULT_GCS_SYSTEM_ID = 246;
 const uint8_t DEFAULT_GCS_COMPONENT_ID = 191;
 const char *DEFAULT_LOG_LEVEL = "debug";
-const char *DEFAULT_MAV_MESSAGE_EXTENSION = "ardupilotmega.xml";
-const char *DEFAULT_MAVSDK_TYPE_TEXT_FILE = "mavsdk_zh_CN.json";
-constexpr int DEFAULT_MAV_COMMAND_ACK_TIMEOUT_MS = 5000;
+const char *DEFAULT_MESSAGE_EXTENSION = "ardupilotmega.xml";
+const char *DEFAULT_TYPE_TEXT_FILE = "type_text_zh_CN.json";
+const char *DEFAULT_TYPE_TEXT_FILE_LEGACY = "mavsdk_zh_CN.json";
+constexpr int DEFAULT_COMMAND_ACK_TIMEOUT_MS = 5000;
 const bool DEFAULT_TIME_SYNC_ENABLED = true;
 constexpr double DEFAULT_MOTION_START_HORIZONTAL = 0.7;
 constexpr double DEFAULT_MOTION_START_VERTICAL = 0.5;
@@ -46,16 +64,31 @@ constexpr double DEFAULT_MOTION_STOP_HORIZONTAL = 0.25;
 constexpr double DEFAULT_MOTION_STOP_VERTICAL = 0.2;
 constexpr int DEFAULT_MOTION_START_SAMPLES = 2;
 constexpr int DEFAULT_MOTION_STOP_SAMPLES = 5;
-enum MavSeverity {
-    MavSeverityEmergency = 0,
-    MavSeverityAlert,
-    MavSeverityCritical,
-    MavSeverityError,
-    MavSeverityWarning,
-    MavSeverityNotice,
-    MavSeverityInfo,
-    MavSeverityDebug
-};
+constexpr double DEFAULT_TELEMETRY_POSITION_HZ = 1.0;
+constexpr double DEFAULT_TELEMETRY_POSITION_VELOCITY_NED_HZ = 1.0;
+constexpr double DEFAULT_TELEMETRY_GPS_INFO_HZ = 1.0;
+constexpr double DEFAULT_TELEMETRY_BATTERY_HZ = 1.0;
+constexpr double DEFAULT_TELEMETRY_RAW_GPS_HZ = 1.0;
+constexpr double DEFAULT_TELEMETRY_ATTITUDE_HZ = 2.0;
+constexpr double DEFAULT_TELEMETRY_LANDED_STATE_HZ = 1.0;
+constexpr double DEFAULT_TELEMETRY_HEALTH_HZ = 0.5;
+constexpr double DEFAULT_TELEMETRY_HOME_HZ = 0.1;
+constexpr double DEFAULT_TELEMETRY_FIXEDWING_METRICS_HZ = 1.0;
+
+QVariant settingsValue(QSettings *settings, const char *key,
+                       const char *legacyKey, const QVariant &defaultValue)
+{
+    if (!settings) {
+        return defaultValue;
+    }
+    if (settings->contains(QLatin1String(key))) {
+        return settings->value(QLatin1String(key), defaultValue);
+    }
+    if (legacyKey && settings->contains(QLatin1String(legacyKey))) {
+        return settings->value(QLatin1String(legacyKey), defaultValue);
+    }
+    return defaultValue;
+}
 thread_local bool g_emittingFirmwareLog = false;
 QtMessageHandler g_previousQtMessageHandler = nullptr;
 bool g_qtLogHandlerInstalled = false;
@@ -286,52 +319,13 @@ void QGCSConfig::release() {
     m_pSInsatance = nullptr;
 }
 
-void QGCSConfig::dealMavsdkStatusText(uint32_t systemID, int severity,
-                                      const QString &text)
-{
-    if (severity >= MavSeverityEmergency &&
-        severity <= MavSeverityWarning) {
-        const QString formatted =
-            QStringLiteral("[%1] [MAVLink] [system_id=%2] %3")
-                .arg(QDateTime::currentDateTime().toString(
-                         QStringLiteral("yyyy-MM-dd HH:mm:ss.zzz")))
-                .arg(systemID)
-                .arg(text);
-        emit firmwareWarningMessage(
-            static_cast<quint32>(systemID), severity, formatted);
-    }
-
-    const FirmwareLogScope firmwareLogScope;
-    switch (severity) {
-    case MavSeverityEmergency:
-    case MavSeverityAlert:
-    case MavSeverityCritical:
-        spdlog::critical(PLAT_FMT_STR, systemID, "text",
-                         text.toUtf8().data());
-        break;
-    case MavSeverityError:
-        spdlog::error(PLAT_FMT_STR, systemID, "text", text.toUtf8().data());
-        break;
-    case MavSeverityWarning:
-        spdlog::warn(PLAT_FMT_STR, systemID, "text", text.toUtf8().data());
-        break;
-    case MavSeverityNotice:
-    case MavSeverityInfo:
-        spdlog::info(PLAT_FMT_STR, systemID, "text", text.toUtf8().data());
-        break;
-    case MavSeverityDebug:
-        spdlog::debug(PLAT_FMT_STR, systemID, "text", text.toUtf8().data());
-        break;
-    }
-}
-
 QString QGCSConfig::logLevel() const {
     if (!m_settings)
         return QString(DEFAULT_LOG_LEVEL);
     return m_settings->value(KEY_LOG_LEVEL, DEFAULT_LOG_LEVEL).toString();
 }
 
-uint8_t QGCSConfig::gcsSystemId() const {
+uint8_t QGCSConfig::stationId() const {
     if (!m_settings) {
         return DEFAULT_GCS_SYSTEM_ID;
     }
@@ -341,7 +335,7 @@ uint8_t QGCSConfig::gcsSystemId() const {
             .toInt());
 }
 
-uint8_t QGCSConfig::gcsComponentId() const {
+uint8_t QGCSConfig::stationComponentId() const {
     if (!m_settings) {
         return DEFAULT_GCS_COMPONENT_ID;
     }
@@ -352,15 +346,15 @@ uint8_t QGCSConfig::gcsComponentId() const {
             .toInt());
 }
 
-QString QGCSConfig::mavMessageExtension() const {
-    QString configured = QString::fromLatin1(DEFAULT_MAV_MESSAGE_EXTENSION);
-    if (m_settings) {
-        configured =
-            m_settings->value(KEY_MAV_MESSAGE_EXTENSION,
-                              DEFAULT_MAV_MESSAGE_EXTENSION).toString().trimmed();
-    }
+namespace {
+QString resolveConfigRelativeFile(const QString &configuredName,
+                                  const QString &configFilePath,
+                                  const QString &defaultName,
+                                  const QString &legacyDefaultName = QString())
+{
+    QString configured = configuredName.trimmed();
     if (configured.isEmpty()) {
-        configured = QString::fromLatin1(DEFAULT_MAV_MESSAGE_EXTENSION);
+        configured = defaultName;
     }
 
     const QFileInfo configuredFile(configured);
@@ -369,16 +363,23 @@ QString QGCSConfig::mavMessageExtension() const {
     }
 
     QString configDirectory;
-    if (!m_configFilePath.isEmpty()) {
-        configDirectory = QFileInfo(m_configFilePath).absolutePath();
+    if (!configFilePath.isEmpty()) {
+        configDirectory = QFileInfo(configFilePath).absolutePath();
     } else {
         configDirectory =
             QDir(QCoreApplication::applicationDirPath()).filePath("Config");
     }
     const QString primaryPath = QDir(configDirectory).filePath(configured);
-    if (QFileInfo::exists(primaryPath) ||
-        configured != QString::fromLatin1(DEFAULT_MAV_MESSAGE_EXTENSION)) {
+    if (QFileInfo::exists(primaryPath) || configured != defaultName) {
         return primaryPath;
+    }
+
+    if (!legacyDefaultName.isEmpty()) {
+        const QString legacyPrimary =
+            QDir(configDirectory).filePath(legacyDefaultName);
+        if (QFileInfo::exists(legacyPrimary)) {
+            return legacyPrimary;
+        }
     }
 
     const QString buildTreePath =
@@ -387,49 +388,13 @@ QString QGCSConfig::mavMessageExtension() const {
     if (QFileInfo::exists(buildTreePath)) {
         return QFileInfo(buildTreePath).absoluteFilePath();
     }
-
-    const QString workingDirectoryPath =
-        QDir::current().filePath(QStringLiteral("Config/%1").arg(configured));
-    if (QFileInfo::exists(workingDirectoryPath)) {
-        return QFileInfo(workingDirectoryPath).absoluteFilePath();
-    }
-    return primaryPath;
-}
-
-QString QGCSConfig::mavsdkTypeTextFile() const {
-    QString configured = QString::fromLatin1(DEFAULT_MAVSDK_TYPE_TEXT_FILE);
-    if (m_settings) {
-        configured =
-            m_settings->value(KEY_MAVSDK_TYPE_TEXT_FILE,
-                              DEFAULT_MAVSDK_TYPE_TEXT_FILE).toString().trimmed();
-    }
-    if (configured.isEmpty()) {
-        configured = QString::fromLatin1(DEFAULT_MAVSDK_TYPE_TEXT_FILE);
-    }
-
-    const QFileInfo configuredFile(configured);
-    if (configuredFile.isAbsolute()) {
-        return configuredFile.absoluteFilePath();
-    }
-
-    QString configDirectory;
-    if (!m_configFilePath.isEmpty()) {
-        configDirectory = QFileInfo(m_configFilePath).absolutePath();
-    } else {
-        configDirectory =
-            QDir(QCoreApplication::applicationDirPath()).filePath("Config");
-    }
-    const QString primaryPath = QDir(configDirectory).filePath(configured);
-    if (QFileInfo::exists(primaryPath) ||
-        configured != QString::fromLatin1(DEFAULT_MAVSDK_TYPE_TEXT_FILE)) {
-        return primaryPath;
-    }
-
-    const QString buildTreePath =
-        QDir(QCoreApplication::applicationDirPath())
-            .filePath(QStringLiteral("../Config/%1").arg(configured));
-    if (QFileInfo::exists(buildTreePath)) {
-        return QFileInfo(buildTreePath).absoluteFilePath();
+    if (!legacyDefaultName.isEmpty()) {
+        const QString legacyBuild =
+            QDir(QCoreApplication::applicationDirPath())
+                .filePath(QStringLiteral("../Config/%1").arg(legacyDefaultName));
+        if (QFileInfo::exists(legacyBuild)) {
+            return QFileInfo(legacyBuild).absoluteFilePath();
+        }
     }
 
     const QString workingDirectoryPath =
@@ -437,22 +402,31 @@ QString QGCSConfig::mavsdkTypeTextFile() const {
     if (QFileInfo::exists(workingDirectoryPath)) {
         return QFileInfo(workingDirectoryPath).absoluteFilePath();
     }
+    if (!legacyDefaultName.isEmpty()) {
+        const QString legacyWorking = QDir::current().filePath(
+            QStringLiteral("Config/%1").arg(legacyDefaultName));
+        if (QFileInfo::exists(legacyWorking)) {
+            return QFileInfo(legacyWorking).absoluteFilePath();
+        }
+    }
     return primaryPath;
 }
+} // namespace
 
-QString QGCSConfig::mavsdkText(
+QString QGCSConfig::typeTextFile() const {
+    const QString configured = settingsValue(
+        m_settings, KEY_TYPE_TEXT_FILE, KEY_TYPE_TEXT_FILE_LEGACY,
+        QString::fromLatin1(DEFAULT_TYPE_TEXT_FILE)).toString();
+    return resolveConfigRelativeFile(
+        configured, m_configFilePath,
+        QString::fromLatin1(DEFAULT_TYPE_TEXT_FILE),
+        QString::fromLatin1(DEFAULT_TYPE_TEXT_FILE_LEGACY));
+}
+
+QString QGCSConfig::typeText(
     const QString &section, const QString &key) const
 {
     return QMavsdkTextCatalog::text(section, key);
-}
-
-int QGCSConfig::mavCommandAckTimeoutMs() const
-{
-    const int configured = m_settings
-        ? m_settings->value(KEY_MAV_COMMAND_ACK_TIMEOUT_MS,
-                            DEFAULT_MAV_COMMAND_ACK_TIMEOUT_MS).toInt()
-        : DEFAULT_MAV_COMMAND_ACK_TIMEOUT_MS;
-    return qBound(1000, configured, 60000);
 }
 
 bool QGCSConfig::timeSyncEnabled() const {
@@ -547,16 +521,18 @@ void QGCSConfig::initializeDefaults() {
     if (!m_settings->contains(KEY_LOG_LEVEL)) {
         m_settings->setValue(KEY_LOG_LEVEL, DEFAULT_LOG_LEVEL);
     }
-    if (!m_settings->contains(KEY_MAV_MESSAGE_EXTENSION)) {
-        m_settings->setValue(KEY_MAV_MESSAGE_EXTENSION, DEFAULT_MAV_MESSAGE_EXTENSION);
+    if (!m_settings->contains(QLatin1String(KEY_MESSAGE_EXTENSION)) &&
+        !m_settings->contains(QLatin1String(KEY_MESSAGE_EXTENSION_LEGACY))) {
+        m_settings->setValue(KEY_MESSAGE_EXTENSION, DEFAULT_MESSAGE_EXTENSION);
     }
-    if (!m_settings->contains(KEY_MAVSDK_TYPE_TEXT_FILE)) {
-        m_settings->setValue(KEY_MAVSDK_TYPE_TEXT_FILE,
-                             DEFAULT_MAVSDK_TYPE_TEXT_FILE);
+    if (!m_settings->contains(QLatin1String(KEY_TYPE_TEXT_FILE)) &&
+        !m_settings->contains(QLatin1String(KEY_TYPE_TEXT_FILE_LEGACY))) {
+        m_settings->setValue(KEY_TYPE_TEXT_FILE, DEFAULT_TYPE_TEXT_FILE);
     }
-    if (!m_settings->contains(KEY_MAV_COMMAND_ACK_TIMEOUT_MS)) {
-        m_settings->setValue(KEY_MAV_COMMAND_ACK_TIMEOUT_MS,
-                             DEFAULT_MAV_COMMAND_ACK_TIMEOUT_MS);
+    if (!m_settings->contains(QLatin1String(KEY_COMMAND_ACK_TIMEOUT_MS)) &&
+        !m_settings->contains(QLatin1String(KEY_COMMAND_ACK_TIMEOUT_MS_LEGACY))) {
+        m_settings->setValue(KEY_COMMAND_ACK_TIMEOUT_MS,
+                             DEFAULT_COMMAND_ACK_TIMEOUT_MS);
     }
     if (!m_settings->contains(KEY_TIME_SYNC_ENABLED)) {
         m_settings->setValue(KEY_TIME_SYNC_ENABLED, DEFAULT_TIME_SYNC_ENABLED);
@@ -585,7 +561,211 @@ void QGCSConfig::initializeDefaults() {
         m_settings->setValue(KEY_MOTION_STOP_SAMPLES,
                              DEFAULT_MOTION_STOP_SAMPLES);
     }
+    if (!m_settings->contains(KEY_TELEMETRY_POSITION_HZ)) {
+        m_settings->setValue(KEY_TELEMETRY_POSITION_HZ,
+                             DEFAULT_TELEMETRY_POSITION_HZ);
+    }
+    if (!m_settings->contains(KEY_TELEMETRY_POSITION_VELOCITY_NED_HZ)) {
+        m_settings->setValue(KEY_TELEMETRY_POSITION_VELOCITY_NED_HZ,
+                             DEFAULT_TELEMETRY_POSITION_VELOCITY_NED_HZ);
+    }
+    if (!m_settings->contains(KEY_TELEMETRY_GPS_INFO_HZ)) {
+        m_settings->setValue(KEY_TELEMETRY_GPS_INFO_HZ,
+                             DEFAULT_TELEMETRY_GPS_INFO_HZ);
+    }
+    if (!m_settings->contains(KEY_TELEMETRY_BATTERY_HZ)) {
+        m_settings->setValue(KEY_TELEMETRY_BATTERY_HZ,
+                             DEFAULT_TELEMETRY_BATTERY_HZ);
+    }
+    if (!m_settings->contains(KEY_TELEMETRY_RAW_GPS_HZ)) {
+        m_settings->setValue(KEY_TELEMETRY_RAW_GPS_HZ,
+                             DEFAULT_TELEMETRY_RAW_GPS_HZ);
+    }
+    if (!m_settings->contains(KEY_TELEMETRY_ATTITUDE_HZ)) {
+        m_settings->setValue(KEY_TELEMETRY_ATTITUDE_HZ,
+                             DEFAULT_TELEMETRY_ATTITUDE_HZ);
+    }
+    if (!m_settings->contains(KEY_TELEMETRY_LANDED_STATE_HZ)) {
+        m_settings->setValue(KEY_TELEMETRY_LANDED_STATE_HZ,
+                             DEFAULT_TELEMETRY_LANDED_STATE_HZ);
+    }
+    if (!m_settings->contains(KEY_TELEMETRY_HEALTH_HZ)) {
+        m_settings->setValue(KEY_TELEMETRY_HEALTH_HZ,
+                             DEFAULT_TELEMETRY_HEALTH_HZ);
+    }
+    if (!m_settings->contains(KEY_TELEMETRY_HOME_HZ)) {
+        m_settings->setValue(KEY_TELEMETRY_HOME_HZ,
+                             DEFAULT_TELEMETRY_HOME_HZ);
+    }
+    if (!m_settings->contains(KEY_TELEMETRY_FIXEDWING_METRICS_HZ)) {
+        m_settings->setValue(KEY_TELEMETRY_FIXEDWING_METRICS_HZ,
+                             DEFAULT_TELEMETRY_FIXEDWING_METRICS_HZ);
+    }
 
     // 立即保存默认值
     m_settings->sync();
 }
+
+struct QGCSConfigPrivateAccess {
+    static QGCSConfig *config() { return QGCSConfig::instance(); }
+
+    static void handleFirmwareLog(uint32_t vehicleId, int severity,
+                                  const QString &text)
+    {
+        QGCSConfig *self = config();
+        if (!self) {
+            return;
+        }
+        if (severity >= QGCSConfig::LogSeverityEmergency &&
+            severity <= QGCSConfig::LogSeverityWarning) {
+            const QString formatted =
+                QStringLiteral("[%1] [vehicle=%2] %3")
+                    .arg(QDateTime::currentDateTime().toString(
+                             QStringLiteral("yyyy-MM-dd HH:mm:ss.zzz")))
+                    .arg(vehicleId)
+                    .arg(text);
+            emit self->firmwareWarningMessage(
+                static_cast<quint32>(vehicleId), formatted);
+        }
+
+        const FirmwareLogScope firmwareLogScope;
+        switch (severity) {
+        case QGCSConfig::LogSeverityEmergency:
+        case QGCSConfig::LogSeverityAlert:
+        case QGCSConfig::LogSeverityCritical:
+            spdlog::critical(PLAT_FMT_STR, vehicleId, "text",
+                             text.toUtf8().data());
+            break;
+        case QGCSConfig::LogSeverityError:
+            spdlog::error(PLAT_FMT_STR, vehicleId, "text",
+                          text.toUtf8().data());
+            break;
+        case QGCSConfig::LogSeverityWarning:
+            spdlog::warn(PLAT_FMT_STR, vehicleId, "text",
+                         text.toUtf8().data());
+            break;
+        case QGCSConfig::LogSeverityNotice:
+        case QGCSConfig::LogSeverityInfo:
+            spdlog::info(PLAT_FMT_STR, vehicleId, "text",
+                         text.toUtf8().data());
+            break;
+        case QGCSConfig::LogSeverityDebug:
+            spdlog::debug(PLAT_FMT_STR, vehicleId, "text",
+                          text.toUtf8().data());
+            break;
+        }
+    }
+
+    static QString messageExtensionFile()
+    {
+        QGCSConfig *self = config();
+        const QString configured = settingsValue(
+            self ? self->m_settings : nullptr, KEY_MESSAGE_EXTENSION,
+            KEY_MESSAGE_EXTENSION_LEGACY,
+            QString::fromLatin1(DEFAULT_MESSAGE_EXTENSION)).toString();
+        return resolveConfigRelativeFile(
+            configured, self ? self->m_configFilePath : QString(),
+            QString::fromLatin1(DEFAULT_MESSAGE_EXTENSION));
+    }
+
+    static int commandAckTimeoutMs()
+    {
+        QGCSConfig *self = config();
+        const int configured = settingsValue(
+            self ? self->m_settings : nullptr, KEY_COMMAND_ACK_TIMEOUT_MS,
+            KEY_COMMAND_ACK_TIMEOUT_MS_LEGACY,
+            DEFAULT_COMMAND_ACK_TIMEOUT_MS).toInt();
+        return qBound(1000, configured, 60000);
+    }
+
+    static double telemetryHz(const char *key, double defaultHz)
+    {
+        QGCSConfig *self = config();
+        if (!self || !self->m_settings) {
+            return defaultHz;
+        }
+        return self->m_settings->value(QLatin1String(key), defaultHz)
+            .toDouble();
+    }
+};
+
+namespace QGCSConfigInternal {
+
+void handleFirmwareLog(uint32_t vehicleId, int severity, const QString &text)
+{
+    QGCSConfigPrivateAccess::handleFirmwareLog(vehicleId, severity, text);
+}
+
+QString messageExtensionFile()
+{
+    return QGCSConfigPrivateAccess::messageExtensionFile();
+}
+
+int commandAckTimeoutMs()
+{
+    return QGCSConfigPrivateAccess::commandAckTimeoutMs();
+}
+
+double telemetryPositionHz()
+{
+    return QGCSConfigPrivateAccess::telemetryHz(
+        KEY_TELEMETRY_POSITION_HZ, DEFAULT_TELEMETRY_POSITION_HZ);
+}
+
+double telemetryPositionVelocityNedHz()
+{
+    return QGCSConfigPrivateAccess::telemetryHz(
+        KEY_TELEMETRY_POSITION_VELOCITY_NED_HZ,
+        DEFAULT_TELEMETRY_POSITION_VELOCITY_NED_HZ);
+}
+
+double telemetryGpsInfoHz()
+{
+    return QGCSConfigPrivateAccess::telemetryHz(
+        KEY_TELEMETRY_GPS_INFO_HZ, DEFAULT_TELEMETRY_GPS_INFO_HZ);
+}
+
+double telemetryBatteryHz()
+{
+    return QGCSConfigPrivateAccess::telemetryHz(
+        KEY_TELEMETRY_BATTERY_HZ, DEFAULT_TELEMETRY_BATTERY_HZ);
+}
+
+double telemetryRawGpsHz()
+{
+    return QGCSConfigPrivateAccess::telemetryHz(
+        KEY_TELEMETRY_RAW_GPS_HZ, DEFAULT_TELEMETRY_RAW_GPS_HZ);
+}
+
+double telemetryAttitudeHz()
+{
+    return QGCSConfigPrivateAccess::telemetryHz(
+        KEY_TELEMETRY_ATTITUDE_HZ, DEFAULT_TELEMETRY_ATTITUDE_HZ);
+}
+
+double telemetryLandedStateHz()
+{
+    return QGCSConfigPrivateAccess::telemetryHz(
+        KEY_TELEMETRY_LANDED_STATE_HZ, DEFAULT_TELEMETRY_LANDED_STATE_HZ);
+}
+
+double telemetryHealthHz()
+{
+    return QGCSConfigPrivateAccess::telemetryHz(
+        KEY_TELEMETRY_HEALTH_HZ, DEFAULT_TELEMETRY_HEALTH_HZ);
+}
+
+double telemetryHomeHz()
+{
+    return QGCSConfigPrivateAccess::telemetryHz(
+        KEY_TELEMETRY_HOME_HZ, DEFAULT_TELEMETRY_HOME_HZ);
+}
+
+double telemetryFixedwingMetricsHz()
+{
+    return QGCSConfigPrivateAccess::telemetryHz(
+        KEY_TELEMETRY_FIXEDWING_METRICS_HZ,
+        DEFAULT_TELEMETRY_FIXEDWING_METRICS_HZ);
+}
+
+} // namespace QGCSConfigInternal

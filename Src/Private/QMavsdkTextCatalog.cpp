@@ -68,7 +68,7 @@ QString QMavsdkTextCatalog::text(QStringView section, QStringView key)
 {
     CatalogCache &cache = catalogCache();
     QMutexLocker locker(&cache.mutex);
-    reloadIfChanged(cache, QGCSConfig::instance()->mavsdkTypeTextFile());
+    reloadIfChanged(cache, QGCSConfig::instance()->typeTextFile());
 
     const QString sectionName = section.toString();
     const QJsonObject entries = cache.root.value(sectionName).toObject();

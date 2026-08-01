@@ -99,8 +99,8 @@ mavsdk::MavlinkDirect::Result XmlToMavSDK::sendCmd(
 
     mavsdk::MavlinkDirect::MavlinkMessage message;
     message.message_name = "COMMAND_LONG";
-    message.component_id = QGCSConfig::instance()->gcsComponentId();
-    message.system_id = QGCSConfig::instance()->gcsSystemId();
+    message.component_id = QGCSConfig::instance()->stationComponentId();
+    message.system_id = QGCSConfig::instance()->stationId();
     message.target_system_id = system.get_system_id();
     message.target_component_id = uComponentID;
     message.fields_json = fieldsJson.toStdString();

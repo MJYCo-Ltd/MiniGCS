@@ -72,20 +72,22 @@ QDroneControlManager::QDroneControlManager(
     connect(QGCSConfig::instance(), &QGCSConfig::warningLogMessage,
             this, [this](int, const QString &message) {
                 m_businessLogs.append(message);
-                constexpr qsizetype MaximumVisibleLogCount = 500;
-                if (m_businessLogs.size() > MaximumVisibleLogCount) {
+                const qsizetype maximumVisibleLogCount =
+                    QTestGCSConfig::instance()->maximumVisibleLogCount();
+                if (m_businessLogs.size() > maximumVisibleLogCount) {
                     m_businessLogs.remove(
-                        0, m_businessLogs.size() - MaximumVisibleLogCount);
+                        0, m_businessLogs.size() - maximumVisibleLogCount);
                 }
                 emit businessLogsChanged();
             });
     connect(QGCSConfig::instance(), &QGCSConfig::firmwareWarningMessage,
-            this, [this](quint32, int, const QString &message) {
+            this, [this](quint32, const QString &message) {
                 m_firmwareLogs.append(message);
-                constexpr qsizetype MaximumVisibleLogCount = 500;
-                if (m_firmwareLogs.size() > MaximumVisibleLogCount) {
+                const qsizetype maximumVisibleLogCount =
+                    QTestGCSConfig::instance()->maximumVisibleLogCount();
+                if (m_firmwareLogs.size() > maximumVisibleLogCount) {
                     m_firmwareLogs.remove(
-                        0, m_firmwareLogs.size() - MaximumVisibleLogCount);
+                        0, m_firmwareLogs.size() - maximumVisibleLogCount);
                 }
                 emit firmwareLogsChanged();
             });
@@ -94,11 +96,11 @@ QDroneControlManager::QDroneControlManager(
 void QDroneControlManager::registerPlatform(QObject *platform)
 {
     auto *autopilot = qobject_cast<QAutopilot *>(platform);
-    if (!autopilot || autopilot->systemId() < 0) {
+    if (!autopilot || autopilot->vehicleId() < 0) {
         return;
     }
 
-    const int systemId = autopilot->systemId();
+    const int systemId = autopilot->vehicleId();
     if (m_autopilots.value(systemId) == autopilot) {
         return;
     }
@@ -107,7 +109,7 @@ void QDroneControlManager::registerPlatform(QObject *platform)
             this, &QDroneControlManager::dronesChanged);
     connect(autopilot, &QAutopilot::actionCommandFinished,
             this, [this, systemId](QAutopilot::ActionCommand action,
-                                   bool success, int,
+                                   bool success,
                                    const QString &reason) {
                 Command command = InvalidCommand;
                 switch (action) {
@@ -228,16 +230,16 @@ QString QDroneControlManager::commandName(int command) const
 {
     const QString key = commandKey(static_cast<Command>(command));
     if (key.isEmpty()) {
-        return QGCSConfig::instance()->mavsdkText(
+        return QGCSConfig::instance()->typeText(
             QStringLiteral("command"), QStringLiteral("default"));
     }
-    return QGCSConfig::instance()->mavsdkText(
+    return QGCSConfig::instance()->typeText(
         QStringLiteral("command"), key);
 }
 
 QString QDroneControlManager::vehicleIcon(int vehicleType) const
 {
-    return QGCSConfig::instance()->mavsdkText(
+    return QGCSConfig::instance()->typeText(
         QStringLiteral("vehicleIcon"), QString::number(vehicleType));
 }
 
@@ -279,15 +281,24 @@ bool QDroneControlManager::applyConfiguredLinks()
                 tr("第 %1 条链路配置无效").arg(index + 1));
             return false;
         }
-        const QString connectionString =
-            QLinkManager::buildConnectionString(kind, params);
-        if (connectionString.isEmpty() ||
-            connectionStrings.contains(connectionString)) {
+        if (params.port == 0 && params.portName.trimmed().isEmpty() &&
+            kind != LinkKind::Raw) {
             emit commandRejected(
                 tr("第 %1 条链路为空或与其他链路重复").arg(index + 1));
             return false;
         }
-        connectionStrings.insert(connectionString);
+        const QString fingerprint = QStringLiteral("%1|%2|%3|%4|%5")
+            .arg(static_cast<int>(kind))
+            .arg(params.hostName)
+            .arg(params.port)
+            .arg(params.portName)
+            .arg(params.baudRate);
+        if (connectionStrings.contains(fingerprint)) {
+            emit commandRejected(
+                tr("第 %1 条链路为空或与其他链路重复").arg(index + 1));
+            return false;
+        }
+        connectionStrings.insert(fingerprint);
         parsedLinks.append(qMakePair(kind, params));
     }
 

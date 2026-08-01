@@ -30,8 +30,11 @@ qt_standard_project_setup(REQUIRES 6.9)
 set(MINIGCS_SOURCES
     Src/AirLine/QAirLine.cpp
     Src/AirLine/QAirLineManager.cpp
-    Src/AirLine/QGpsPosition.cpp
-    Src/AirLine/QNEDPosition.cpp
+    Src/Common/QGpsPosition.cpp
+    Src/Common/QNEDPosition.cpp
+    Src/Common/QAttitude.cpp
+    Src/Common/QVelocity.cpp
+    Src/Common/QRawGps.cpp
     Src/Plat/QAutopilotStatus.cpp
     Src/Plat/QAutopilotFixedwing.cpp
     Src/Extern/XmlToMavSDK.cpp
@@ -54,6 +57,12 @@ set(MINIGCS_HEADERS
     Inc/MiniGCSExport.h
     Inc/AirLine/QAirLine.h
     Inc/AirLine/QAirLineManager.h
+    Inc/Common/QGpsPosition.h
+    Inc/Common/QNEDPosition.h
+    Inc/Common/QAttitude.h
+    Inc/Common/QVelocity.h
+    Inc/Common/QRawGps.h
+    Src/Private/QGCSConfigInternal.h
     Inc/AirLine/QGpsPosition.h
     Inc/AirLine/QNEDPosition.h
     Inc/Plat/QAutopilotStatus.h
@@ -131,13 +140,25 @@ install(DIRECTORY Inc/
 
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/Config")
 configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/Config/mavsdk_zh_CN.json"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Config/type_text_zh_CN.json"
+    "${CMAKE_CURRENT_BINARY_DIR}/Config/type_text_zh_CN.json"
+    COPYONLY
+)
+# 兼容旧配置文件名：与 type_text_zh_CN.json 同源，勿再维护第二份文案
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/Config/type_text_zh_CN.json"
     "${CMAKE_CURRENT_BINARY_DIR}/Config/mavsdk_zh_CN.json"
     COPYONLY
 )
 
-install(FILES Config/mavsdk_zh_CN.json
+install(FILES
+    Config/type_text_zh_CN.json
     DESTINATION bin/Config
+)
+install(FILES
+    Config/type_text_zh_CN.json
+    DESTINATION bin/Config
+    RENAME mavsdk_zh_CN.json
 )
 
 # 安装 CMake 配置文件

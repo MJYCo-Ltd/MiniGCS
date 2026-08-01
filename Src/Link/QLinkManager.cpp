@@ -4,11 +4,6 @@
 #include "QGroundControlStation.h"
 #include <QDebug>
 
-QString QLinkManager::buildConnectionString(LinkKind type, const LinkParams &params)
-{
-    return QLinkManagerPrivate::buildConnectionString(type, params);
-}
-
 QLinkManager::QLinkManager(QGroundControlStation *groundStation, QObject *parent)
     : QObject(parent)
     , d_ptr(new QLinkManagerPrivate(this, groundStation))
@@ -19,7 +14,7 @@ QLinkManager::~QLinkManager() = default;
 
 QDataLink *QLinkManager::addLink(LinkKind type, const LinkParams &params)
 {
-    QString connStr = buildConnectionString(type, params);
+    QString connStr = QLinkManagerPrivate::buildConnectionString(type, params);
     if (connStr.isEmpty()) {
         emit linkCreateFailed(tr("无效的链路参数"));
         return nullptr;
@@ -38,7 +33,7 @@ QDataLink *QLinkManager::addLink(LinkKind type, const LinkParams &params)
 
 void QLinkManager::removeLink(LinkKind type, const LinkParams &params)
 {
-    QString connStr = buildConnectionString(type, params);
+    QString connStr = QLinkManagerPrivate::buildConnectionString(type, params);
     if (!connStr.isEmpty()) {
         d_func()->removeConnection(connStr);
     }

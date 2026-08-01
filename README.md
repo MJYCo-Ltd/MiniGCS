@@ -177,10 +177,19 @@ if (link) {
 | 类 | 说明 |
 |----|------|
 | `QPlat` | 平台基类：固件版本、连接状态等 |
-| `QAutopilot` | 自驾仪：GPS/NED/Home、姿态、航向、飞行模式、解锁/起飞等 |
-| `QAutopilotStatus` | 电池、飞行模式、解锁状态等 |
+| `QAutopilot` | 自驾仪：位置、姿态、速度、飞行模式、解锁/起飞等 |
+| `QAutopilotStatus` | 电池、健康与遥控等状态 |
 | `QAutopilotFixedwing` | 固定翼扩展状态 |
 | `QAutoVehicleType` | 载具与自驾仪类型枚举 |
+
+### 通用类型（Common）
+
+| 类 | 说明 |
+|----|------|
+| `QGpsPosition` | 地理坐标（经纬度、高度） |
+| `QNEDPosition` | NED 局部位移 |
+| `QAttitude` | 姿态欧拉角与航向 |
+| `QVelocity` | NED 速度分量及水平/垂直速度 |
 
 ### 航线管理（AirLine）
 
@@ -188,8 +197,6 @@ if (link) {
 |----|------|
 | `QAirLineManager` | 多条航线管理（支持 QML） |
 | `QAirLine` | 单条航线及航点列表 |
-| `QGpsPosition` | GPS 坐标（经纬度、高度） |
-| `QNEDPosition` | NED 坐标 |
 
 `QAirLineManager::addAirLine()` 成功后接管航线对象所有权；移除或清空航线时，
 对象会在 `airlineRemoved` 信号发出后通过 `deleteLater()` 销毁。
@@ -228,19 +235,19 @@ autopilot->uploadAirLine(waypoints);
 - 日志由 **spdlog** 输出，并通过 `QGCSConfig::qtLogHandler` 接管 Qt 的 `qDebug` / `qWarning` 等。
 - 默认日志文件（相对**当前工作目录**）：`data/log/minigcs.log`（按日滚动，保留 7 天）。
 - `QGCSConfig::warningLogMessage` 转发业务 warning 及以上日志；
-  `firmwareWarningMessage` 单独转发 MAVLink `STATUSTEXT` 中 warning 及以上的固件日志。
+  `firmwareWarningMessage` 单独转发飞控固件 warning 及以上日志。
 - 配置文件路径：`<可执行文件目录>/Config/<applicationName>.ini`（`applicationName` 为空时使用 `MiniGCS.ini`）。
 
-常用 INI 键（节名以代码为准）：
+常用 INI 键（节名以代码为准；旧键仍兼容）：
 
 | 键 | 默认值 | 说明 |
 |----|--------|------|
-| `GCS/SystemId` | `246` | 地面站 MAVLink 系统 ID |
+| `GCS/SystemId` | `246` | 地面站身份 ID |
 | `GCS/ComponentId` | `191` | 地面站组件 ID |
 | `Logging/Level` | `debug` | `trace` / `debug` / `info` / `warn` / `error` / `critical` / `off` |
-| `MavMessage/Extension` | `ardupilotmega.xml` | APM `MAV_CMD` 命令表（相对路径基于配置目录）。默认 `ardupilotmega.xml` 仅作命令名映射：MAVSDK 已内嵌该方言到共享 MessageSet。若改为其它自定义 XML，地面站会整站注入一次 |
-| `Mavsdk/TypeTextFile` | `mavsdk_zh_CN.json` | MAVSDK 类型文本映射文件；相对路径基于配置文件目录 |
-| `Mavsdk/CommandAckTimeoutMs` | `5000` | 扩展 `COMMAND_LONG` 等待最终 `COMMAND_ACK` 的超时时间（1000–60000 ms） |
+| `MessageExtension/File` | `ardupilotmega.xml` | 扩展命令表文件（相对配置目录）。兼容旧键 `MavMessage/Extension` |
+| `TypeText/File` | `type_text_zh_CN.json` | 类型/状态显示文本目录。兼容旧键 `Mavsdk/TypeTextFile` 与旧文件名 `mavsdk_zh_CN.json` |
+| `Command/AckTimeoutMs` | `5000` | 扩展命令确认超时（1000–60000 ms）。兼容旧键 `Mavsdk/CommandAckTimeoutMs` |
 | `TimeSync/Enabled` | `true` | 是否启用时间同步 |
 | `Motion/StartHorizontalSpeedMS` | `0.7` | 判定开始移动的水平速度阈值（m/s） |
 | `Motion/StartVerticalSpeedMS` | `0.5` | 判定开始移动的垂直速度阈值（m/s） |
@@ -248,11 +255,14 @@ autopilot->uploadAirLine(waypoints);
 | `Motion/StopVerticalSpeedMS` | `0.2` | 判定停止移动的垂直速度阈值（m/s） |
 | `Motion/StartSampleCount` | `2` | 开始移动所需连续采样数 |
 | `Motion/StopSampleCount` | `5` | 停止移动所需连续采样数 |
+| `Telemetry/PositionHz` 等 | 见默认 | 遥测订阅频率（Hz），含 Position / GpsInfo / Battery / Attitude / Health / Home 等 |
 
-载具类型、飞控类型、机型图标、控制命令名称、GPS 定位状态、固件版本类型和 Mission 返回结果均从
-`Config/mavsdk_zh_CN.json` 读取，不在 C++ 中硬编码。可以复制该文件制作其他
-语言版本，再通过 `Mavsdk/TypeTextFile` 指向新文件；程序会在文件更新时间或
+载具类型、飞控类型、机型图标、控制命令名称、GPS 定位状态、固件版本类型和任务结果均从
+`Config/type_text_zh_CN.json`（或兼容的旧文件）读取，不在 C++ 中硬编码。可以复制该文件制作其他
+语言版本，再通过 `TypeText/File` 指向新文件；程序会在文件更新时间或
 大小变化后重新加载。
+
+公开 API 仅暴露业务接口（平台、航线、链路 Kind/Params、业务命令与结果）。协议适配细节保留在 `Src/**/Private`。
 
 可通过继承 `QGCSConfig` 并在首次 `instance()` 前调用 `QGCSConfig::setInstance()` 注入自定义配置（`Test` 工程中的 `QTestGCSConfig` 即如此，并额外支持多链路配置）。
 
@@ -271,7 +281,7 @@ cmake --build build --target Test
 ```
 
 程序从 `QTestGCSConfig` 读取链路列表并自动 `addLink`，QML 界面见 `Test/qml/Main.qml`。
-界面支持按 MAVLink 系统 ID 配置无人机别名、创建编组并维护成员，也可以向
+界面支持按平台 ID 配置无人机别名、创建编组并维护成员，也可以向
 单机或编组中的在线成员发送解锁、上锁、起飞、降落、返航和任务下载命令。
 无人机别名与编组配置保存在演示程序的 INI 配置文件中。
 地图插件、初始中心、缩放范围以及航点默认/最小/最大高度也可通过演示程序
@@ -291,6 +301,7 @@ MiniGCS/
 │   ├── QGCSConfig.h
 │   ├── MiniGCSExport.h
 │   ├── AirLine/
+│   ├── Common/
 │   ├── Link/
 │   ├── Plat/
 ├── Src/                       # 实现及 MAVSDK/spdlog 内部适配

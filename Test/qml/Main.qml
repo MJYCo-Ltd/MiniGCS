@@ -29,6 +29,11 @@ ApplicationWindow {
         return null
     }
 
+    function centerOnDrone(systemId) {
+        if (mapLoader.item)
+            mapLoader.item.centerOnDrone(systemId)
+    }
+
     function requestCommand(command, groupCommand, waypoints) {
         pendingCommand = command
         pendingGroupCommand = groupCommand
@@ -175,6 +180,7 @@ ApplicationWindow {
 
                         onDroneSelected: function(systemId) {
                             controlPanel.selectedDroneId = systemId
+                            centerOnDrone(systemId)
                         }
                         onRouteCoordinateRequested: function(coordinate) {
                             routeEditor.addCoordinate(coordinate)
@@ -240,6 +246,9 @@ ApplicationWindow {
                             root.requestCommand(command, groupCommand, [])
                         }
                         onStatusRequested: rightPanelTabs.currentIndex = 1
+                        onLocateRequested: function(systemId) {
+                            root.centerOnDrone(systemId)
+                        }
                     }
 
                     DroneStatusPage {
@@ -330,41 +339,41 @@ ApplicationWindow {
         target: DroneControl
 
         function onCommandDispatched(command, target, count) {
-            controlPanel.statusText =
+            controlPanel.setStatus(
                 qsTr("已向“%1”的 %2 架在线无人机发送“%3”")
                     .arg(target).arg(count)
-                    .arg(DroneControl.commandName(command))
+                    .arg(DroneControl.commandName(command)))
         }
 
         function onCommandRejected(reason) {
-            controlPanel.statusText = qsTr("命令未发送：%1").arg(reason)
+            controlPanel.setStatus(qsTr("命令未发送：%1").arg(reason))
         }
 
         function onCommandResult(systemId, command, success, reason) {
-            controlPanel.statusText = success
+            controlPanel.setStatus(success
                     ? qsTr("无人机 %1 已确认“%2”")
                         .arg(systemId).arg(DroneControl.commandName(command))
                     : qsTr("无人机 %1 执行“%2”失败：%3")
                         .arg(systemId)
                         .arg(DroneControl.commandName(command))
-                        .arg(reason)
+                        .arg(reason))
         }
 
         function onMissionDownloaded(systemId, waypoints) {
             if (Number(systemId) ===
                     Number(controlPanel.selectedDroneId)) {
                 routeEditor.loadMissionWaypoints(waypoints)
-                controlPanel.statusText =
+                controlPanel.setStatus(
                     qsTr("已加载无人机 %1 的 %2 个航点")
-                        .arg(systemId).arg(waypoints.length)
+                        .arg(systemId).arg(waypoints.length))
             }
         }
 
         function onMissionUploadResult(systemId, success, reason) {
-            controlPanel.statusText = success
+            controlPanel.setStatus(success
                     ? qsTr("无人机 %1 航线上传成功").arg(systemId)
                     : qsTr("无人机 %1 航线上传失败：%2")
-                        .arg(systemId).arg(reason)
+                        .arg(systemId).arg(reason))
         }
     }
 }

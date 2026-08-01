@@ -8,7 +8,7 @@
 #include <optional>
 #include <string>
 #include <cstdint>
-#include "AirLine/QGpsPosition.h"
+#include "Common/QGpsPosition.h"
 #include "QPlatPrivate.h"
 
 /**
