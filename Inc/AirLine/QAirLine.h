@@ -6,6 +6,7 @@
 #include <QList>
 #include <QMetaType>
 #include "Common/QGpsPosition.h"
+#include "AirLine/QMissionPoint.h"
 #include "MiniGCSExport.h"
 
 /**
@@ -18,6 +19,7 @@ class MINIGCS_EXPORT QAirLine : public QObject
     Q_OBJECT
     Q_PROPERTY(QString name READ name WRITE setName NOTIFY nameChanged)
     Q_PROPERTY(QList<QGpsPosition> waypoints READ waypoints WRITE setWaypoints NOTIFY waypointsChanged)
+    Q_PROPERTY(QList<QMissionPoint> missionPoints READ missionPoints WRITE setMissionPoints NOTIFY waypointsChanged)
     Q_PROPERTY(int waypointCount READ waypointCount NOTIFY waypointsChanged)
 
 public:
@@ -48,6 +50,9 @@ public:
      * @param waypoints 航点列表
      */
     void setWaypoints(const QList<QGpsPosition> &waypoints);
+
+    QList<QMissionPoint> missionPoints() const;
+    void setMissionPoints(const QList<QMissionPoint> &points);
 
     /**
      * @brief 获取航点数量
@@ -100,7 +105,7 @@ signals:
 
 private:
     QString m_name;                          ///< 航线名称
-    QList<QGpsPosition> m_waypoints;        ///< 航点列表
+    QList<QMissionPoint> m_missionPoints;   ///< 任务点列表（唯一存储）
 };
 
 #endif // _YTY_QAIRLINE_H

@@ -30,6 +30,7 @@ qt_standard_project_setup(REQUIRES 6.9)
 set(MINIGCS_SOURCES
     Src/AirLine/QAirLine.cpp
     Src/AirLine/QAirLineManager.cpp
+    Src/AirLine/QMissionPoint.cpp
     Src/Common/QGpsPosition.cpp
     Src/Common/QNEDPosition.cpp
     Src/Common/QAttitude.cpp
@@ -57,6 +58,7 @@ set(MINIGCS_HEADERS
     Inc/MiniGCSExport.h
     Inc/AirLine/QAirLine.h
     Inc/AirLine/QAirLineManager.h
+    Inc/AirLine/QMissionPoint.h
     Inc/Common/QGpsPosition.h
     Inc/Common/QNEDPosition.h
     Inc/Common/QAttitude.h

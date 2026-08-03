@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Controls.Basic as Basic
 import QtQuick.Layouts
 import MiniGCS
 
@@ -75,7 +76,7 @@ Rectangle {
                 color: "#667085"
             }
 
-            Frame {
+            Basic.Frame {
                 Layout.fillWidth: true
                 background: Rectangle { color: "white"; radius: 8; border.color: "#d0d5dd" }
 
@@ -86,7 +87,7 @@ Rectangle {
                     rowSpacing: 12
 
                     Label { text: qsTr("地图插件"); font.bold: true }
-                    ComboBox {
+                    Basic.ComboBox {
                         id: mapProvider
                         Layout.fillWidth: true
                         editable: true
@@ -111,7 +112,7 @@ Rectangle {
                 }
             }
 
-            Frame {
+            Basic.Frame {
                 Layout.fillWidth: true
                 background: Rectangle { color: "white"; radius: 8; border.color: "#d0d5dd" }
 
@@ -132,7 +133,7 @@ Rectangle {
                 }
             }
 
-            Frame {
+            Basic.Frame {
                 Layout.fillWidth: true
                 background: Rectangle { color: "white"; radius: 8; border.color: "#d0d5dd" }
 

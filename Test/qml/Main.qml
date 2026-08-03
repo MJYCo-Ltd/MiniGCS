@@ -13,20 +13,35 @@ ApplicationWindow {
     minimumWidth: 1024
     minimumHeight: 700
     visible: true
-    title: qsTr("MiniGCS 无人机控制")
+    title: qsTr("MiniGCS 任务控制")
 
+    property int selectedDroneId: -1
+    property string selectedGroupName: ""
     property int pendingCommand: -1
     property bool pendingGroupCommand: false
     property var pendingWaypoints: []
+    property string pendingActionLabel: ""
+    property string pendingDetailText: ""
+    property bool pendingStartAfterUpload: false
 
     function selectedDroneEntry() {
         const drones = DroneControl.drones
         for (let index = 0; index < drones.length; ++index) {
-            if (Number(drones[index].systemId) ===
-                    Number(controlPanel.selectedDroneId))
+            if (Number(drones[index].systemId) === Number(selectedDroneId))
                 return drones[index]
         }
         return null
+    }
+
+    function selectedDroneName() {
+        const entry = selectedDroneEntry()
+        return entry ? entry.name : qsTr("所选无人机")
+    }
+
+    function selectFirstDroneIfNeeded() {
+        if (selectedDroneId >= 0 || DroneControl.drones.length === 0)
+            return
+        selectedDroneId = Number(DroneControl.drones[0].systemId)
     }
 
     function centerOnDrone(systemId) {
@@ -34,133 +49,144 @@ ApplicationWindow {
             mapLoader.item.centerOnDrone(systemId)
     }
 
-    function requestCommand(command, groupCommand, waypoints) {
+    function setUserStatus(text) {
+        missionStatus.statusText = text
+        advancedControlPanel.setStatus(text)
+    }
+
+    function requestCommand(command, groupCommand, waypoints,
+                            actionLabel, detailText, startAfterUpload) {
         pendingCommand = command
         pendingGroupCommand = groupCommand
         pendingWaypoints = waypoints || []
+        pendingActionLabel = actionLabel || ""
+        pendingDetailText = detailText || ""
+        pendingStartAfterUpload = Boolean(startAfterUpload)
         confirmDialog.open()
     }
 
-    menuBar: MenuBar {
-        Menu {
-            title: qsTr("视图")
-
-            MenuItem {
-                id: controlPanelMenuItem
-                text: qsTr("无人机控制面板")
-                checkable: true
-                checked: true
-            }
-            MenuItem {
-                id: routeEditorMenuItem
-                text: qsTr("航线编辑")
-                checkable: true
-                checked: true
-            }
-            MenuItem {
-                id: logPanelMenuItem
-                text: qsTr("告警日志")
-                checkable: true
-                checked: true
-            }
-            MenuItem {
-                text: qsTr("无人机详细状态")
-                enabled: controlPanel.selectedDroneId >= 0
-                onTriggered: {
-                    controlPanelMenuItem.checked = true
-                    rightPanelTabs.currentIndex = 1
-                }
-            }
-            MenuSeparator {}
-            MenuItem {
-                text: qsTr("显示全部")
-                onTriggered: {
-                    controlPanelMenuItem.checked = true
-                    routeEditorMenuItem.checked = true
-                    logPanelMenuItem.checked = true
-                }
-            }
-            MenuItem {
-                text: qsTr("隐藏全部")
-                onTriggered: {
-                    controlPanelMenuItem.checked = false
-                    routeEditorMenuItem.checked = false
-                    logPanelMenuItem.checked = false
-                }
-            }
+    function requestStartTask(waypoints) {
+        const entry = selectedDroneEntry()
+        if (!entry || !entry.connected) {
+            setUserStatus(qsTr("无法开始：请选择在线无人机"))
+            return
         }
-        Menu {
-            title: qsTr("配置")
-
-            MenuItem {
-                text: qsTr("链路配置")
-                onTriggered: {
-                    settingsTabs.currentIndex = 0
-                    settingsDialog.open()
-                }
-            }
-            MenuItem {
-                text: qsTr("地图配置")
-                onTriggered: {
-                    settingsTabs.currentIndex = 1
-                    settingsDialog.open()
-                }
-            }
+        if (!entry.vehicle.status.isHomePositionOk) {
+            setUserStatus(qsTr("无法开始：无人机尚未确认家点"))
+            return
         }
+        requestCommand(
+            DroneControl.uploadMissionCommand,
+            false,
+            waypoints,
+            qsTr("开始任务"),
+            qsTr("系统会先把当前任务路线保存到无人机，然后开始执行。"),
+            true)
     }
 
-    SplitView {
-        id: horizontalSplit
-        anchors.fill: parent
-        orientation: Qt.Horizontal
+    Component.onCompleted: selectFirstDroneIfNeeded()
 
-        handle: Rectangle {
-            implicitWidth: 5
-            implicitHeight: 5
-            color: SplitHandle.pressed ? "#3b82f6"
-                  : SplitHandle.hovered ? "#93c5fd" : "#d0d5dd"
-        }
+    ColumnLayout {
+        anchors.fill: parent
+        spacing: 0
 
         Rectangle {
-            id: routeDock
-            visible: routeEditorMenuItem.checked
-            SplitView.preferredWidth: 360
-            SplitView.minimumWidth: 240
-            SplitView.maximumWidth: 520
-            color: "#f5f7fa"
-            border.color: "#d0d5dd"
+            Layout.fillWidth: true
+            Layout.preferredHeight: 62
+            color: "#ffffff"
+            border.color: "#d9e0e8"
 
-            RouteEditor {
-                id: routeEditor
+            RowLayout {
                 anchors.fill: parent
-                radius: 0
-                color: "#f8fafc"
-                selectedDroneId: controlPanel.selectedDroneId
-                selectedGroupName: controlPanel.selectedGroupName
+                anchors.leftMargin: 18
+                anchors.rightMargin: 12
+                spacing: 12
 
-                onUploadRequested: function(groupCommand, waypoints) {
-                    root.requestCommand(DroneControl.uploadMissionCommand,
-                                        groupCommand, waypoints)
+                Rectangle {
+                    Layout.preferredWidth: 34
+                    Layout.preferredHeight: 34
+                    radius: 9
+                    color: "#1769e0"
+                    Label {
+                        anchors.centerIn: parent
+                        text: qsTr("航")
+                        color: "white"
+                        font.bold: true
+                    }
+                }
+
+                Label {
+                    text: qsTr("MiniGCS")
+                    color: "#17202a"
+                    font.pixelSize: 17
+                    font.bold: true
+                }
+
+                Button {
+                    text: qsTr("任务规划")
+                    highlighted: true
+                }
+                Button {
+                    text: qsTr("飞行记录")
+                    flat: true
+                    onClicked: flightRecordDialog.open()
+                }
+                Button {
+                    text: qsTr("设备")
+                    flat: true
+                    onClicked: {
+                        deviceManagementPanel.selectedDroneId =
+                                root.selectedDroneId
+                        deviceDialog.open()
+                    }
+                }
+
+                Item { Layout.fillWidth: true }
+
+                Label {
+                    text: DroneControl.drones.length > 0
+                          ? qsTr("●  %1 架在线").arg(
+                                DroneControl.drones.length)
+                          : qsTr("●  等待设备")
+                    color: DroneControl.drones.length > 0
+                           ? "#16815b" : "#b54708"
+                }
+
+                Button {
+                    text: qsTr("⚙")
+                    flat: true
+                    onClicked: settingsDialog.open()
                 }
             }
         }
 
         SplitView {
-            id: centerSplit
-            SplitView.fillWidth: true
-            SplitView.minimumWidth: 350
-            orientation: Qt.Vertical
+            id: horizontalSplit
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            orientation: Qt.Horizontal
 
             handle: Rectangle {
-                implicitWidth: 5
-                implicitHeight: 5
-                color: SplitHandle.pressed ? "#3b82f6"
-                      : SplitHandle.hovered ? "#93c5fd" : "#d0d5dd"
+                implicitWidth: 4
+                implicitHeight: 4
+                color: SplitHandle.pressed ? "#1769e0"
+                      : SplitHandle.hovered ? "#9bc0f6" : "#d9e0e8"
+            }
+
+            RouteEditor {
+                id: routeEditor
+                SplitView.preferredWidth: 330
+                SplitView.minimumWidth: 285
+                SplitView.maximumWidth: 440
+                selectedDroneId: root.selectedDroneId
+                selectedGroupName: root.selectedGroupName
+                selectedTargetName: root.selectedDroneName()
+
             }
 
             Rectangle {
-                SplitView.fillHeight: true
-                SplitView.minimumHeight: 260
+                SplitView.fillWidth: true
+                SplitView.minimumWidth: 360
                 color: "#e9eef5"
 
                 Loader {
@@ -173,17 +199,91 @@ ApplicationWindow {
                     id: mapComponent
                     DroneMap {
                         drones: DroneControl.drones
-                        selectedDroneId: controlPanel.selectedDroneId
+                        selectedDroneId: root.selectedDroneId
                         waypointModel: routeEditor.waypointModel
+                        selectedWaypointIndex: routeEditor.selectedWaypointIndex
                         routeCoordinates: routeEditor.routeCoordinates
                         routeEditing: routeEditor.editing
 
                         onDroneSelected: function(systemId) {
-                            controlPanel.selectedDroneId = systemId
-                            centerOnDrone(systemId)
+                            root.selectedDroneId = systemId
+                            root.centerOnDrone(systemId)
                         }
                         onRouteCoordinateRequested: function(coordinate) {
                             routeEditor.addCoordinate(coordinate)
+                        }
+                        onWaypointSelected: function(index) {
+                            routeEditor.selectedWaypointIndex = index
+                        }
+                    }
+                }
+
+                Rectangle {
+                    anchors.left: parent.left
+                    anchors.bottom: parent.bottom
+                    anchors.margins: 14
+                    width: mapHint.implicitWidth + 22
+                    height: mapHint.implicitHeight + 14
+                    radius: 8
+                    color: "#eaf2ff"
+                    border.color: "#9bc0f6"
+                    visible: routeEditor.editing
+
+                    Label {
+                        id: mapHint
+                        anchors.centerIn: parent
+                        text: qsTr("点击地图添加任务点")
+                        color: "#175bb7"
+                    }
+                }
+
+                Row {
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    anchors.margins: 14
+                    spacing: 8
+
+                    Button {
+                        text: qsTr("⌖  定位无人机")
+                        onClicked: root.centerOnDrone(root.selectedDroneId)
+                    }
+                    Button {
+                        text: qsTr("▱  地图")
+                        onClicked: settingsDialog.open()
+                    }
+                }
+
+                Rectangle {
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: 14
+                    width: 250
+                    implicitHeight: homeCardColumn.implicitHeight + 24
+                    radius: 10
+                    color: "#f8ffffff"
+                    border.color: "#d9e0e8"
+
+                    ColumnLayout {
+                        id: homeCardColumn
+                        anchors.fill: parent
+                        anchors.margins: 12
+                        spacing: 5
+                        Label {
+                            text: qsTr("⌂  家点：起飞位置")
+                            color: "#17202a"
+                            font.bold: true
+                        }
+                        Label {
+                            Layout.fillWidth: true
+                            text: qsTr("任务结束或电量不足时回到这里")
+                            color: "#667085"
+                            wrapMode: Text.Wrap
+                        }
+                        Button {
+                            text: qsTr("在地图上重新设置")
+                            flat: true
+                            onClicked: root.setUserStatus(
+                                qsTr("家点由无人机在起飞时确认；请在高级控制中完成飞控家点设置。"))
                         }
                     }
                 }
@@ -199,70 +299,194 @@ ApplicationWindow {
                 }
             }
 
-            LogPanel {
-                id: logPanel
-                visible: logPanelMenuItem.checked
-                SplitView.preferredHeight: expanded ? 230 : 38
-                SplitView.minimumHeight: expanded ? 120 : 38
-                SplitView.maximumHeight: expanded ? 520 : 38
-                radius: 0
-                businessLogs: DroneControl.businessLogs
-                firmwareLogs: DroneControl.firmwareLogs
+        }
 
-                onClearBusinessRequested: DroneControl.clearBusinessLogs()
-                onClearFirmwareRequested: DroneControl.clearFirmwareLogs()
-            }
+        MissionStatusPanel {
+            id: missionStatus
+            Layout.fillWidth: true
+            Layout.preferredHeight: 310
+            selectedDroneId: root.selectedDroneId
+            returnHomeAfterMission: routeEditor.returnHomeAfterMission
+            plannedPointCount: routeEditor.waypointModel.count
+            currentTargetName: routeEditor.currentTaskName
+
+            onPauseRequested: root.requestCommand(
+                DroneControl.pauseMissionCommand,
+                false, [], qsTr("暂停任务"),
+                qsTr("无人机将在当前位置暂停任务并保持等待。"), false)
+            onReturnHomeRequested: root.requestCommand(
+                DroneControl.returnToLaunchCommand,
+                false, [], qsTr("立即返回家点"),
+                qsTr("无人机将中止当前任务并返回已确认的家点。"), false)
         }
 
         Rectangle {
-            id: rightDock
-            visible: controlPanelMenuItem.checked
-            SplitView.preferredWidth: 460
-            SplitView.minimumWidth: 320
-            SplitView.maximumWidth: 720
-            color: "#f5f7fa"
-            border.color: "#d0d5dd"
+            Layout.fillWidth: true
+            Layout.preferredHeight: 66
+            color: "#ffffff"
+            border.color: "#d9e0e8"
 
-            ColumnLayout {
+            RowLayout {
                 anchors.fill: parent
-                spacing: 0
+                anchors.leftMargin: 18
+                anchors.rightMargin: 18
+                spacing: 12
 
-                TabBar {
-                    id: rightPanelTabs
+                ColumnLayout {
                     Layout.fillWidth: true
-                    TabButton { text: qsTr("控制") }
-                    TabButton { text: qsTr("状态") }
+                    spacing: 2
+                    Label {
+                        text: routeEditor.waypointModel.count > 0
+                              ? qsTr("任务路线已就绪")
+                              : qsTr("等待添加任务点")
+                        color: "#17202a"
+                        font.bold: true
+                    }
+                    Label {
+                        text: routeEditor.waypointModel.count > 0
+                              ? qsTr("%1 个任务点 · %2")
+                                  .arg(routeEditor.waypointModel.count)
+                                  .arg(routeEditor.returnHomeAfterMission
+                                       ? qsTr("结束后返回家点")
+                                       : qsTr("结束后留在最后任务点"))
+                              : qsTr("在左侧打开添加模式，然后点击地图")
+                        color: "#667085"
+                    }
                 }
 
-                StackLayout {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    currentIndex: rightPanelTabs.currentIndex
-
-                    DroneControlPanel {
-                        id: controlPanel
-
-                        onCommandRequested: function(command, groupCommand) {
-                            root.requestCommand(command, groupCommand, [])
-                        }
-                        onStatusRequested: rightPanelTabs.currentIndex = 1
-                        onLocateRequested: function(systemId) {
-                            root.centerOnDrone(systemId)
-                        }
+                Button {
+                    text: qsTr("预览路线")
+                    enabled: routeEditor.waypointModel.count > 0
+                             && root.selectedDroneId >= 0
+                    onClicked: {
+                        if (mapLoader.item)
+                            mapLoader.item.previewRoute()
                     }
+                }
+                Button {
+                    text: qsTr("开始任务")
+                    highlighted: true
+                    enabled: routeEditor.waypointModel.count > 0
+                             && root.selectedDroneId >= 0
+                             && root.selectedDroneEntry()
+                             && root.selectedDroneEntry().connected
+                    onClicked: root.requestStartTask(
+                        routeEditor.missionWaypoints())
+                }
+            }
+        }
 
-                    DroneStatusPage {
-                        vehicle: {
-                            const entry = root.selectedDroneEntry()
-                            return entry ? entry.vehicle : null
-                        }
-                        droneName: {
-                            const entry = root.selectedDroneEntry()
-                            return entry ? entry.name : ""
-                        }
-                        waypointModel: routeEditor.waypointModel
-                        onCloseRequested: rightPanelTabs.currentIndex = 0
+    }
+
+    Dialog {
+        id: flightRecordDialog
+        modal: true
+        width: Math.min(root.width - 60, 1180)
+        height: Math.min(root.height - 60, 760)
+        x: Math.round((root.width - width) / 2)
+        y: Math.round((root.height - height) / 2)
+        padding: 0
+        title: qsTr("飞行记录")
+        standardButtons: Dialog.Close
+
+        FlightRecordPage {
+            anchors.fill: parent
+        }
+    }
+
+    Dialog {
+        id: deviceDialog
+        modal: true
+        width: Math.min(root.width - 80, 920)
+        height: Math.min(root.height - 80, 690)
+        x: Math.round((root.width - width) / 2)
+        y: Math.round((root.height - height) / 2)
+        padding: 0
+        title: qsTr("无人机管理")
+        standardButtons: Dialog.Close
+
+        DroneControlPanel {
+            id: deviceManagementPanel
+            anchors.fill: parent
+            managementMode: true
+            selectedDroneId: root.selectedDroneId
+            statusText: qsTr("可查看无人机、修改名称并管理编组")
+
+            onSelectedDroneIdChanged: {
+                if (selectedDroneId >= 0)
+                    root.selectedDroneId = selectedDroneId
+            }
+            onSelectedGroupNameChanged:
+                root.selectedGroupName = selectedGroupName
+            onStatusRequested: {
+                advancedControlPanel.selectedDroneId = root.selectedDroneId
+                advancedTabs.currentIndex = 1
+                deviceDialog.close()
+                advancedDialog.open()
+            }
+            onLocateRequested: function(systemId) {
+                root.centerOnDrone(systemId)
+                deviceDialog.close()
+            }
+        }
+    }
+
+    Dialog {
+        id: advancedDialog
+        modal: true
+        width: Math.min(root.width - 60, 1120)
+        height: Math.min(root.height - 60, 780)
+        x: Math.round((root.width - width) / 2)
+        y: Math.round((root.height - height) / 2)
+        padding: 0
+        title: qsTr("设备与高级控制")
+        standardButtons: Dialog.Close
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 0
+
+            TabBar {
+                id: advancedTabs
+                Layout.fillWidth: true
+                TabButton { text: qsTr("高级控制") }
+                TabButton { text: qsTr("详细状态") }
+            }
+
+            StackLayout {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                currentIndex: advancedTabs.currentIndex
+
+                DroneControlPanel {
+                    id: advancedControlPanel
+                    selectedDroneId: root.selectedDroneId
+
+                    onSelectedDroneIdChanged: {
+                        if (selectedDroneId >= 0)
+                            root.selectedDroneId = selectedDroneId
                     }
+                    onSelectedGroupNameChanged:
+                        root.selectedGroupName = selectedGroupName
+                    onCommandRequested: function(command, groupCommand) {
+                        root.requestCommand(
+                            command, groupCommand, [],
+                            DroneControl.commandName(command), "", false)
+                    }
+                    onStatusRequested: advancedTabs.currentIndex = 1
+                    onLocateRequested: function(systemId) {
+                        root.centerOnDrone(systemId)
+                    }
+                }
+
+                DroneStatusPage {
+                    vehicle: {
+                        const entry = root.selectedDroneEntry()
+                        return entry ? entry.vehicle : null
+                    }
+                    droneName: root.selectedDroneName()
+                    waypointModel: routeEditor.waypointModel
+                    onCloseRequested: advancedDialog.close()
                 }
             }
         }
@@ -276,8 +500,7 @@ ApplicationWindow {
         x: Math.round((root.width - width) / 2)
         y: Math.round((root.height - height) / 2)
         padding: 0
-        title: settingsTabs.currentIndex === 0
-               ? qsTr("链路配置") : qsTr("地图配置")
+        title: qsTr("设置")
         standardButtons: Dialog.Close
 
         ColumnLayout {
@@ -287,8 +510,8 @@ ApplicationWindow {
             TabBar {
                 id: settingsTabs
                 Layout.fillWidth: true
-                TabButton { text: qsTr("链路配置") }
-                TabButton { text: qsTr("地图配置") }
+                TabButton { text: qsTr("连接") }
+                TabButton { text: qsTr("地图与任务") }
             }
 
             StackLayout {
@@ -305,31 +528,36 @@ ApplicationWindow {
         id: confirmDialog
         x: Math.round((root.width - width) / 2)
         y: Math.round((root.height - height) / 2)
-        commandLabel: DroneControl.commandName(root.pendingCommand)
+        commandLabel: root.pendingActionLabel.length > 0
+                      ? root.pendingActionLabel
+                      : DroneControl.commandName(root.pendingCommand)
+        detailText: root.pendingDetailText
         targetName: root.pendingGroupCommand
-                    ? controlPanel.selectedGroupName
-                    : qsTr("系统 ID %1").arg(controlPanel.selectedDroneId)
+                    ? root.selectedGroupName : root.selectedDroneName()
         groupCommand: root.pendingGroupCommand
 
+        onRejected: root.pendingStartAfterUpload = false
+
         onCommandConfirmed: {
-            if (root.pendingCommand ===
-                    DroneControl.uploadMissionCommand) {
+            if (root.pendingCommand === DroneControl.uploadMissionCommand) {
                 if (root.pendingGroupCommand) {
                     DroneControl.uploadMissionGroup(
-                                controlPanel.selectedGroupName,
-                                root.pendingWaypoints)
+                                root.selectedGroupName,
+                                root.pendingWaypoints,
+                                routeEditor.returnHomeAfterMission)
                 } else {
                     DroneControl.uploadMissionSingle(
-                                controlPanel.selectedDroneId,
-                                root.pendingWaypoints)
+                                root.selectedDroneId,
+                                root.pendingWaypoints,
+                                routeEditor.returnHomeAfterMission)
                 }
             } else if (root.pendingGroupCommand) {
                 DroneControl.executeGroup(
-                            controlPanel.selectedGroupName,
+                            root.selectedGroupName,
                             root.pendingCommand)
             } else {
                 DroneControl.executeSingle(
-                            controlPanel.selectedDroneId,
+                            root.selectedDroneId,
                             root.pendingCommand)
             }
         }
@@ -338,20 +566,25 @@ ApplicationWindow {
     Connections {
         target: DroneControl
 
+        function onDronesChanged() {
+            root.selectFirstDroneIfNeeded()
+        }
+
         function onCommandDispatched(command, target, count) {
-            controlPanel.setStatus(
-                qsTr("已向“%1”的 %2 架在线无人机发送“%3”")
+            root.setUserStatus(
+                qsTr("已让“%1”的 %2 架在线无人机执行“%3”")
                     .arg(target).arg(count)
                     .arg(DroneControl.commandName(command)))
         }
 
         function onCommandRejected(reason) {
-            controlPanel.setStatus(qsTr("命令未发送：%1").arg(reason))
+            root.pendingStartAfterUpload = false
+            root.setUserStatus(qsTr("操作未执行：%1").arg(reason))
         }
 
         function onCommandResult(systemId, command, success, reason) {
-            controlPanel.setStatus(success
-                    ? qsTr("无人机 %1 已确认“%2”")
+            root.setUserStatus(success
+                    ? qsTr("无人机 %1 已完成“%2”")
                         .arg(systemId).arg(DroneControl.commandName(command))
                     : qsTr("无人机 %1 执行“%2”失败：%3")
                         .arg(systemId)
@@ -360,20 +593,29 @@ ApplicationWindow {
         }
 
         function onMissionDownloaded(systemId, waypoints) {
-            if (Number(systemId) ===
-                    Number(controlPanel.selectedDroneId)) {
+            if (Number(systemId) === Number(root.selectedDroneId)) {
                 routeEditor.loadMissionWaypoints(waypoints)
-                controlPanel.setStatus(
-                    qsTr("已加载无人机 %1 的 %2 个航点")
-                        .arg(systemId).arg(waypoints.length))
+                root.setUserStatus(
+                    qsTr("已读取 %1 个任务点").arg(waypoints.length))
             }
         }
 
         function onMissionUploadResult(systemId, success, reason) {
-            controlPanel.setStatus(success
-                    ? qsTr("无人机 %1 航线上传成功").arg(systemId)
-                    : qsTr("无人机 %1 航线上传失败：%2")
-                        .arg(systemId).arg(reason))
+            const shouldStart = root.pendingStartAfterUpload
+                    && Number(systemId) === Number(root.selectedDroneId)
+            root.pendingStartAfterUpload = false
+            if (!success) {
+                root.setUserStatus(
+                    qsTr("任务保存失败：%1").arg(reason))
+                return
+            }
+            if (shouldStart) {
+                root.setUserStatus(qsTr("任务已保存，正在开始执行…"))
+                DroneControl.executeSingle(
+                            systemId, DroneControl.startMissionCommand)
+            } else {
+                root.setUserStatus(qsTr("任务已保存到无人机 %1").arg(systemId))
+            }
         }
     }
 }

@@ -79,22 +79,27 @@ int main(int argc, char *argv[]) {
 
     QObject::connect(
         pGroundStation, &QGroundControlStation::newPlatFind, [](QPlat *vehicle) {
-            qDebug() << " 新飞控对象创建:" << vehicle->toString();
+            qDebug() << "新飞控对象创建: vehicleId=" << vehicle->vehicleId();
 
             QObject::connect(vehicle, &QPlat::connectionStatusChanged,
                              [vehicle](bool bIsConnected) {
-                                 if (bIsConnected)
-                                     qDebug() << "飞控已连接:" << vehicle->toString();
-                                 else
-                                     qDebug() << "飞控失去连接:" << vehicle->toString();
+                                 qDebug() << (bIsConnected
+                                                  ? "飞控已连接:"
+                                                  : "飞控失去连接:")
+                                          << "vehicleId="
+                                          << vehicle->vehicleId();
                              });
 
             QObject::connect(vehicle, &QPlat::infoUpdated, [vehicle]() {
-                qDebug() << "飞控信息更新:" << vehicle->toString();
+                qDebug() << "飞控信息更新: vehicleId="
+                         << vehicle->vehicleId()
+                         << "firmware=" << vehicle->getFirmwareVersion()
+                         << "software=" << vehicle->getSoftwareVersion();
             });
-            QObject::connect(vehicle,&QPlat::errorInfo,[](const QString& sErrorInfo){
-                qDebug()<< "异常消息："<<sErrorInfo;
-            });
+            QObject::connect(vehicle, &QPlat::errorInfo,
+                             [](const QString &sErrorInfo) {
+                                 qDebug() << "异常消息：" << sErrorInfo;
+                             });
         });
 
     QObject::connect(pGroundStation->linkManager(), &QLinkManager::linkCreateFailed,

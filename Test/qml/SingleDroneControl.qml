@@ -8,6 +8,7 @@ ColumnLayout {
     id: root
 
     property int selectedDroneId: -1
+    property bool showCommands: true
     signal commandRequested(int command)
     signal statusRequested()
     /** 每次点击列表项时发出（含重复选中同一架），用于地图定位 */
@@ -134,6 +135,7 @@ ColumnLayout {
     }
 
     GridLayout {
+        visible: root.showCommands
         columns: 2
         Layout.fillWidth: true
 
@@ -152,7 +154,6 @@ ColumnLayout {
         Button {
             text: DroneControl.commandName(DroneControl.takeoffCommand)
             Layout.fillWidth: true
-            highlighted: true
             enabled: root.selectedDroneId >= 0
             onClicked: root.commandRequested(DroneControl.takeoffCommand)
         }
@@ -179,11 +180,29 @@ ColumnLayout {
                            DroneControl.downloadMissionCommand)
         }
         Button {
+            text: DroneControl.commandName(
+                      DroneControl.startMissionCommand)
+            Layout.columnSpan: 2
+            Layout.fillWidth: true
+            highlighted: true
+            enabled: root.selectedDroneId >= 0
+            onClicked: root.commandRequested(
+                           DroneControl.startMissionCommand)
+        }
+        Button {
             text: qsTr("查看详细状态")
             Layout.columnSpan: 2
             Layout.fillWidth: true
             enabled: root.selectedDroneId >= 0
             onClicked: root.statusRequested()
         }
+    }
+
+    Button {
+        visible: !root.showCommands
+        text: qsTr("查看所选无人机详细状态")
+        Layout.fillWidth: true
+        enabled: root.selectedDroneId >= 0
+        onClicked: root.statusRequested()
     }
 }

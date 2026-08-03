@@ -71,6 +71,7 @@ QAutopilotPrivate::~QAutopilotPrivate()
         m_mission->cancel_mission_download();
         m_mission->cancel_mission_upload();
     }
+    clearMissionSubscription();
     clearExternalCommandSubscription();
     clearTelemetrySubscriptions();
     m_mission.reset();
@@ -95,6 +96,7 @@ void QAutopilotPrivate::setSystem(std::shared_ptr<mavsdk::System> system) {
         q_func()->cancelAirLineDownload();
         q_func()->cancelAirLineUpload();
     }
+    clearMissionSubscription();
     clearExternalCommandSubscription();
     clearTelemetrySubscriptions();
     m_mission.reset();
@@ -112,6 +114,22 @@ void QAutopilotPrivate::setSystem(std::shared_ptr<mavsdk::System> system) {
     m_telemetry = std::make_unique<mavsdk::Telemetry>(*system);
     m_action = std::make_unique<mavsdk::Action>(*system);
     m_mission = std::make_unique<mavsdk::Mission>(*system);
+    const QPointer<QAutopilot> autopilot(q_func());
+    m_missionProgressHandle = m_mission->subscribe_mission_progress(
+        [autopilot](mavsdk::Mission::MissionProgress progress) {
+            if (!autopilot) {
+                return;
+            }
+            QMetaObject::invokeMethod(
+                autopilot,
+                [autopilot, progress]() {
+                    if (autopilot) {
+                        autopilot->missionProgressUpdate(
+                            progress.current, progress.total);
+                    }
+                },
+                Qt::QueuedConnection);
+        });
     setupExternalCommandSubscription();
 
     q_func()->setAutopilotType(
@@ -206,6 +224,16 @@ void QAutopilotPrivate::clearTelemetrySubscriptions()
             m_fixedwingMetricsHandle);
         m_fixedwingMetricsHandle = {};
     }
+}
+
+void QAutopilotPrivate::clearMissionSubscription()
+{
+    if (!m_mission || !m_missionProgressHandle.valid()) {
+        m_missionProgressHandle = {};
+        return;
+    }
+    m_mission->unsubscribe_mission_progress(m_missionProgressHandle);
+    m_missionProgressHandle = {};
 }
 
 void QAutopilotPrivate::disarm()

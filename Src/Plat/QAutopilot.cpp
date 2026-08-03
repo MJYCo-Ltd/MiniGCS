@@ -13,6 +13,7 @@ QAutopilot::QAutopilot(QObject *parent)
 {
     qRegisterMetaType<QAutopilot::FlightMode>("QAutopilot::FlightMode");
     qRegisterMetaType<QAutopilot::LandedState>("QAutopilot::LandedState");
+    qRegisterMetaType<QList<QMissionPoint>>("QList<QMissionPoint>");
 }
 
 QAutopilot::~QAutopilot() {}
@@ -81,18 +82,30 @@ void QAutopilot::downloadAirLine()
 
 void QAutopilot::uploadAirLine(const QList<QGpsPosition> &waypoints)
 {
+    QList<QMissionPoint> points;
+    points.reserve(waypoints.size());
+    for (const QGpsPosition &waypoint : waypoints) {
+        points.append(QMissionPoint(waypoint));
+    }
+    uploadMission(points, true);
+}
+
+void QAutopilot::uploadMission(const QList<QMissionPoint> &points,
+                               bool returnHomeAfterMission)
+{
     if (m_airLineUploading || m_airLineDownloading) {
         emit airLineUploadFailed(
             m_airLineDownloading ? tr("航线正在下载")
                                  : tr("航线正在上传"));
         return;
     }
-    if (waypoints.isEmpty()) {
+    if (points.isEmpty()) {
         emit airLineUploadFailed(tr("航线没有有效航点"));
         return;
     }
-    for (qsizetype index = 0; index < waypoints.size(); ++index) {
-        const QGpsPosition &waypoint = waypoints.at(index);
+    for (qsizetype index = 0; index < points.size(); ++index) {
+        const QMissionPoint &point = points.at(index);
+        const QGpsPosition waypoint = point.position();
         const double latitude = waypoint.latitude();
         const double longitude = waypoint.longitude();
         const double altitude = waypoint.altitude();
@@ -104,6 +117,19 @@ void QAutopilot::uploadAirLine(const QList<QGpsPosition> &waypoints)
                 tr("第 %1 个航点坐标或高度无效").arg(index + 1));
             return;
         }
+        if (!std::isfinite(point.actionDurationS()) ||
+            point.actionDurationS() < 0.0 ||
+            !std::isfinite(point.speedMS()) || point.speedMS() < 0.0) {
+            emit airLineUploadFailed(
+                tr("第 %1 个任务点动作参数无效").arg(index + 1));
+            return;
+        }
+        if (point.action() == QMissionPoint::LandAction &&
+            index != points.size() - 1) {
+            emit airLineUploadFailed(
+                tr("降落动作只能设置在最后一个任务点"));
+            return;
+        }
     }
     if (!d_func()) {
         emit airLineUploadFailed(tr("飞控尚未初始化"));
@@ -113,17 +139,38 @@ void QAutopilot::uploadAirLine(const QList<QGpsPosition> &waypoints)
     m_airLineUploading = true;
     const quint64 requestId = ++m_airLineUploadRequestId;
     emit airLineUploadingChanged(true);
-    d_func()->uploadAirLine(requestId, waypoints);
+    d_func()->uploadAirLine(requestId, points, returnHomeAfterMission);
+}
+
+void QAutopilot::startAirLine()
+{
+    if (m_airLineUploading || m_airLineDownloading) {
+        emit airLineStartFailed(
+            m_airLineUploading ? tr("航线正在上传")
+                               : tr("航线正在下载"));
+        return;
+    }
+    if (!d_func()) {
+        emit airLineStartFailed(tr("飞控尚未初始化"));
+        return;
+    }
+    d_func()->startAirLine();
 }
 
 void QAutopilot::completeAirLineDownload(
-    quint64 requestId, const QList<QGpsPosition> &waypoints)
+    quint64 requestId, const QList<QMissionPoint> &points)
 {
     if (requestId != m_airLineDownloadRequestId) {
         return;
     }
     m_airLineDownloading = false;
     emit airLineDownloadingChanged(false);
+    QList<QGpsPosition> waypoints;
+    waypoints.reserve(points.size());
+    for (const QMissionPoint &point : points) {
+        waypoints.append(point.position());
+    }
+    emit missionDownloaded(points);
     emit airLineDownloaded(waypoints);
 }
 
@@ -587,4 +634,29 @@ void QAutopilot::fixedwingUpdate(float airspeedMS, float throttlePercentage, flo
     if (changed) {
         emit fixedwingChanged(m_fixedwing);
     }
+}
+
+void QAutopilot::pauseAirLine()
+{
+    if (m_airLineUploading || m_airLineDownloading) {
+        emit airLinePauseFailed(
+            m_airLineUploading ? tr("航线正在上传")
+                               : tr("航线正在下载"));
+        return;
+    }
+    if (!d_func()) {
+        emit airLinePauseFailed(tr("飞控尚未初始化"));
+        return;
+    }
+    d_func()->pauseAirLine();
+}
+
+void QAutopilot::missionProgressUpdate(int current, int total)
+{
+    if (m_missionCurrent == current && m_missionTotal == total) {
+        return;
+    }
+    m_missionCurrent = current;
+    m_missionTotal = total;
+    emit missionProgressChanged();
 }
