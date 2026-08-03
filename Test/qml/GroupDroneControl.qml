@@ -8,6 +8,7 @@ ColumnLayout {
     id: root
 
     property string selectedGroupName: ""
+    property bool showCommands: true
     signal commandRequested(int command)
 
     spacing: 10
@@ -122,6 +123,7 @@ ColumnLayout {
     }
 
     GridLayout {
+        visible: root.showCommands
         columns: 2
         Layout.fillWidth: true
 

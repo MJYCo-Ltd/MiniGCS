@@ -9,6 +9,7 @@ Rectangle {
     property alias selectedDroneId: singleControl.selectedDroneId
     property alias selectedGroupName: groupControl.selectedGroupName
     property string statusText: qsTr("控制命令执行前会进行确认")
+    property bool managementMode: false
 
     signal commandRequested(int command, bool groupCommand)
     signal statusRequested()
@@ -28,7 +29,8 @@ Rectangle {
         spacing: 12
 
         Label {
-            text: qsTr("无人机配置与控制")
+            text: root.managementMode
+                  ? qsTr("无人机管理") : qsTr("无人机配置与控制")
             font.pixelSize: 22
             font.bold: true
             color: "#1f2937"
@@ -44,8 +46,8 @@ Rectangle {
         TabBar {
             id: modeTabs
             Layout.fillWidth: true
-            TabButton { text: qsTr("单机控制") }
-            TabButton { text: qsTr("编组控制") }
+            TabButton { text: root.managementMode ? qsTr("无人机") : qsTr("单机控制") }
+            TabButton { text: root.managementMode ? qsTr("编组") : qsTr("编组控制") }
         }
 
         StackLayout {
@@ -55,6 +57,7 @@ Rectangle {
 
             SingleDroneControl {
                 id: singleControl
+                showCommands: !root.managementMode
                 onCommandRequested: function(command) {
                     root.commandRequested(command, false)
                 }
@@ -66,6 +69,7 @@ Rectangle {
 
             GroupDroneControl {
                 id: groupControl
+                showCommands: !root.managementMode
                 onCommandRequested: function(command) {
                     root.commandRequested(command, true)
                 }

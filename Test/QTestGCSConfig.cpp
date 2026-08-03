@@ -16,6 +16,12 @@ const char *KEY_MAP_MAXIMUM_ZOOM = "Map/MaximumZoom";
 const char *KEY_MISSION_DEFAULT_ALTITUDE = "Mission/DefaultAltitude";
 const char *KEY_MISSION_MINIMUM_ALTITUDE = "Mission/MinimumAltitude";
 const char *KEY_MISSION_MAXIMUM_ALTITUDE = "Mission/MaximumAltitude";
+const char *KEY_FLIGHT_RECORD_MINIMUM_SAMPLE_INTERVAL_MS =
+    "FlightRecord/MinimumSampleIntervalMs";
+const char *KEY_FLIGHT_RECORD_MINIMUM_SAMPLE_DISTANCE_M =
+    "FlightRecord/MinimumSampleDistanceM";
+const char *KEY_FLIGHT_RECORD_MAXIMUM_COUNT =
+    "FlightRecord/MaximumCount";
 const char *KEY_LINKS_COUNT = "Links/Count";
 const char *KEY_LINK_GROUP_PREFIX = "link";
 const char *KEY_DRONE_GROUPS_COUNT = "DroneGroups/Count";
@@ -56,6 +62,9 @@ constexpr double DEFAULT_MAP_MAXIMUM_ZOOM = 18.0;
 constexpr double DEFAULT_MISSION_ALTITUDE = 30.0;
 constexpr double DEFAULT_MISSION_MINIMUM_ALTITUDE = -1000.0;
 constexpr double DEFAULT_MISSION_MAXIMUM_ALTITUDE = 10000.0;
+constexpr qint64 DEFAULT_FLIGHT_RECORD_MINIMUM_SAMPLE_INTERVAL_MS = 1000;
+constexpr double DEFAULT_FLIGHT_RECORD_MINIMUM_SAMPLE_DISTANCE_M = 2.0;
+constexpr int DEFAULT_FLIGHT_RECORD_MAXIMUM_COUNT = 200;
 } // namespace
 
 QTestGCSConfig *QTestGCSConfig::s_instance = nullptr;
@@ -358,6 +367,33 @@ double QTestGCSConfig::missionMaximumAltitude() const
         : DEFAULT_MISSION_MAXIMUM_ALTITUDE;
 }
 
+qint64 QTestGCSConfig::flightRecordMinimumSampleIntervalMs() const
+{
+    return m_settings
+        ? qMax<qint64>(100, m_settings->value(
+              KEY_FLIGHT_RECORD_MINIMUM_SAMPLE_INTERVAL_MS,
+              DEFAULT_FLIGHT_RECORD_MINIMUM_SAMPLE_INTERVAL_MS).toLongLong())
+        : DEFAULT_FLIGHT_RECORD_MINIMUM_SAMPLE_INTERVAL_MS;
+}
+
+double QTestGCSConfig::flightRecordMinimumSampleDistanceM() const
+{
+    return m_settings
+        ? qMax(0.0, m_settings->value(
+              KEY_FLIGHT_RECORD_MINIMUM_SAMPLE_DISTANCE_M,
+              DEFAULT_FLIGHT_RECORD_MINIMUM_SAMPLE_DISTANCE_M).toDouble())
+        : DEFAULT_FLIGHT_RECORD_MINIMUM_SAMPLE_DISTANCE_M;
+}
+
+int QTestGCSConfig::flightRecordMaximumCount() const
+{
+    return m_settings
+        ? qMax(1, m_settings->value(
+              KEY_FLIGHT_RECORD_MAXIMUM_COUNT,
+              DEFAULT_FLIGHT_RECORD_MAXIMUM_COUNT).toInt())
+        : DEFAULT_FLIGHT_RECORD_MAXIMUM_COUNT;
+}
+
 bool QTestGCSConfig::setMapConfiguration(const QVariantMap &config)
 {
     if (!m_settings) {
@@ -619,6 +655,22 @@ void QTestGCSConfig::initializeDefaults()
     if (!m_settings->contains(KEY_MISSION_MAXIMUM_ALTITUDE)) {
         m_settings->setValue(KEY_MISSION_MAXIMUM_ALTITUDE,
                              DEFAULT_MISSION_MAXIMUM_ALTITUDE);
+    }
+    if (!m_settings->contains(
+            KEY_FLIGHT_RECORD_MINIMUM_SAMPLE_INTERVAL_MS)) {
+        m_settings->setValue(
+            KEY_FLIGHT_RECORD_MINIMUM_SAMPLE_INTERVAL_MS,
+            DEFAULT_FLIGHT_RECORD_MINIMUM_SAMPLE_INTERVAL_MS);
+    }
+    if (!m_settings->contains(
+            KEY_FLIGHT_RECORD_MINIMUM_SAMPLE_DISTANCE_M)) {
+        m_settings->setValue(
+            KEY_FLIGHT_RECORD_MINIMUM_SAMPLE_DISTANCE_M,
+            DEFAULT_FLIGHT_RECORD_MINIMUM_SAMPLE_DISTANCE_M);
+    }
+    if (!m_settings->contains(KEY_FLIGHT_RECORD_MAXIMUM_COUNT)) {
+        m_settings->setValue(KEY_FLIGHT_RECORD_MAXIMUM_COUNT,
+                             DEFAULT_FLIGHT_RECORD_MAXIMUM_COUNT);
     }
     if (!m_settings->contains(KEY_LINKS_COUNT)) {
         m_settings->setValue(KEY_LINKS_COUNT, 0);

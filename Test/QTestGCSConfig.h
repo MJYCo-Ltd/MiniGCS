@@ -64,6 +64,9 @@ public:
     Q_INVOKABLE double missionDefaultAltitude() const;
     Q_INVOKABLE double missionMinimumAltitude() const;
     Q_INVOKABLE double missionMaximumAltitude() const;
+    qint64 flightRecordMinimumSampleIntervalMs() const;
+    double flightRecordMinimumSampleDistanceM() const;
+    int flightRecordMaximumCount() const;
     Q_INVOKABLE bool setMapConfiguration(const QVariantMap &config);
 
     // ---------- 多链路配置 ----------

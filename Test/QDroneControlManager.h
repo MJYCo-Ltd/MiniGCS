@@ -11,6 +11,7 @@
 
 class QAutopilot;
 class QGroundControlStation;
+class QFlightRecordStore;
 
 class QDroneControlManager : public QObject
 {
@@ -19,6 +20,7 @@ class QDroneControlManager : public QObject
     Q_PROPERTY(QVariantList groups READ groups NOTIFY groupsChanged)
     Q_PROPERTY(QStringList businessLogs READ businessLogs NOTIFY businessLogsChanged)
     Q_PROPERTY(QStringList firmwareLogs READ firmwareLogs NOTIFY firmwareLogsChanged)
+    Q_PROPERTY(QVariantList flightRecords READ flightRecords NOTIFY flightRecordsChanged)
     Q_PROPERTY(int armCommand READ armCommand CONSTANT)
     Q_PROPERTY(int disarmCommand READ disarmCommand CONSTANT)
     Q_PROPERTY(int takeoffCommand READ takeoffCommand CONSTANT)
@@ -51,6 +53,7 @@ public:
     QVariantList groups() const;
     QStringList businessLogs() const;
     QStringList firmwareLogs() const;
+    QVariantList flightRecords() const;
     int armCommand() const { return ArmCommand; }
     int disarmCommand() const { return DisarmCommand; }
     int takeoffCommand() const { return TakeoffCommand; }
@@ -83,6 +86,7 @@ public:
         bool returnHomeAfterMission = true);
     Q_INVOKABLE void clearBusinessLogs();
     Q_INVOKABLE void clearFirmwareLogs();
+    Q_INVOKABLE void clearFlightRecords();
     Q_INVOKABLE bool applyConfiguredLinks();
 
 signals:
@@ -90,6 +94,7 @@ signals:
     void groupsChanged();
     void businessLogsChanged();
     void firmwareLogsChanged();
+    void flightRecordsChanged();
     void commandDispatched(
         int command, const QString &target, int count);
     void commandResult(
@@ -109,7 +114,9 @@ private:
 
     QPointer<QGroundControlStation> m_groundStation;
     QHash<int, QPointer<QAutopilot>> m_autopilots;
+    QHash<int, QVariantList> m_uploadedMissionPoints;
     QSet<int> m_startMissionAfterArm;
+    QFlightRecordStore *m_flightRecordStore{nullptr};
     QStringList m_businessLogs;
     QStringList m_firmwareLogs;
 };

@@ -6,6 +6,7 @@
 #include "QGCSConfig.h"
 #include "QGroundControlStation.h"
 #include "QTestGCSConfig.h"
+#include "QFlightRecordStore.h"
 
 #include <algorithm>
 #include <cmath>
@@ -58,6 +59,13 @@ QDroneControlManager::QDroneControlManager(
     : QObject(parent)
     , m_groundStation(groundStation)
 {
+    const auto *config = QTestGCSConfig::instance();
+    m_flightRecordStore = new QFlightRecordStore(
+        config->flightRecordMinimumSampleIntervalMs(),
+        config->flightRecordMinimumSampleDistanceM(),
+        config->flightRecordMaximumCount(), this);
+    connect(m_flightRecordStore, &QFlightRecordStore::recordsChanged,
+            this, &QDroneControlManager::flightRecordsChanged);
     if (!m_groundStation) {
         return;
     }
@@ -107,6 +115,11 @@ void QDroneControlManager::registerPlatform(QObject *platform)
     m_autopilots.insert(systemId, autopilot);
     connect(autopilot, &QPlat::connectionStatusChanged,
             this, &QDroneControlManager::dronesChanged);
+    connect(autopilot, &QPlat::connectionStatusChanged,
+            this, [this, systemId](bool connected) {
+                if (!connected)
+                    m_flightRecordStore->cancel(systemId);
+            });
     connect(autopilot, &QAutopilot::actionCommandFinished,
             this, [this, systemId](QAutopilot::ActionCommand action,
                                    bool success,
@@ -173,11 +186,21 @@ void QDroneControlManager::registerPlatform(QObject *platform)
             });
     connect(autopilot, &QAutopilot::airLineStarted,
             this, [this, systemId]() {
+                QAutopilot *autopilot = m_autopilots.value(systemId);
+                m_flightRecordStore->start(
+                    systemId,
+                    QTestGCSConfig::instance()->droneName(systemId),
+                    m_uploadedMissionPoints.value(systemId));
+                if (autopilot && autopilot->hasGpsPosition()) {
+                    m_flightRecordStore->appendPosition(
+                        systemId, autopilot->gpsPosition());
+                }
                 emit commandResult(
                     systemId, StartMissionCommand, true, QString());
             });
     connect(autopilot, &QAutopilot::airLineStartFailed,
             this, [this, systemId](const QString &reason) {
+                m_flightRecordStore->cancel(systemId);
                 emit commandResult(
                     systemId, StartMissionCommand, false, reason);
             });
@@ -191,10 +214,26 @@ void QDroneControlManager::registerPlatform(QObject *platform)
                 emit commandResult(
                     systemId, PauseMissionCommand, false, reason);
             });
+    connect(autopilot, &QAutopilot::gpsPositionChanged,
+            this, [this, systemId](const QGpsPosition &position) {
+                m_flightRecordStore->appendPosition(systemId, position);
+            });
+    connect(autopilot, &QAutopilot::missionProgressChanged,
+            this, [this, systemId, autopilot]() {
+                if (autopilot->missionTotal() > 0 &&
+                    autopilot->missionCurrent() >= autopilot->missionTotal()) {
+                    if (autopilot->hasGpsPosition()) {
+                        m_flightRecordStore->appendPosition(
+                            systemId, autopilot->gpsPosition());
+                    }
+                    m_flightRecordStore->complete(systemId);
+                }
+            });
     connect(autopilot, &QObject::destroyed, this,
             [this, systemId](QObject *destroyedObject) {
         const QPointer<QAutopilot> current = m_autopilots.value(systemId);
         if (!current || current.data() == destroyedObject) {
+            m_flightRecordStore->cancel(systemId);
             m_startMissionAfterArm.remove(systemId);
             m_autopilots.remove(systemId);
             emit dronesChanged();
@@ -284,6 +323,12 @@ QString QDroneControlManager::vehicleIcon(int vehicleType) const
         QStringLiteral("vehicleIcon"), QString::number(vehicleType));
 }
 
+QVariantList QDroneControlManager::flightRecords() const
+{
+    return m_flightRecordStore ? m_flightRecordStore->records()
+                               : QVariantList();
+}
+
 QString QDroneControlManager::missionActionName(int actionValue) const
 {
     QString key;
@@ -347,6 +392,12 @@ void QDroneControlManager::clearFirmwareLogs()
     }
     m_firmwareLogs.clear();
     emit firmwareLogsChanged();
+}
+
+void QDroneControlManager::clearFlightRecords()
+{
+    if (m_flightRecordStore)
+        m_flightRecordStore->clear();
 }
 
 bool QDroneControlManager::applyConfiguredLinks()
@@ -475,9 +526,11 @@ bool QDroneControlManager::execute(
         autopilot->takeoff();
         return true;
     case LandCommand:
+        m_flightRecordStore->cancel(autopilot->vehicleId());
         autopilot->land();
         return true;
     case ReturnToLaunchCommand:
+        m_flightRecordStore->cancel(autopilot->vehicleId());
         autopilot->returnToLaunch();
         return true;
     case DownloadMissionCommand:
@@ -634,6 +687,7 @@ bool QDroneControlManager::uploadMissionSingle(
     }
 
     autopilot->uploadMission(points, returnHomeAfterMission);
+    m_uploadedMissionPoints.insert(systemId, values);
     emit commandDispatched(
         UploadMissionCommand,
         QTestGCSConfig::instance()->droneName(systemId), 1);
@@ -660,6 +714,7 @@ bool QDroneControlManager::uploadMissionGroup(
             continue;
         }
         autopilot->uploadMission(points, returnHomeAfterMission);
+        m_uploadedMissionPoints.insert(member.toInt(), values);
         ++dispatched;
     }
     if (dispatched == 0) {

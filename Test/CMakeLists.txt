@@ -40,6 +40,8 @@ qt_add_executable(${PROJECT_NAME}
     QTestGCSConfig.h
     QDroneControlManager.cpp
     QDroneControlManager.h
+    QFlightRecordStore.cpp
+    QFlightRecordStore.h
 )
 
 # 添加 QML 模块
@@ -50,6 +52,7 @@ qt_add_qml_module(${PROJECT_NAME}
         qml/DroneControlPanel.qml
         qml/DroneMap.qml
         qml/DroneStatusPage.qml
+        qml/FlightRecordPage.qml
         qml/GroupDroneControl.qml
         qml/LinkConfigPage.qml
         qml/LogPanel.qml

@@ -84,6 +84,7 @@ Rectangle {
         for (let index = 0; index < routeModel.count; ++index) {
             const waypoint = routeModel.get(index)
             waypoints.push({
+                "title": waypoint.title,
                 "latitude": Number(waypoint.latitude),
                 "longitude": Number(waypoint.longitude),
                 "altitude": Number(waypoint.altitude),

@@ -264,6 +264,9 @@ autopilot->startAirLine();
 | `Motion/StopVerticalSpeedMS` | `0.2` | 判定停止移动的垂直速度阈值（m/s） |
 | `Motion/StartSampleCount` | `2` | 开始移动所需连续采样数 |
 | `Motion/StopSampleCount` | `5` | 停止移动所需连续采样数 |
+| `FlightRecord/MinimumSampleIntervalMs` | `1000` | 飞行轨迹相邻采样的最短时间间隔（ms） |
+| `FlightRecord/MinimumSampleDistanceM` | `2` | 飞行轨迹相邻采样的最短距离（m） |
+| `FlightRecord/MaximumCount` | `200` | 最多保留的成功任务记录数量 |
 | `Telemetry/PositionHz` 等 | 见默认 | 遥测订阅频率（Hz），含 Position / GpsInfo / Battery / Attitude / Health / Home 等 |
 
 载具类型、飞控类型、机型图标、控制命令名称、GPS 定位状态、固件版本类型和任务结果均从

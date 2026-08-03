@@ -129,15 +129,15 @@ ApplicationWindow {
                 Button {
                     text: qsTr("飞行记录")
                     flat: true
-                    onClicked: logDialog.open()
+                    onClicked: flightRecordDialog.open()
                 }
                 Button {
                     text: qsTr("设备")
                     flat: true
                     onClicked: {
-                        advancedControlPanel.selectedDroneId =
+                        deviceManagementPanel.selectedDroneId =
                                 root.selectedDroneId
-                        advancedDialog.open()
+                        deviceDialog.open()
                     }
                 }
 
@@ -379,24 +379,55 @@ ApplicationWindow {
     }
 
     Dialog {
-        id: logDialog
+        id: flightRecordDialog
         modal: true
-        width: Math.min(root.width - 80, 1000)
-        height: Math.min(root.height - 80, 650)
+        width: Math.min(root.width - 60, 1180)
+        height: Math.min(root.height - 60, 760)
         x: Math.round((root.width - width) / 2)
         y: Math.round((root.height - height) / 2)
         padding: 0
-        title: qsTr("飞行记录与告警")
+        title: qsTr("飞行记录")
         standardButtons: Dialog.Close
 
-        LogPanel {
+        FlightRecordPage {
             anchors.fill: parent
-            radius: 0
-            expanded: true
-            businessLogs: DroneControl.businessLogs
-            firmwareLogs: DroneControl.firmwareLogs
-            onClearBusinessRequested: DroneControl.clearBusinessLogs()
-            onClearFirmwareRequested: DroneControl.clearFirmwareLogs()
+        }
+    }
+
+    Dialog {
+        id: deviceDialog
+        modal: true
+        width: Math.min(root.width - 80, 920)
+        height: Math.min(root.height - 80, 690)
+        x: Math.round((root.width - width) / 2)
+        y: Math.round((root.height - height) / 2)
+        padding: 0
+        title: qsTr("无人机管理")
+        standardButtons: Dialog.Close
+
+        DroneControlPanel {
+            id: deviceManagementPanel
+            anchors.fill: parent
+            managementMode: true
+            selectedDroneId: root.selectedDroneId
+            statusText: qsTr("可查看无人机、修改名称并管理编组")
+
+            onSelectedDroneIdChanged: {
+                if (selectedDroneId >= 0)
+                    root.selectedDroneId = selectedDroneId
+            }
+            onSelectedGroupNameChanged:
+                root.selectedGroupName = selectedGroupName
+            onStatusRequested: {
+                advancedControlPanel.selectedDroneId = root.selectedDroneId
+                advancedTabs.currentIndex = 1
+                deviceDialog.close()
+                advancedDialog.open()
+            }
+            onLocateRequested: function(systemId) {
+                root.centerOnDrone(systemId)
+                deviceDialog.close()
+            }
         }
     }
 
