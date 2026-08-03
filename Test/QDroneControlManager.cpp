@@ -111,6 +111,17 @@ void QDroneControlManager::registerPlatform(QObject *platform)
             this, [this, systemId](QAutopilot::ActionCommand action,
                                    bool success,
                                    const QString &reason) {
+                if (action == QAutopilot::ArmAction &&
+                    m_startMissionAfterArm.remove(systemId)) {
+                    QAutopilot *autopilot = m_autopilots.value(systemId);
+                    if (success && autopilot && autopilot->isConnected()) {
+                        autopilot->startAirLine();
+                    } else {
+                        emit commandResult(
+                            systemId, StartMissionCommand, false, reason);
+                    }
+                    return;
+                }
                 Command command = InvalidCommand;
                 switch (action) {
                 case QAutopilot::ArmAction:
@@ -131,15 +142,20 @@ void QDroneControlManager::registerPlatform(QObject *platform)
                 }
                 emit commandResult(systemId, command, success, reason);
             });
-    connect(autopilot, &QAutopilot::airLineDownloaded,
-            this, [this, systemId](const QList<QGpsPosition> &waypoints) {
+    connect(autopilot, &QAutopilot::missionDownloaded,
+            this, [this, systemId](const QList<QMissionPoint> &points) {
                 QVariantList values;
-                values.reserve(waypoints.size());
-                for (const QGpsPosition &waypoint : waypoints) {
+                values.reserve(points.size());
+                for (const QMissionPoint &point : points) {
+                    const QGpsPosition waypoint = point.position();
                     QVariantMap value;
                     value.insert("latitude", waypoint.latitude());
                     value.insert("longitude", waypoint.longitude());
                     value.insert("altitude", waypoint.altitude());
+                    value.insert("action", static_cast<int>(point.action()));
+                    value.insert("actionDurationS", point.actionDurationS());
+                    value.insert("speedMS", point.speedMS());
+                    value.insert("flyThrough", point.flyThrough());
                     values.append(value);
                 }
                 emit missionDownloaded(systemId, values);
@@ -155,10 +171,31 @@ void QDroneControlManager::registerPlatform(QObject *platform)
                            << reason;
                 emit missionUploadResult(systemId, false, reason);
             });
+    connect(autopilot, &QAutopilot::airLineStarted,
+            this, [this, systemId]() {
+                emit commandResult(
+                    systemId, StartMissionCommand, true, QString());
+            });
+    connect(autopilot, &QAutopilot::airLineStartFailed,
+            this, [this, systemId](const QString &reason) {
+                emit commandResult(
+                    systemId, StartMissionCommand, false, reason);
+            });
+    connect(autopilot, &QAutopilot::airLinePaused,
+            this, [this, systemId]() {
+                emit commandResult(
+                    systemId, PauseMissionCommand, true, QString());
+            });
+    connect(autopilot, &QAutopilot::airLinePauseFailed,
+            this, [this, systemId](const QString &reason) {
+                emit commandResult(
+                    systemId, PauseMissionCommand, false, reason);
+            });
     connect(autopilot, &QObject::destroyed, this,
             [this, systemId](QObject *destroyedObject) {
         const QPointer<QAutopilot> current = m_autopilots.value(systemId);
         if (!current || current.data() == destroyedObject) {
+            m_startMissionAfterArm.remove(systemId);
             m_autopilots.remove(systemId);
             emit dronesChanged();
         }
@@ -220,6 +257,10 @@ QString QDroneControlManager::commandKey(Command command) const
         return QStringLiteral("downloadMission");
     case UploadMissionCommand:
         return QStringLiteral("uploadMission");
+    case StartMissionCommand:
+        return QStringLiteral("startMission");
+    case PauseMissionCommand:
+        return QStringLiteral("pauseMission");
     case InvalidCommand:
         break;
     }
@@ -241,6 +282,53 @@ QString QDroneControlManager::vehicleIcon(int vehicleType) const
 {
     return QGCSConfig::instance()->typeText(
         QStringLiteral("vehicleIcon"), QString::number(vehicleType));
+}
+
+QString QDroneControlManager::missionActionName(int actionValue) const
+{
+    QString key;
+    switch (static_cast<QMissionPoint::Action>(actionValue)) {
+    case QMissionPoint::ContinueAction:
+        key = QStringLiteral("continue");
+        break;
+    case QMissionPoint::WaitAction:
+        key = QStringLiteral("wait");
+        break;
+    case QMissionPoint::TakePhotoAction:
+        key = QStringLiteral("takePhoto");
+        break;
+    case QMissionPoint::RecordVideoAction:
+        key = QStringLiteral("recordVideo");
+        break;
+    case QMissionPoint::LandAction:
+        key = QStringLiteral("land");
+        break;
+    }
+    return QGCSConfig::instance()->typeText(
+        QStringLiteral("missionPointAction"), key);
+}
+
+QVariantList QDroneControlManager::missionActions() const
+{
+    QVariantList result;
+    const QList<QMissionPoint::Action> actions = {
+        QMissionPoint::ContinueAction,
+        QMissionPoint::WaitAction,
+        QMissionPoint::TakePhotoAction,
+        QMissionPoint::RecordVideoAction,
+        QMissionPoint::LandAction
+    };
+    for (QMissionPoint::Action action : actions) {
+        QVariantMap value;
+        value.insert(QStringLiteral("value"), static_cast<int>(action));
+        value.insert(QStringLiteral("name"),
+                     missionActionName(static_cast<int>(action)));
+        value.insert(QStringLiteral("needsDuration"),
+                     action == QMissionPoint::WaitAction ||
+                     action == QMissionPoint::RecordVideoAction);
+        result.append(value);
+    }
+    return result;
 }
 
 void QDroneControlManager::clearBusinessLogs()
@@ -399,6 +487,24 @@ bool QDroneControlManager::execute(
         }
         autopilot->downloadAirLine();
         return true;
+    case StartMissionCommand:
+        if (autopilot->airLineDownloading() ||
+            autopilot->airLineUploading()) {
+            return false;
+        }
+        if (autopilot->armed()) {
+            autopilot->startAirLine();
+        } else {
+            m_startMissionAfterArm.insert(autopilot->vehicleId());
+            autopilot->arm();
+        }
+        return true;
+    case PauseMissionCommand:
+        if (!autopilot->inAir()) {
+            return false;
+        }
+        autopilot->pauseAirLine();
+        return true;
     case UploadMissionCommand:
     case InvalidCommand:
         return false;
@@ -442,8 +548,8 @@ bool QDroneControlManager::executeGroup(
     return true;
 }
 
-bool QDroneControlManager::parseWaypoints(
-    const QVariantList &values, QList<QGpsPosition> &waypoints,
+bool QDroneControlManager::parseMissionPoints(
+    const QVariantList &values, QList<QMissionPoint> &points,
     QString &reason) const
 {
     if (values.isEmpty()) {
@@ -451,8 +557,8 @@ bool QDroneControlManager::parseWaypoints(
         return false;
     }
 
-    waypoints.clear();
-    waypoints.reserve(values.size());
+    points.clear();
+    points.reserve(values.size());
     const auto *config = QTestGCSConfig::instance();
     const double minimumAltitude = config->missionMinimumAltitude();
     const double maximumAltitude = config->missionMaximumAltitude();
@@ -467,27 +573,53 @@ bool QDroneControlManager::parseWaypoints(
             value.value("longitude").toDouble(&longitudeOk);
         const double altitude =
             value.value("altitude").toDouble(&altitudeOk);
+        bool actionOk = false;
+        bool durationOk = false;
+        bool speedOk = false;
+        const int actionValue = value.value("action", 0).toInt(&actionOk);
+        const double durationS = value.value("actionDurationS", 0.0)
+                                     .toDouble(&durationOk);
+        const double speedMS = value.value("speedMS", 0.0)
+                                   .toDouble(&speedOk);
+        const auto action = static_cast<QMissionPoint::Action>(actionValue);
         if (!latitudeOk || !longitudeOk || !altitudeOk ||
+            !actionOk || !durationOk || !speedOk ||
             !std::isfinite(latitude) || !std::isfinite(longitude) ||
             !std::isfinite(altitude) ||
+            !std::isfinite(durationS) || !std::isfinite(speedMS) ||
             latitude < -90.0 || latitude > 90.0 ||
             longitude < -180.0 || longitude > 180.0 ||
-            altitude < minimumAltitude || altitude > maximumAltitude) {
-            reason = tr("第 %1 个航点坐标或高度无效")
+            altitude < minimumAltitude || altitude > maximumAltitude ||
+            actionValue < QMissionPoint::ContinueAction ||
+            actionValue > QMissionPoint::LandAction ||
+            durationS < 0.0 || speedMS < 0.0 ||
+            ((action == QMissionPoint::WaitAction ||
+              action == QMissionPoint::RecordVideoAction) &&
+             durationS <= 0.0)) {
+            reason = tr("第 %1 个任务点参数无效")
                          .arg(index + 1);
             return false;
         }
-        waypoints.append(QGpsPosition(longitude, latitude, altitude));
+        if (action == QMissionPoint::LandAction &&
+            index != values.size() - 1) {
+            reason = tr("降落动作只能设置在最后一个任务点");
+            return false;
+        }
+        points.append(QMissionPoint(
+            QGpsPosition(longitude, latitude, altitude),
+            action, durationS, speedMS,
+            value.value("flyThrough", false).toBool()));
     }
     return true;
 }
 
 bool QDroneControlManager::uploadMissionSingle(
-    int systemId, const QVariantList &values)
+    int systemId, const QVariantList &values,
+    bool returnHomeAfterMission)
 {
-    QList<QGpsPosition> waypoints;
+    QList<QMissionPoint> points;
     QString reason;
-    if (!parseWaypoints(values, waypoints, reason)) {
+    if (!parseMissionPoints(values, points, reason)) {
         emit commandRejected(reason);
         return false;
     }
@@ -501,7 +633,7 @@ bool QDroneControlManager::uploadMissionSingle(
         return false;
     }
 
-    autopilot->uploadAirLine(waypoints);
+    autopilot->uploadMission(points, returnHomeAfterMission);
     emit commandDispatched(
         UploadMissionCommand,
         QTestGCSConfig::instance()->droneName(systemId), 1);
@@ -509,11 +641,12 @@ bool QDroneControlManager::uploadMissionSingle(
 }
 
 bool QDroneControlManager::uploadMissionGroup(
-    const QString &groupName, const QVariantList &values)
+    const QString &groupName, const QVariantList &values,
+    bool returnHomeAfterMission)
 {
-    QList<QGpsPosition> waypoints;
+    QList<QMissionPoint> points;
     QString reason;
-    if (!parseWaypoints(values, waypoints, reason)) {
+    if (!parseMissionPoints(values, points, reason)) {
         emit commandRejected(reason);
         return false;
     }
@@ -526,7 +659,7 @@ bool QDroneControlManager::uploadMissionGroup(
             autopilot->airLineDownloading()) {
             continue;
         }
-        autopilot->uploadAirLine(waypoints);
+        autopilot->uploadMission(points, returnHomeAfterMission);
         ++dispatched;
     }
     if (dispatched == 0) {

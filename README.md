@@ -197,6 +197,7 @@ if (link) {
 |----|------|
 | `QAirLineManager` | 多条航线管理（支持 QML） |
 | `QAirLine` | 单条航线及航点列表 |
+| `QMissionPoint` | 任务点位置、到达动作、持续时间与飞行方式 |
 
 `QAirLineManager::addAirLine()` 成功后接管航线对象所有权；移除或清空航线时，
 对象会在 `airlineRemoved` 信号发出后通过 `deleteLater()` 销毁。
@@ -229,6 +230,14 @@ autopilot->uploadAirLine(waypoints);
 
 可通过 `airLineUploading` 属性及 `airLineUploadFailed` 信号观察上传状态。
 上传与下载互斥，防止对同一个 Mission 插件并发发起任务请求。
+
+上传成功后需显式开始执行航线（仅「起飞」只会垂直离地，不会沿航点飞行）：
+
+```cpp
+connect(autopilot, &QAutopilot::airLineStarted, ...);
+connect(autopilot, &QAutopilot::airLineStartFailed, ...);
+autopilot->startAirLine();
+```
 
 ## 日志与配置
 
@@ -282,7 +291,7 @@ cmake --build build --target Test
 
 程序从 `QTestGCSConfig` 读取链路列表并自动 `addLink`，QML 界面见 `Test/qml/Main.qml`。
 界面支持按平台 ID 配置无人机别名、创建编组并维护成员，也可以向
-单机或编组中的在线成员发送解锁、上锁、起飞、降落、返航和任务下载命令。
+单机或编组中的在线成员发送解锁、上锁、起飞、降落、返航、任务下载和开始任务命令。
 无人机别名与编组配置保存在演示程序的 INI 配置文件中。
 地图插件、初始中心、缩放范围以及航点默认/最小/最大高度也可通过演示程序
 INI 文件中的 `Map/*` 与 `Mission/*` 配置项调整。

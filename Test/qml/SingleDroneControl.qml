@@ -152,7 +152,6 @@ ColumnLayout {
         Button {
             text: DroneControl.commandName(DroneControl.takeoffCommand)
             Layout.fillWidth: true
-            highlighted: true
             enabled: root.selectedDroneId >= 0
             onClicked: root.commandRequested(DroneControl.takeoffCommand)
         }
@@ -177,6 +176,16 @@ ColumnLayout {
             enabled: root.selectedDroneId >= 0
             onClicked: root.commandRequested(
                            DroneControl.downloadMissionCommand)
+        }
+        Button {
+            text: DroneControl.commandName(
+                      DroneControl.startMissionCommand)
+            Layout.columnSpan: 2
+            Layout.fillWidth: true
+            highlighted: true
+            enabled: root.selectedDroneId >= 0
+            onClicked: root.commandRequested(
+                           DroneControl.startMissionCommand)
         }
         Button {
             text: qsTr("查看详细状态")

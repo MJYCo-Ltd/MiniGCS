@@ -6,7 +6,8 @@
 #include <QPointer>
 #include <QStringList>
 #include <QVariantList>
-#include "Common/QGpsPosition.h"
+#include <QSet>
+#include "AirLine/QMissionPoint.h"
 
 class QAutopilot;
 class QGroundControlStation;
@@ -25,6 +26,8 @@ class QDroneControlManager : public QObject
     Q_PROPERTY(int returnToLaunchCommand READ returnToLaunchCommand CONSTANT)
     Q_PROPERTY(int downloadMissionCommand READ downloadMissionCommand CONSTANT)
     Q_PROPERTY(int uploadMissionCommand READ uploadMissionCommand CONSTANT)
+    Q_PROPERTY(int startMissionCommand READ startMissionCommand CONSTANT)
+    Q_PROPERTY(int pauseMissionCommand READ pauseMissionCommand CONSTANT)
 
 public:
     enum Command {
@@ -35,7 +38,9 @@ public:
         LandCommand,
         ReturnToLaunchCommand,
         DownloadMissionCommand,
-        UploadMissionCommand
+        UploadMissionCommand,
+        StartMissionCommand,
+        PauseMissionCommand
     };
     Q_ENUM(Command)
 
@@ -53,8 +58,12 @@ public:
     int returnToLaunchCommand() const { return ReturnToLaunchCommand; }
     int downloadMissionCommand() const { return DownloadMissionCommand; }
     int uploadMissionCommand() const { return UploadMissionCommand; }
+    int startMissionCommand() const { return StartMissionCommand; }
+    int pauseMissionCommand() const { return PauseMissionCommand; }
     Q_INVOKABLE QString commandName(int command) const;
     Q_INVOKABLE QString vehicleIcon(int vehicleType) const;
+    Q_INVOKABLE QVariantList missionActions() const;
+    Q_INVOKABLE QString missionActionName(int action) const;
 
     Q_INVOKABLE void renameDrone(int systemId, const QString &name);
     Q_INVOKABLE bool addGroup(const QString &name);
@@ -67,9 +76,11 @@ public:
     Q_INVOKABLE bool executeGroup(
         const QString &groupName, int command);
     Q_INVOKABLE bool uploadMissionSingle(
-        int systemId, const QVariantList &waypoints);
+        int systemId, const QVariantList &waypoints,
+        bool returnHomeAfterMission = true);
     Q_INVOKABLE bool uploadMissionGroup(
-        const QString &groupName, const QVariantList &waypoints);
+        const QString &groupName, const QVariantList &waypoints,
+        bool returnHomeAfterMission = true);
     Q_INVOKABLE void clearBusinessLogs();
     Q_INVOKABLE void clearFirmwareLogs();
     Q_INVOKABLE bool applyConfiguredLinks();
@@ -92,12 +103,13 @@ private:
     void registerPlatform(QObject *platform);
     QString commandKey(Command command) const;
     bool execute(QAutopilot *autopilot, Command command);
-    bool parseWaypoints(const QVariantList &values,
-                        QList<QGpsPosition> &waypoints,
-                        QString &reason) const;
+    bool parseMissionPoints(const QVariantList &values,
+                            QList<QMissionPoint> &points,
+                            QString &reason) const;
 
     QPointer<QGroundControlStation> m_groundStation;
     QHash<int, QPointer<QAutopilot>> m_autopilots;
+    QSet<int> m_startMissionAfterArm;
     QStringList m_businessLogs;
     QStringList m_firmwareLogs;
 };

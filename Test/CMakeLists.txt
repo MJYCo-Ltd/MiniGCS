@@ -55,6 +55,7 @@ qt_add_qml_module(${PROJECT_NAME}
         qml/LogPanel.qml
         qml/Main.qml
         qml/MapConfigPage.qml
+        qml/MissionStatusPanel.qml
         qml/RouteEditor.qml
         qml/SingleDroneControl.qml
     RESOURCES

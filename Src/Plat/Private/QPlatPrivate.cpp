@@ -47,7 +47,7 @@ QString QPlatPrivate::toString() const {
     const QString softwareVersion = getSoftwareVersion();
 
     oss << "QPlatInfo:\r\n"
-        << "systemId=" << m_pSystem->get_system_id()
+        << "systemId=" << static_cast<unsigned>(m_pSystem->get_system_id())
         << "\r\nfirmwareVersion=" << firmwareVersion.toStdString()
         << "\r\nsoftwareVersion=" << softwareVersion.toStdString()
         << "\r\nhasCamera=" << (m_pSystem->has_camera() ? "true" : "false")
@@ -55,7 +55,7 @@ QString QPlatPrivate::toString() const {
         << "\r\ncomponentIds=[";
 
     for (auto one : m_pSystem->component_ids()) {
-        oss << one << ',';
+        oss << static_cast<unsigned>(one) << ',';
     }
     oss << "]";
 
@@ -148,12 +148,18 @@ void QPlatPrivate::setupMessageHandling() {
     // 订阅系统连接状态变化
     const QPointer<QPlat> plat(q_ptr);
     m_hConntecd = m_pSystem->subscribe_is_connected([plat](bool isConnected) {
-        // 发射连接状态变化信号
-        if (plat) {
-            QMetaObject::invokeMethod(plat, "connectionStatusChanged",
-                                      Qt::QueuedConnection,
-                                      Q_ARG(bool, isConnected));
+        if (!plat) {
+            return;
         }
+        QMetaObject::invokeMethod(
+            plat,
+            [plat, isConnected]() {
+                if (!plat || plat->isConnected() == isConnected) {
+                    return;
+                }
+                emit plat->connectionStatusChanged(isConnected);
+            },
+            Qt::QueuedConnection);
     });
 
     // 订阅组件发现
@@ -184,11 +190,18 @@ void QPlatPrivate::syncConnectionStatus() const
 
     const QPointer<QPlat> plat(q_ptr);
     const bool isConnected = m_pSystem->is_connected();
-    if (plat) {
-        QMetaObject::invokeMethod(plat, "connectionStatusChanged",
-                                  Qt::QueuedConnection,
-                                  Q_ARG(bool, isConnected));
+    if (!plat) {
+        return;
     }
+    QMetaObject::invokeMethod(
+        plat,
+        [plat, isConnected]() {
+            if (!plat || plat->isConnected() == isConnected) {
+                return;
+            }
+            emit plat->connectionStatusChanged(isConnected);
+        },
+        Qt::QueuedConnection);
 }
 
 template<>struct fmt::formatter<mavsdk::Info::Result>:ostream_formatter{};

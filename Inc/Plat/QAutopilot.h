@@ -7,6 +7,7 @@
 #include "Common/QAttitude.h"
 #include "Common/QVelocity.h"
 #include "Common/QRawGps.h"
+#include "AirLine/QMissionPoint.h"
 #include "Plat/QAutopilotStatus.h"
 #include "Plat/QAutopilotFixedwing.h"
 #include "Plat/QAutoVehicleType.h"
@@ -41,6 +42,8 @@ class MINIGCS_EXPORT QAutopilot : public QPlat
     Q_PROPERTY(QString landedStateName READ landedStateName NOTIFY landedStateChanged)
     Q_PROPERTY(bool airLineDownloading READ airLineDownloading NOTIFY airLineDownloadingChanged)
     Q_PROPERTY(bool airLineUploading READ airLineUploading NOTIFY airLineUploadingChanged)
+    Q_PROPERTY(int missionCurrent READ missionCurrent NOTIFY missionProgressChanged)
+    Q_PROPERTY(int missionTotal READ missionTotal NOTIFY missionProgressChanged)
     Q_PROPERTY(QAutoVehicleType::Vehicle vehicleType READ vehicleType WRITE setVehicleType NOTIFY vehicleTypeChanged)
     Q_PROPERTY(QString vehicleName READ vehicleName NOTIFY vehicleNameChanged)
     Q_PROPERTY(QAutoVehicleType::Autopilot autopilotType READ autopilotType WRITE setAutopilotType NOTIFY autopilotTypeChanged)
@@ -102,7 +105,18 @@ public:
      * @param waypoints 航点列表，高度为相对起飞点高度（米）
      */
     Q_INVOKABLE void uploadAirLine(const QList<QGpsPosition> &waypoints);
+    void uploadMission(const QList<QMissionPoint> &points,
+                       bool returnHomeAfterMission = true);
     bool airLineUploading() const { return m_airLineUploading; }
+    int missionCurrent() const { return m_missionCurrent; }
+    int missionTotal() const { return m_missionTotal; }
+
+    /**
+     * @brief 开始执行已上传的任务航线
+     * @note 仅「起飞」不会进入任务；上传航线后需调用本接口才会沿航点飞行
+     */
+    Q_INVOKABLE void startAirLine();
+    Q_INVOKABLE void pauseAirLine();
 
     QGpsPosition gpsPosition() const { return m_gpsPosition; }
     bool hasGpsPosition() const { return m_hasGpsPosition; }
@@ -158,11 +172,18 @@ signals:
 
     /** 航线下载完成；航点高度为相对起飞点高度 */
     void airLineDownloaded(const QList<QGpsPosition> &waypoints);
+    /** 任务下载完成；包含到达动作与飞行方式 */
+    void missionDownloaded(const QList<QMissionPoint> &points);
     void airLineDownloadFailed(const QString &reason);
     void airLineDownloadingChanged(bool downloading);
     void airLineUploaded();
     void airLineUploadFailed(const QString &reason);
     void airLineUploadingChanged(bool uploading);
+    void airLineStarted();
+    void airLineStartFailed(const QString &reason);
+    void airLinePaused();
+    void airLinePauseFailed(const QString &reason);
+    void missionProgressChanged();
 
 private slots:
     void positionUpdate(double dLon, double dLat, float dH,
@@ -195,11 +216,12 @@ private slots:
     void homeUpdate(double dLon, double dLat, float dH);
     void fixedwingUpdate(float airspeedMS, float throttlePercentage, float climbRateMS,
                         float groundspeedMS, float headingDeg, float absoluteAltitudeM);
+    void missionProgressUpdate(int current, int total);
 
 private:
     friend class QAutopilotPrivate;
     void completeAirLineDownload(quint64 requestId,
-                                 const QList<QGpsPosition> &waypoints);
+                                 const QList<QMissionPoint> &points);
     void failAirLineDownload(quint64 requestId, const QString &reason);
     void cancelAirLineDownload();
     void completeAirLineUpload(quint64 requestId);
@@ -234,6 +256,8 @@ private:
     quint64 m_airLineDownloadRequestId{0};
     bool m_airLineUploading{false};
     quint64 m_airLineUploadRequestId{0};
+    int m_missionCurrent{0};
+    int m_missionTotal{0};
 };
 
 #endif // _YTY_QAUTOPILOT_H

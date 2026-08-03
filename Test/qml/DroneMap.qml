@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Effects
@@ -11,14 +13,36 @@ MapView {
     property var drones: []
     property int selectedDroneId: -1
     property var waypointModel: null
+    property int selectedWaypointIndex: -1
     property var routeCoordinates: []
     property bool routeEditing: false
     property bool centeredOnDrone: false
+    property var selectedVehicle: selectedDroneEntry()
     /** 选中时尚无 GPS 时，待该机首次有效定位后再居中 */
     property int pendingLocateDroneId: -1
 
     signal droneSelected(int systemId)
     signal routeCoordinateRequested(var coordinate)
+    signal waypointSelected(int index)
+
+    function selectedDroneEntry() {
+        for (let index = 0; index < drones.length; ++index) {
+            if (Number(drones[index].systemId) === Number(selectedDroneId))
+                return drones[index].vehicle
+        }
+        return null
+    }
+
+    function isValidHome(vehicle) {
+        return vehicle
+                && vehicle.status.isHomePositionOk
+                && isFinite(vehicle.homePosition.latitude)
+                && isFinite(vehicle.homePosition.longitude)
+                && vehicle.homePosition.latitude >= -90
+                && vehicle.homePosition.latitude <= 90
+                && vehicle.homePosition.longitude >= -180
+                && vehicle.homePosition.longitude <= 180
+    }
 
     function isValidGps(vehicle) {
         return vehicle
@@ -54,6 +78,10 @@ MapView {
         return false
     }
 
+    function previewRoute() {
+        root.map.fitViewportToMapItems()
+    }
+
     onSelectedDroneIdChanged: {
         if (selectedDroneId < 0) {
             pendingLocateDroneId = -1
@@ -76,9 +104,63 @@ MapView {
     MapPolyline {
         parent: root.map
         line.width: 4
-        line.color: "#dc2626"
+        line.color: "#1769e0"
         path: root.routeCoordinates
         z: 1
+    }
+
+    MapQuickItem {
+        id: homeMarker
+        parent: root.map
+        visible: root.isValidHome(root.selectedVehicle)
+        coordinate: homeMarker.visible
+                    ? QtPositioning.coordinate(
+                          root.selectedVehicle.homePosition.latitude,
+                          root.selectedVehicle.homePosition.longitude,
+                          root.selectedVehicle.homePosition.altitude)
+                    : QtPositioning.coordinate()
+        anchorPoint: Qt.point(sourceItem.width / 2,
+                              sourceItem.height - 3)
+        z: 16
+
+        sourceItem: Item {
+            width: 86
+            height: 58
+
+            Rectangle {
+                anchors.horizontalCenter: parent.horizontalCenter
+                y: 20
+                width: 30
+                height: 30
+                radius: 15
+                color: "#16815b"
+                border.width: 2
+                border.color: "white"
+
+                Label {
+                    anchors.centerIn: parent
+                    text: qsTr("家")
+                    color: "white"
+                    font.bold: true
+                }
+            }
+
+            Rectangle {
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: homeLabel.implicitWidth + 10
+                height: homeLabel.implicitHeight + 4
+                radius: 4
+                color: "#e616815b"
+
+                Label {
+                    id: homeLabel
+                    anchors.centerIn: parent
+                    text: qsTr("家点")
+                    color: "white"
+                    font.pixelSize: 11
+                }
+            }
+        }
     }
 
     MapItemView {
@@ -92,28 +174,63 @@ MapView {
             required property double latitude
             required property double longitude
             required property double altitude
+            required property string title
+            required property int action
 
             coordinate: QtPositioning.coordinate(
                             latitude, longitude, altitude)
-            anchorPoint: Qt.point(sourceItem.width / 2,
-                                  sourceItem.height / 2)
+            anchorPoint: Qt.point(sourceItem.width / 2, 17)
             z: 20
 
-            sourceItem: Rectangle {
+            sourceItem: Item {
                 z: 20
-                width: 28
-                height: 28
-                radius: 14
-                color: "#dc2626"
-                border.width: 2
-                border.color: "white"
+                width: 180
+                height: 62
 
-                Label {
-                    z: 21
-                    anchors.centerIn: parent
-                    text: waypointMarker.index + 1
-                    color: "white"
-                    font.bold: true
+                Rectangle {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: root.selectedWaypointIndex ===
+                           waypointMarker.index ? 36 : 30
+                    height: width
+                    radius: width / 2
+                    color: "#1769e0"
+                    border.width: root.selectedWaypointIndex ===
+                                  waypointMarker.index ? 4 : 2
+                    border.color: root.selectedWaypointIndex ===
+                                  waypointMarker.index ? "#b7d3fa" : "white"
+
+                    Label {
+                        anchors.centerIn: parent
+                        text: waypointMarker.index + 1
+                        color: "white"
+                        font.bold: true
+                    }
+                }
+
+                Rectangle {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    y: 40
+                    width: Math.min(parent.width,
+                                    selectedWaypointLabel.implicitWidth + 12)
+                    height: selectedWaypointLabel.implicitHeight + 6
+                    radius: 4
+                    color: "#eeffffff"
+                    border.color: "#d9e0e8"
+                    visible: root.selectedWaypointIndex === waypointMarker.index
+
+                    Label {
+                        id: selectedWaypointLabel
+                        anchors.centerIn: parent
+                        text: waypointMarker.title + " · " +
+                              DroneControl.missionActionName(
+                                  waypointMarker.action)
+                        color: "#17202a"
+                        font.pixelSize: 11
+                    }
+                }
+
+                TapHandler {
+                    onTapped: root.waypointSelected(waypointMarker.index)
                 }
             }
         }
@@ -171,7 +288,7 @@ MapView {
                     droneMarker.acceptCurrentPosition(false)
                 }
 
-                function onMotionChanged() {
+                function onMovingChanged() {
                     if (droneMarker.vehicle.moving)
                         droneMarker.acceptCurrentPosition(true)
                 }

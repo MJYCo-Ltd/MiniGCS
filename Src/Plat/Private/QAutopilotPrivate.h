@@ -9,6 +9,7 @@
 #include <string>
 #include <cstdint>
 #include "Common/QGpsPosition.h"
+#include "AirLine/QMissionPoint.h"
 #include "QPlatPrivate.h"
 
 /**
@@ -39,7 +40,10 @@ public:
 
     void downloadAirLine(quint64 requestId);
     void uploadAirLine(quint64 requestId,
-                       const QList<QGpsPosition> &waypoints);
+                       const QList<QMissionPoint> &points,
+                       bool returnHomeAfterMission);
+    void startAirLine();
+    void pauseAirLine();
 
     /**
      * @brief 按 MAV_CMD 名发送扩展 COMMAND_LONG（使用整站命令表 + 本机 MavlinkDirect）
@@ -50,6 +54,7 @@ public:
 
 protected:
     void clearTelemetrySubscriptions();
+    void clearMissionSubscription();
     void clearExternalCommandSubscription();
     void setupExternalCommandSubscription();
     void handleExternalCommandAck(
@@ -90,6 +95,7 @@ protected:
     mavsdk::Telemetry::HomeHandle m_homeHandle;
     mavsdk::Telemetry::RcStatusHandle m_rcStatusHandle;
     mavsdk::Telemetry::FixedwingMetricsHandle m_fixedwingMetricsHandle;
+    mavsdk::Mission::MissionProgressHandle m_missionProgressHandle;
     mavsdk::MavlinkDirect::MessageHandle m_commandAckHandle;
     std::optional<PendingExternalCommand> m_pendingExternalCommand;
     quint64 m_externalCommandGeneration{};

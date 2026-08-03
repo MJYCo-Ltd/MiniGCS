@@ -67,7 +67,17 @@
     "returnToLaunch": "返航",
     "downloadMission": "下载任务",
     "uploadMission": "上传航线",
+    "startMission": "开始任务",
+    "pauseMission": "暂停任务",
     "default": "未知命令"
+  },
+  "missionPointAction": {
+    "continue": "继续前往下一点",
+    "wait": "停留等待",
+    "takePhoto": "拍摄一张照片",
+    "recordVideo": "录制视频",
+    "land": "在此降落",
+    "default": "继续前往下一点"
   },
   "gpsFixType": {
     "0": "无GPS连接",

@@ -60,7 +60,7 @@ ColumnLayout {
         }
     }
 
-    ComboBox {
+    Basic.ComboBox {
         id: groupSelector
         Layout.fillWidth: true
         textRole: "name"
@@ -143,7 +143,6 @@ ColumnLayout {
             text: qsTr("编组%1").arg(
                       DroneControl.commandName(DroneControl.takeoffCommand))
             Layout.fillWidth: true
-            highlighted: true
             enabled: root.selectedGroupName.length > 0
             onClicked: root.commandRequested(DroneControl.takeoffCommand)
         }
@@ -169,6 +168,16 @@ ColumnLayout {
             enabled: root.selectedGroupName.length > 0
             onClicked: root.commandRequested(
                            DroneControl.downloadMissionCommand)
+        }
+        Button {
+            text: qsTr("编组%1").arg(DroneControl.commandName(
+                      DroneControl.startMissionCommand))
+            Layout.columnSpan: 2
+            Layout.fillWidth: true
+            highlighted: true
+            enabled: root.selectedGroupName.length > 0
+            onClicked: root.commandRequested(
+                           DroneControl.startMissionCommand)
         }
     }
 }

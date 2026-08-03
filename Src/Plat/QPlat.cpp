@@ -42,6 +42,9 @@ bool QPlat::isConnected() const
 
 void QPlat::updateConnection(bool bConnected)
 {
+    if (m_bConnected == bConnected) {
+        return;
+    }
     m_bConnected = bConnected;
 
     if (m_bConnected) {

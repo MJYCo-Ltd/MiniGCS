@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Controls.Basic as Basic
 import QtQuick.Layouts
 import MiniGCS
 
@@ -207,7 +208,7 @@ Rectangle {
             Layout.fillHeight: true
             orientation: Qt.Horizontal
 
-            Frame {
+            Basic.Frame {
                 SplitView.preferredWidth: 330
                 SplitView.minimumWidth: 250
                 background: Rectangle { color: "white"; border.color: "#d0d5dd" }
@@ -271,7 +272,7 @@ Rectangle {
                 }
             }
 
-            Frame {
+            Basic.Frame {
                 SplitView.fillWidth: true
                 SplitView.minimumWidth: 360
                 background: Rectangle { color: "white"; border.color: "#d0d5dd" }
@@ -288,17 +289,17 @@ Rectangle {
                     Label { text: qsTr("名称"); font.bold: true }
                     TextField { id: nameField; Layout.fillWidth: true; placeholderText: qsTr("例如：飞控串口") }
                     Label { text: qsTr("链路类型"); font.bold: true }
-                    ComboBox { id: typeCombo; Layout.fillWidth: true; model: typeModel; textRole: "text"; valueRole: "value" }
+                    Basic.ComboBox { id: typeCombo; Layout.fillWidth: true; model: typeModel; textRole: "text"; valueRole: "value" }
 
                     Label { visible: typeCombo.currentValue === "Serial"; text: qsTr("串口"); font.bold: true }
                     RowLayout {
                         visible: typeCombo.currentValue === "Serial"
                         Layout.fillWidth: true
-                        ComboBox { id: portCombo; Layout.fillWidth: true; editable: true; model: root.portNames }
+                        Basic.ComboBox { id: portCombo; Layout.fillWidth: true; editable: true; model: root.portNames }
                         Button { text: qsTr("刷新"); onClicked: root.refreshSerialOptions() }
                     }
                     Label { visible: typeCombo.currentValue === "Serial"; text: qsTr("波特率"); font.bold: true }
-                    ComboBox { id: baudCombo; visible: typeCombo.currentValue === "Serial"; Layout.fillWidth: true; editable: true; model: root.baudRates }
+                    Basic.ComboBox { id: baudCombo; visible: typeCombo.currentValue === "Serial"; Layout.fillWidth: true; editable: true; model: root.baudRates }
 
                     Label {
                         visible: typeCombo.currentValue !== "Serial"
