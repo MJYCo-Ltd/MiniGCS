@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:        # 触发所有 push
-  pull_request:# 触发所有 PR
+  pull_request: # 触发所有 PR
 
 jobs:
   build:
