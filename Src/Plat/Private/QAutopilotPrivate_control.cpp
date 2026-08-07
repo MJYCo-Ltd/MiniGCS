@@ -250,6 +250,7 @@ void QAutopilotPrivate::startAirLine()
                     emit autopilot->airLineStartFailed(reason);
                     return;
                 }
+                autopilot->missionActiveUpdate(true);
                 emit autopilot->airLineStarted();
             },
             Qt::QueuedConnection);

@@ -37,6 +37,7 @@ class MINIGCS_EXPORT QAutopilot : public QPlat
     Q_PROPERTY(bool armed READ armed NOTIFY armedChanged)
     Q_PROPERTY(bool inAir READ inAir NOTIFY inAirChanged)
     Q_PROPERTY(FlightMode flightMode READ flightMode NOTIFY flightModeChanged)
+    Q_PROPERTY(bool missionActive READ missionActive NOTIFY missionActiveChanged)
     Q_PROPERTY(QString flightModeName READ flightModeName NOTIFY flightModeChanged)
     Q_PROPERTY(LandedState landedState READ landedState NOTIFY landedStateChanged)
     Q_PROPERTY(QString landedStateName READ landedStateName NOTIFY landedStateChanged)
@@ -132,6 +133,7 @@ public:
     bool armed() const { return m_armed; }
     bool inAir() const { return m_inAir; }
     FlightMode flightMode() const { return m_flightMode; }
+    bool missionActive() const { return m_missionActive; }
     QString flightModeName() const;
     LandedState landedState() const { return m_landedState; }
     QString landedStateName() const;
@@ -162,6 +164,7 @@ signals:
     void armedChanged(bool armed);
     void inAirChanged(bool inAir);
     void flightModeChanged();
+    void missionActiveChanged(bool active);
     void landedStateChanged();
     void rawGpsChanged(const QRawGps &rawGps);
     void fixedwingChanged(const QAutopilotFixedwing &fixedwing);
@@ -217,6 +220,7 @@ private slots:
     void fixedwingUpdate(float airspeedMS, float throttlePercentage, float climbRateMS,
                         float groundspeedMS, float headingDeg, float absoluteAltitudeM);
     void missionProgressUpdate(int current, int total);
+    void missionActiveUpdate(bool active);
 
 private:
     friend class QAutopilotPrivate;
@@ -258,6 +262,7 @@ private:
     quint64 m_airLineUploadRequestId{0};
     int m_missionCurrent{0};
     int m_missionTotal{0};
+    bool m_missionActive{false};
 };
 
 #endif // _YTY_QAUTOPILOT_H

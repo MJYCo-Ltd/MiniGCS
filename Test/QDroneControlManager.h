@@ -4,7 +4,6 @@
 #include <QHash>
 #include <QObject>
 #include <QPointer>
-#include <QStringList>
 #include <QVariantList>
 #include <QSet>
 #include "AirLine/QMissionPoint.h"
@@ -18,8 +17,6 @@ class QDroneControlManager : public QObject
     Q_OBJECT
     Q_PROPERTY(QVariantList drones READ drones NOTIFY dronesChanged)
     Q_PROPERTY(QVariantList groups READ groups NOTIFY groupsChanged)
-    Q_PROPERTY(QStringList businessLogs READ businessLogs NOTIFY businessLogsChanged)
-    Q_PROPERTY(QStringList firmwareLogs READ firmwareLogs NOTIFY firmwareLogsChanged)
     Q_PROPERTY(QVariantList flightRecords READ flightRecords NOTIFY flightRecordsChanged)
     Q_PROPERTY(int armCommand READ armCommand CONSTANT)
     Q_PROPERTY(int disarmCommand READ disarmCommand CONSTANT)
@@ -51,8 +48,6 @@ public:
 
     QVariantList drones() const;
     QVariantList groups() const;
-    QStringList businessLogs() const;
-    QStringList firmwareLogs() const;
     QVariantList flightRecords() const;
     int armCommand() const { return ArmCommand; }
     int disarmCommand() const { return DisarmCommand; }
@@ -84,16 +79,12 @@ public:
     Q_INVOKABLE bool uploadMissionGroup(
         const QString &groupName, const QVariantList &waypoints,
         bool returnHomeAfterMission = true);
-    Q_INVOKABLE void clearBusinessLogs();
-    Q_INVOKABLE void clearFirmwareLogs();
     Q_INVOKABLE void clearFlightRecords();
     Q_INVOKABLE bool applyConfiguredLinks();
 
 signals:
     void dronesChanged();
     void groupsChanged();
-    void businessLogsChanged();
-    void firmwareLogsChanged();
     void flightRecordsChanged();
     void commandDispatched(
         int command, const QString &target, int count);
@@ -117,8 +108,6 @@ private:
     QHash<int, QVariantList> m_uploadedMissionPoints;
     QSet<int> m_startMissionAfterArm;
     QFlightRecordStore *m_flightRecordStore{nullptr};
-    QStringList m_businessLogs;
-    QStringList m_firmwareLogs;
 };
 
 #endif // QDRONECONTROLMANAGER_H

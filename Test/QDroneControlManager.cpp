@@ -77,28 +77,6 @@ QDroneControlManager::QDroneControlManager(
             this, [this](QPlat *platform) {
                 registerPlatform(platform);
             });
-    connect(QGCSConfig::instance(), &QGCSConfig::warningLogMessage,
-            this, [this](int, const QString &message) {
-                m_businessLogs.append(message);
-                const qsizetype maximumVisibleLogCount =
-                    QTestGCSConfig::instance()->maximumVisibleLogCount();
-                if (m_businessLogs.size() > maximumVisibleLogCount) {
-                    m_businessLogs.remove(
-                        0, m_businessLogs.size() - maximumVisibleLogCount);
-                }
-                emit businessLogsChanged();
-            });
-    connect(QGCSConfig::instance(), &QGCSConfig::firmwareWarningMessage,
-            this, [this](quint32, const QString &message) {
-                m_firmwareLogs.append(message);
-                const qsizetype maximumVisibleLogCount =
-                    QTestGCSConfig::instance()->maximumVisibleLogCount();
-                if (m_firmwareLogs.size() > maximumVisibleLogCount) {
-                    m_firmwareLogs.remove(
-                        0, m_firmwareLogs.size() - maximumVisibleLogCount);
-                }
-                emit firmwareLogsChanged();
-            });
 }
 
 void QDroneControlManager::registerPlatform(QObject *platform)
@@ -269,16 +247,6 @@ QVariantList QDroneControlManager::groups() const
     return QTestGCSConfig::instance()->droneGroupList();
 }
 
-QStringList QDroneControlManager::businessLogs() const
-{
-    return m_businessLogs;
-}
-
-QStringList QDroneControlManager::firmwareLogs() const
-{
-    return m_firmwareLogs;
-}
-
 QString QDroneControlManager::commandKey(Command command) const
 {
     switch (command) {
@@ -376,24 +344,6 @@ QVariantList QDroneControlManager::missionActions() const
     return result;
 }
 
-void QDroneControlManager::clearBusinessLogs()
-{
-    if (m_businessLogs.isEmpty()) {
-        return;
-    }
-    m_businessLogs.clear();
-    emit businessLogsChanged();
-}
-
-void QDroneControlManager::clearFirmwareLogs()
-{
-    if (m_firmwareLogs.isEmpty()) {
-        return;
-    }
-    m_firmwareLogs.clear();
-    emit firmwareLogsChanged();
-}
-
 void QDroneControlManager::clearFlightRecords()
 {
     if (m_flightRecordStore)
@@ -450,9 +400,6 @@ bool QDroneControlManager::applyConfiguredLinks()
         }
     }
 
-    m_businessLogs.append(
-        tr("已应用 %1 条链路配置并重新连接").arg(parsedLinks.size()));
-    emit businessLogsChanged();
     return true;
 }
 

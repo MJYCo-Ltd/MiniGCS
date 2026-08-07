@@ -87,7 +87,7 @@ Rectangle {
                     rowSpacing: 12
 
                     Label { text: qsTr("地图插件"); font.bold: true }
-                    Basic.ComboBox {
+                    AppComboBox {
                         id: mapProvider
                         Layout.fillWidth: true
                         editable: true

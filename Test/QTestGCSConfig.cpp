@@ -4,8 +4,6 @@
 
 namespace {
 const char *KEY_LINK_DEFAULT_BAUD_RATE = "Link/DefaultBaudRate";
-const char *KEY_LOGGING_MAXIMUM_VISIBLE_COUNT =
-    "Logging/MaximumVisibleCount";
 const char *KEY_MAP_NAME = "Map/Name";
 const char *KEY_MAP_CENTER_LATITUDE = "Map/CenterLatitude";
 const char *KEY_MAP_CENTER_LONGITUDE = "Map/CenterLongitude";
@@ -51,7 +49,6 @@ bool linkMapContains(const QVariantMap &config,
 }
 
 constexpr int DEFAULT_LINK_BAUD_RATE = 115200;
-constexpr int DEFAULT_MAXIMUM_VISIBLE_LOG_COUNT = 500;
 const char *DEFAULT_MAP_NAME = "QGroundControl";
 constexpr double DEFAULT_MAP_CENTER_LATITUDE = 38.045474;
 constexpr double DEFAULT_MAP_CENTER_LONGITUDE = 114.502461;
@@ -112,29 +109,11 @@ int QTestGCSConfig::defaultBaudRate() const
         .toInt();
 }
 
-int QTestGCSConfig::maximumVisibleLogCount() const
-{
-    if (!m_settings) {
-        return DEFAULT_MAXIMUM_VISIBLE_LOG_COUNT;
-    }
-    return qMax(
-        1, m_settings
-               ->value(KEY_LOGGING_MAXIMUM_VISIBLE_COUNT,
-                       DEFAULT_MAXIMUM_VISIBLE_LOG_COUNT)
-               .toInt());
-}
-
 QString QTestGCSConfig::mapName() const
 {
     if (!m_settings)
         return QString(DEFAULT_MAP_NAME);
     return m_settings->value(KEY_MAP_NAME, DEFAULT_MAP_NAME).toString();
-}
-
-void QTestGCSConfig::setMapName(const QString &mapName)
-{
-    if (m_settings)
-        m_settings->setValue(KEY_MAP_NAME, mapName);
 }
 
 void QTestGCSConfig::release()
@@ -610,10 +589,6 @@ void QTestGCSConfig::initializeDefaults()
     if (!m_settings->contains(KEY_LINK_DEFAULT_BAUD_RATE)) {
         m_settings->setValue(KEY_LINK_DEFAULT_BAUD_RATE,
                              DEFAULT_LINK_BAUD_RATE);
-    }
-    if (!m_settings->contains(KEY_LOGGING_MAXIMUM_VISIBLE_COUNT)) {
-        m_settings->setValue(KEY_LOGGING_MAXIMUM_VISIBLE_COUNT,
-                             DEFAULT_MAXIMUM_VISIBLE_LOG_COUNT);
     }
     const QString configuredMapName =
         m_settings->value(KEY_MAP_NAME).toString().trimmed();

@@ -14,6 +14,22 @@ QAutopilot::QAutopilot(QObject *parent)
     qRegisterMetaType<QAutopilot::FlightMode>("QAutopilot::FlightMode");
     qRegisterMetaType<QAutopilot::LandedState>("QAutopilot::LandedState");
     qRegisterMetaType<QList<QMissionPoint>>("QList<QMissionPoint>");
+    connect(this, &QPlat::connectionStatusChanged, this,
+            [this](bool connected) {
+                if (!connected) {
+                    missionActiveUpdate(false);
+                }
+            });
+    connect(this, &QAutopilot::actionCommandFinished, this,
+            [this](ActionCommand command, bool success, const QString &) {
+                if (!success) {
+                    return;
+                }
+                if (command == DisarmAction || command == LandAction ||
+                    command == ReturnToLaunchAction) {
+                    missionActiveUpdate(false);
+                }
+            });
 }
 
 QAutopilot::~QAutopilot() {}
@@ -476,6 +492,13 @@ void QAutopilot::flightModeUpdate(QAutopilot::FlightMode flightMode,
     }
     m_flightMode = flightMode;
     m_flightModeFallbackName = fallbackName;
+    if (flightMode == FlightModeMission) {
+        missionActiveUpdate(true);
+    } else if (flightMode == FlightModeReturnToLaunch ||
+               flightMode == FlightModeLand ||
+               flightMode == FlightModeReady) {
+        missionActiveUpdate(false);
+    }
     emit flightModeChanged();
 }
 
@@ -654,9 +677,24 @@ void QAutopilot::pauseAirLine()
 void QAutopilot::missionProgressUpdate(int current, int total)
 {
     if (m_missionCurrent == current && m_missionTotal == total) {
+        if (total > 0 && current >= total) {
+            missionActiveUpdate(false);
+        }
         return;
     }
     m_missionCurrent = current;
     m_missionTotal = total;
     emit missionProgressChanged();
+    if (total > 0 && current >= total) {
+        missionActiveUpdate(false);
+    }
+}
+
+void QAutopilot::missionActiveUpdate(bool active)
+{
+    if (m_missionActive == active) {
+        return;
+    }
+    m_missionActive = active;
+    emit missionActiveChanged(active);
 }
