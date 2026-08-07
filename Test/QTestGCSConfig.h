@@ -50,11 +50,8 @@ public:
     Q_INVOKABLE QStringList standardBaudRates() const;
     /** 串口默认波特率（新建链路 / QML 回落） */
     Q_INVOKABLE int defaultBaudRate() const;
-    /** 业务/固件日志面板最大可见条数 */
-    Q_INVOKABLE int maximumVisibleLogCount() const;
 
     Q_INVOKABLE QString mapName() const;
-    Q_INVOKABLE void setMapName(const QString &mapName);
     Q_INVOKABLE double mapCenterLatitude() const;
     Q_INVOKABLE double mapCenterLongitude() const;
     Q_INVOKABLE double mapInitialZoom() const;

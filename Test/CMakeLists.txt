@@ -48,6 +48,7 @@ qt_add_executable(${PROJECT_NAME}
 qt_add_qml_module(${PROJECT_NAME}
     URI MiniGCS
     QML_FILES
+        qml/AppComboBox.qml
         qml/CommandConfirmDialog.qml
         qml/DroneControlPanel.qml
         qml/DroneMap.qml
@@ -55,7 +56,6 @@ qt_add_qml_module(${PROJECT_NAME}
         qml/FlightRecordPage.qml
         qml/GroupDroneControl.qml
         qml/LinkConfigPage.qml
-        qml/LogPanel.qml
         qml/Main.qml
         qml/MapConfigPage.qml
         qml/MissionStatusPanel.qml

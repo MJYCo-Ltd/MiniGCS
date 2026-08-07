@@ -61,7 +61,7 @@ ColumnLayout {
         }
     }
 
-    Basic.ComboBox {
+    AppComboBox {
         id: groupSelector
         Layout.fillWidth: true
         textRole: "name"

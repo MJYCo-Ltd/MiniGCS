@@ -8,22 +8,15 @@ Rectangle {
     id: root
 
     property int selectedDroneId: -1
-    property var selectedEntry: findDrone(selectedDroneId)
+    property var selectedEntry: findDrone(selectedDroneId, DroneControl.drones)
     property var vehicle: selectedEntry ? selectedEntry.vehicle : null
-    property bool returnHomeAfterMission: true
     property int plannedPointCount: 0
     property string currentTargetName: qsTr("等待任务开始")
-    property string statusText: qsTr("请选择一架无人机开始规划任务")
 
-    signal droneSelected(int systemId)
-    signal locateRequested(int systemId)
     signal pauseRequested()
     signal returnHomeRequested()
-    signal statusRequested()
-    signal advancedRequested()
 
-    function findDrone(systemId) {
-        const drones = DroneControl.drones
+    function findDrone(systemId, drones) {
         for (let index = 0; index < drones.length; ++index) {
             if (Number(drones[index].systemId) === Number(systemId))
                 return drones[index]
@@ -53,7 +46,7 @@ Rectangle {
     function flightStateText() {
         if (!vehicle)
             return qsTr("未选择")
-        if (!vehicle.connected)
+        if (!selectedEntry.connected)
             return qsTr("离线")
         if (vehicle.inAir)
             return vehicle.moving ? qsTr("飞行中") : qsTr("空中等待")
@@ -71,6 +64,31 @@ Rectangle {
         const distance = current.distanceTo(home)
         return isFinite(distance) ? qsTr("%1 米").arg(distance.toFixed(0))
                                   : qsTr("--")
+    }
+
+    function missionTotalCount() {
+        if (!vehicle)
+            return plannedPointCount
+        const total = Number(vehicle.missionTotal)
+        return isFinite(total) && total > 0 ? total : plannedPointCount
+    }
+
+    function missionDisplayCurrent() {
+        if (!vehicle)
+            return 0
+        const total = missionTotalCount()
+        const current = Number(vehicle.missionCurrent)
+        if (!isFinite(current) || total <= 0)
+            return 0
+        const normalized = Math.max(0, Math.min(total, current))
+        return vehicle.missionActive && normalized < total
+                ? normalized + 1 : normalized
+    }
+
+    function missionTargetText() {
+        const current = missionDisplayCurrent()
+        return vehicle && vehicle.missionActive && current > 0
+                ? qsTr("任务点 %1").arg(current) : currentTargetName
     }
 
     color: "#ffffff"
@@ -100,13 +118,14 @@ Rectangle {
                         font.bold: true
                     }
                     Label {
-                        text: qsTr("正在前往：%1").arg(root.currentTargetName)
+                        text: qsTr("正在前往：%1").arg(
+                                  root.missionTargetText())
                         color: "#344054"
                     }
                 }
                 Label {
                     text: "●  " + root.flightStateText()
-                    color: root.vehicle && root.vehicle.connected
+                    color: root.selectedEntry && root.selectedEntry.connected
                            ? "#16815b" : "#b42318"
                 }
             }
@@ -115,21 +134,17 @@ Rectangle {
                 Layout.fillWidth: true
                 Label { text: qsTr("任务进度"); color: "#344054"; Layout.fillWidth: true }
                 Label {
-                    text: root.vehicle && root.vehicle.missionTotal > 0
-                          ? qsTr("%1 / %2")
-                              .arg(root.vehicle.missionCurrent)
-                              .arg(root.vehicle.missionTotal)
-                          : qsTr("0 / %1").arg(root.plannedPointCount)
+                    text: qsTr("%1 / %2")
+                          .arg(root.missionDisplayCurrent())
+                          .arg(root.missionTotalCount())
                     color: "#17202a"
                 }
             }
             ProgressBar {
                 Layout.fillWidth: true
                 from: 0
-                to: Math.max(1, root.vehicle && root.vehicle.missionTotal > 0
-                                ? root.vehicle.missionTotal
-                                : root.plannedPointCount)
-                value: root.vehicle ? root.vehicle.missionCurrent : 0
+                to: Math.max(1, root.missionTotalCount())
+                value: root.missionDisplayCurrent()
             }
 
             Repeater {
@@ -196,7 +211,7 @@ Rectangle {
                 text: qsTr("立即返回家点")
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                enabled: root.vehicle && root.vehicle.connected
+                enabled: root.selectedEntry && root.selectedEntry.connected
                 onClicked: root.returnHomeRequested()
 
                 background: Rectangle {

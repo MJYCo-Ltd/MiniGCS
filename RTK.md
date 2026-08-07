@@ -83,11 +83,15 @@ QML/Test UI -> Test 控制层 -> MiniGCS 公共 API -> Private/MAVSDK
 - 按功能拆分 QML，当前职责如下：
   - `DroneMap.qml`：地图、无人机标记、航线和航点显示。
   - `RouteEditor.qml`：航点编辑、航线数据和上传请求。
-  - `LogPanel.qml`：业务日志与固件日志。
+  - `AppComboBox.qml`：统一下拉高亮对比度的 ComboBox。
   - `SingleDroneControl.qml`：单机选择、状态和控制。
   - `GroupDroneControl.qml`：编组维护和编组控制。
   - `DroneControlPanel.qml`：单机/编组控制区域的组合。
   - `CommandConfirmDialog.qml`：危险控制命令确认。
+  - `MissionStatusPanel.qml`：任务进度与暂停/返航快捷操作。
+  - `FlightRecordPage.qml`：飞行记录查看。
+  - `LinkConfigPage.qml` / `MapConfigPage.qml`：链路与地图设置。
+  - `DroneStatusPage.qml`：单机详细状态。
 - 新功能优先创建或扩展对应组件；不要继续把实现堆入 `Main.qml`。
 - 组件通过属性和信号通信，不跨组件直接访问内部控件 ID。
 - 新增 QML 文件后必须加入 `Test/CMakeLists.txt` 的 `QML_FILES`。
@@ -140,13 +144,11 @@ QML/Test UI -> Test 控制层 -> MiniGCS 公共 API -> Private/MAVSDK
 
 ## 8. 日志规则
 
-- 日志窗口只展示 warning 及以上信息，并区分：
-  - 业务日志：Qt/C++ 业务层 warning 及以上信息。
-  - 固件日志：飞控固件 warning 及以上信息。
-- 固件日志不得再次进入业务日志造成重复显示。
+- 文件日志继续由 spdlog 管理（经 `QGCSConfig` 接管 Qt 日志）。
+- 业务 warning 及以上与固件 warning 及以上通过 `QGCSConfig` 信号区分转发；固件日志不得再次进入业务日志造成重复。
 - 固件日志级别判断使用具名常量或枚举，不在判断和 `switch` 中散落数字。
-- 日志列表必须限制内存中的最大条数；文件日志继续由 spdlog 管理。
 - 日志回调不得阻塞 MAVSDK 或 UI 线程。
+- Test 演示工程不再维护内存日志面板；告警以文件日志与控制台为准。
 
 ## 9. 生命周期与线程安全
 

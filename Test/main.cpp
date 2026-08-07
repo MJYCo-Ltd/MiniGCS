@@ -8,7 +8,6 @@
 #include "QTestGCSConfig.h"
 #include "QDroneControlManager.h"
 #include "QGroundControlStation.h"
-#include "Plat/QAutoVehicleType.h"
 #include "Plat/QPlat.h"
 
 static LinkKind linkKindFromString(const QString &type)
@@ -60,7 +59,6 @@ static void addLinksFromConfig(QGroundControlStation *pGroundStation)
         QDataLink *link = linkManager->addLink(kind, params);
         if (link) {
             qDebug() << "链路添加成功:" << typeStr;
-            // 可设置重连: link->setReconnectCount(5); link->setAutoReconnect(true);
         }
     }
 }
@@ -107,12 +105,6 @@ int main(int argc, char *argv[]) {
                          qWarning() << "链路创建失败:" << reason;
                      });
 
-    qmlRegisterType<QGroundControlStation>("MiniGCS", 1, 0, "GroundControlStation");
-    qmlRegisterType<QPlat>("MiniGCS", 1, 0, "Plat");
-    qmlRegisterUncreatableMetaObject(
-        QAutoVehicleType::staticMetaObject,
-        "MiniGCS", 1, 0, "AutoVehicleType",
-        "AutoVehicleType only provides vehicle and autopilot enums");
     auto *droneControl =
         new QDroneControlManager(pGroundStation, &app);
     qmlRegisterSingletonInstance(

@@ -11,9 +11,6 @@ Rectangle {
     id: root
 
     property bool editing: false
-    property int selectedDroneId: -1
-    property string selectedGroupName: ""
-    property string selectedTargetName: ""
     property bool returnHomeAfterMission: true
     property int selectedWaypointIndex: -1
     property var actionChoices: DroneControl.missionActions()
@@ -70,12 +67,6 @@ Rectangle {
         routeModel.remove(index)
         selectedWaypointIndex = routeModel.count === 0
                 ? -1 : Math.min(index, routeModel.count - 1)
-        refreshRoutePath()
-    }
-
-    function clearRoute() {
-        routeModel.clear()
-        selectedWaypointIndex = -1
         refreshRoutePath()
     }
 
@@ -277,7 +268,7 @@ Rectangle {
 
                         RowLayout {
                             Layout.fillWidth: true
-                            Basic.ComboBox {
+                            AppComboBox {
                                 id: actionSelector
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 30

@@ -15,6 +15,13 @@ ApplicationWindow {
     visible: true
     title: qsTr("MiniGCS 任务控制")
 
+    // Windows 系统 palette 下 ComboBox/Menu 高亮项常为白字+浅底，导致选中项不可见。
+    palette.highlight: "#dbeafe"
+    palette.highlightedText: "#101828"
+    palette.windowText: "#101828"
+    palette.text: "#101828"
+    palette.buttonText: "#101828"
+
     property int selectedDroneId: -1
     property string selectedGroupName: ""
     property int pendingCommand: -1
@@ -50,7 +57,6 @@ ApplicationWindow {
     }
 
     function setUserStatus(text) {
-        missionStatus.statusText = text
         advancedControlPanel.setStatus(text)
     }
 
@@ -178,10 +184,6 @@ ApplicationWindow {
                 SplitView.preferredWidth: 330
                 SplitView.minimumWidth: 285
                 SplitView.maximumWidth: 440
-                selectedDroneId: root.selectedDroneId
-                selectedGroupName: root.selectedGroupName
-                selectedTargetName: root.selectedDroneName()
-
             }
 
             Rectangle {
@@ -306,7 +308,6 @@ ApplicationWindow {
             Layout.fillWidth: true
             Layout.preferredHeight: 310
             selectedDroneId: root.selectedDroneId
-            returnHomeAfterMission: routeEditor.returnHomeAfterMission
             plannedPointCount: routeEditor.waypointModel.count
             currentTargetName: routeEditor.currentTaskName
 

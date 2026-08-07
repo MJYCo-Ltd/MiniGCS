@@ -289,17 +289,17 @@ Rectangle {
                     Label { text: qsTr("名称"); font.bold: true }
                     TextField { id: nameField; Layout.fillWidth: true; placeholderText: qsTr("例如：飞控串口") }
                     Label { text: qsTr("链路类型"); font.bold: true }
-                    Basic.ComboBox { id: typeCombo; Layout.fillWidth: true; model: typeModel; textRole: "text"; valueRole: "value" }
+                    AppComboBox { id: typeCombo; Layout.fillWidth: true; model: typeModel; textRole: "text"; valueRole: "value" }
 
                     Label { visible: typeCombo.currentValue === "Serial"; text: qsTr("串口"); font.bold: true }
                     RowLayout {
                         visible: typeCombo.currentValue === "Serial"
                         Layout.fillWidth: true
-                        Basic.ComboBox { id: portCombo; Layout.fillWidth: true; editable: true; model: root.portNames }
+                        AppComboBox { id: portCombo; Layout.fillWidth: true; editable: true; model: root.portNames }
                         Button { text: qsTr("刷新"); onClicked: root.refreshSerialOptions() }
                     }
                     Label { visible: typeCombo.currentValue === "Serial"; text: qsTr("波特率"); font.bold: true }
-                    Basic.ComboBox { id: baudCombo; visible: typeCombo.currentValue === "Serial"; Layout.fillWidth: true; editable: true; model: root.baudRates }
+                    AppComboBox { id: baudCombo; visible: typeCombo.currentValue === "Serial"; Layout.fillWidth: true; editable: true; model: root.baudRates }
 
                     Label {
                         visible: typeCombo.currentValue !== "Serial"
